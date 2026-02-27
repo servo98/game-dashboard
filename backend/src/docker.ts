@@ -125,6 +125,17 @@ export async function startGameContainer(
   // Build volume bindings: host_path -> container_path
   const binds = Object.entries(volumes).map(([host, container]) => `${host}:${container}`);
 
+  // Pull image if not present locally
+  await new Promise<void>((resolve, reject) => {
+    docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+      if (err) return reject(err);
+      docker.modem.followProgress(stream, (err: Error | null) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  });
+
   const container = await docker.createContainer({
     name: containerName,
     Image: image,

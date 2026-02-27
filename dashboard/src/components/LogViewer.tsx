@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createLogStream } from "../api";
 
 type Props = {
@@ -6,11 +6,22 @@ type Props = {
   onClose: () => void;
 };
 
+const MAX_LINES = 500;
+
 export default function LogViewer({ serverId, onClose }: Props) {
   const [lines, setLines] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
+  const autoScroll = useRef(true);
+
+  // Track whether user has scrolled up (disable auto-scroll)
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    autoScroll.current = atBottom;
+  }, []);
 
   useEffect(() => {
     const es = createLogStream(serverId);
@@ -20,7 +31,15 @@ export default function LogViewer({ serverId, onClose }: Props) {
 
     es.onmessage = (e) => {
       const text = JSON.parse(e.data as string) as string;
-      setLines((prev) => [...prev.slice(-500), text]); // Keep last 500 lines
+      setLines((prev) => {
+        if (prev.length >= MAX_LINES) {
+          const next = prev.slice(-Math.floor(MAX_LINES * 0.75));
+          next.push(text);
+          return next;
+        }
+        prev.push(text);
+        return [...prev];
+      });
     };
 
     es.onerror = () => {
@@ -32,9 +51,11 @@ export default function LogViewer({ serverId, onClose }: Props) {
     };
   }, [serverId]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom (instant, not smooth)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll.current && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   }, [lines]);
 
   return (
@@ -61,17 +82,18 @@ export default function LogViewer({ serverId, onClose }: Props) {
         </div>
 
         {/* Log output */}
-        <div className="flex-1 overflow-y-auto p-4 font-mono text-xs text-green-400 leading-relaxed">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4 font-mono text-xs text-green-400 leading-relaxed"
+        >
           {lines.length === 0 ? (
             <p className="text-gray-600">Waiting for log output...</p>
           ) : (
-            lines.map((line, i) => (
-              <div key={i} className="whitespace-pre-wrap break-all">
-                {line}
-              </div>
-            ))
+            <pre className="whitespace-pre-wrap break-all m-0">
+              {lines.join("\n")}
+            </pre>
           )}
-          <div ref={bottomRef} />
         </div>
       </div>
     </div>

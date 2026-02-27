@@ -31,10 +31,12 @@ export default function Home() {
     try {
       const list = await api.listServers();
       setServers(list);
+      setError(null);
     } catch {
-      setError("Failed to load servers");
+      // Only show if we have no data yet (first load)
+      if (servers.length === 0) setError("Failed to load servers");
     }
-  }, []);
+  }, [servers.length]);
 
   useEffect(() => {
     fetchServers();
