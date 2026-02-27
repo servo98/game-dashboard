@@ -11,18 +11,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # needed for paths-filter
+          fetch-depth: 2
 
-      - name: Detect changed paths
+      - name: Detectar cambios
         id: changed
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            backend:
+              - 'backend/**'
+              - 'games/**'
+              - 'docker-compose.yml'
+            dashboard:
+              - 'dashboard/**'
+              - 'docker-compose.yml'
+            bot:
+              - 'bot/**'
+              - 'docker-compose.yml'
             commands:
               - 'bot/src/commands/**'
               - 'bot/src/register.ts'
+            nginx:
+              - 'nginx/nginx.conf'
+            static:
+              - 'static-site/**'
+            games:
+              - 'games/**'
 
-      - name: Deploy to server
+      - name: Rebuild backend
+        if: steps.changed.outputs.backend == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel && git pull origin main
+            docker compose up -d --build backend
+
+      - name: Reseed DB (si cambiaron games/)
+        if: steps.changed.outputs.games == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -30,11 +58,31 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/game-panel
-            git pull origin main
-            docker compose up -d --build
-            docker compose ps
+            docker compose exec backend bun run src/seed.ts
 
-      - name: Register slash commands (solo si cambiaron)
+      - name: Rebuild dashboard
+        if: steps.changed.outputs.dashboard == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel && git pull origin main
+            docker compose up -d --build dashboard
+
+      - name: Rebuild bot
+        if: steps.changed.outputs.bot == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel && git pull origin main
+            docker compose up -d --build bot
+
+      - name: Registrar slash commands
         if: steps.changed.outputs.commands == 'true'
         uses: appleboy/ssh-action@v1
         with:
@@ -44,3 +92,25 @@ jobs:
           script: |
             cd /root/game-panel
             docker compose run --rm bot bun run src/register.ts
+
+      - name: Recargar nginx (sin rebuild)
+        if: steps.changed.outputs.nginx == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel && git pull origin main
+            docker compose exec nginx nginx -s reload
+
+      - name: Actualizar sitio estático
+        if: steps.changed.outputs.static == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel && git pull origin main
+            echo "static-site actualizado (nginx lo sirve directo)"
