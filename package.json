@@ -1,0 +1,11 @@
+{
+  "name": "game-panel",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["backend", "dashboard", "bot"],
+  "scripts": {
+    "dev:backend": "bun run --cwd backend dev",
+    "dev:dashboard": "bun run --cwd dashboard dev",
+    "dev:bot": "bun run --cwd bot dev"
+  }
+}

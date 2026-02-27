@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # needed for paths-filter
+
+      - name: Detect changed paths
+        id: changed
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            commands:
+              - 'bot/src/commands/**'
+              - 'bot/src/register.ts'
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel
+            git pull origin main
+            docker compose up -d --build
+            docker compose ps
+
+      - name: Register slash commands (solo si cambiaron)
+        if: steps.changed.outputs.commands == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/game-panel
+            docker compose run --rm bot bun run src/register.ts

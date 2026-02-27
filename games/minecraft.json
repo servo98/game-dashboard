@@ -1,0 +1,20 @@
+{
+  "id": "minecraft",
+  "name": "Minecraft Java",
+  "game_type": "minecraft",
+  "docker_image": "itzg/minecraft-server:latest",
+  "port": 25565,
+  "env_vars": {
+    "EULA": "TRUE",
+    "MEMORY": "2G",
+    "TYPE": "VANILLA",
+    "VERSION": "LATEST",
+    "ONLINE_MODE": "TRUE",
+    "MAX_PLAYERS": "10",
+    "DIFFICULTY": "normal",
+    "MOTD": "Game Panel - Minecraft Server"
+  },
+  "volumes": {
+    "/data/minecraft": "/data"
+  }
+}

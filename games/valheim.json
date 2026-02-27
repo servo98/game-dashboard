@@ -1,0 +1,21 @@
+{
+  "id": "valheim",
+  "name": "Valheim",
+  "game_type": "valheim",
+  "docker_image": "lloesche/valheim-server:latest",
+  "port": 2456,
+  "env_vars": {
+    "SERVER_NAME": "Game Panel - Valheim",
+    "WORLD_NAME": "Dedicated",
+    "SERVER_PASS": "${VALHEIM_SERVER_PASS}",
+    "SERVER_PUBLIC": "1",
+    "UPDATE_ON_START": "1",
+    "BACKUPS": "1",
+    "BACKUPS_INTERVAL": "3600",
+    "BACKUPS_MAX_AGE": "3"
+  },
+  "volumes": {
+    "/data/valheim": "/config",
+    "/data/valheim-data": "/opt/valheim"
+  }
+}
