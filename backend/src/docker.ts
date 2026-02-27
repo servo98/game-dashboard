@@ -20,8 +20,11 @@ export async function ensureNetwork() {
 /** Return the currently running game container (if any) */
 export async function getActiveContainer(): Promise<{ id: string; name: string } | null> {
   const containers = await docker.listContainers({ all: false });
+  // Filter to game containers only — exclude Compose-managed services
+  // (Compose containers have the "com.docker.compose.service" label)
   const active = containers.find((c) =>
-    c.Names.some((n) => n.startsWith(`/${CONTAINER_PREFIX}`))
+    c.Names.some((n) => n.startsWith(`/${CONTAINER_PREFIX}`)) &&
+    !c.Labels["com.docker.compose.service"]
   );
   if (!active) return null;
   const serverId = active.Names[0].replace(`/${CONTAINER_PREFIX}`, "");
