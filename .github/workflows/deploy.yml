@@ -3,6 +3,18 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Servicio a deployar manualmente'
+        required: true
+        type: choice
+        options:
+          - all
+          - backend
+          - dashboard
+          - bot
+          - nginx
 
 jobs:
   deploy:
@@ -13,8 +25,9 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detectar cambios
+      - name: Detectar cambios (solo en push automático)
         id: changed
+        if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
         with:
           filters: |
@@ -39,7 +52,9 @@ jobs:
               - 'games/**'
 
       - name: Rebuild backend
-        if: steps.changed.outputs.backend == 'true'
+        if: |
+          (github.event_name == 'push' && steps.changed.outputs.backend == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.service == 'backend' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -53,7 +68,9 @@ jobs:
             docker compose up -d --build backend
 
       - name: Reseed DB (si cambiaron games/)
-        if: steps.changed.outputs.games == 'true'
+        if: |
+          (github.event_name == 'push' && steps.changed.outputs.games == 'true') ||
+          (github.event_name == 'workflow_dispatch' && inputs.service == 'all')
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -65,7 +82,9 @@ jobs:
             docker compose exec backend bun run src/seed.ts
 
       - name: Rebuild dashboard
-        if: steps.changed.outputs.dashboard == 'true'
+        if: |
+          (github.event_name == 'push' && steps.changed.outputs.dashboard == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.service == 'dashboard' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -79,7 +98,9 @@ jobs:
             docker compose up -d --build dashboard
 
       - name: Rebuild bot
-        if: steps.changed.outputs.bot == 'true'
+        if: |
+          (github.event_name == 'push' && steps.changed.outputs.bot == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.service == 'bot' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -93,7 +114,7 @@ jobs:
             docker compose up -d --build bot
 
       - name: Registrar slash commands
-        if: steps.changed.outputs.commands == 'true'
+        if: github.event_name == 'push' && steps.changed.outputs.commands == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -105,7 +126,9 @@ jobs:
             docker compose run --rm bot bun run src/register.ts
 
       - name: Recargar nginx (sin rebuild)
-        if: steps.changed.outputs.nginx == 'true'
+        if: |
+          (github.event_name == 'push' && steps.changed.outputs.nginx == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.service == 'nginx' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -119,7 +142,7 @@ jobs:
             docker compose exec nginx nginx -s reload
 
       - name: Actualizar sitio estático
-        if: steps.changed.outputs.static == 'true'
+        if: github.event_name == 'push' && steps.changed.outputs.static == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
