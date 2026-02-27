@@ -85,12 +85,12 @@ export default function LogViewer({ serverId, onClose }: Props) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-4 font-mono text-xs text-green-400 leading-relaxed"
+          className="flex-1 overflow-y-auto p-4 font-mono text-xs text-green-400 leading-tight contain-layout"
         >
           {lines.length === 0 ? (
             <p className="text-gray-600">Waiting for log output...</p>
           ) : (
-            <pre className="whitespace-pre-wrap break-all m-0">
+            <pre className="whitespace-pre-wrap break-all m-0 leading-tight">
               {lines.join("\n")}
             </pre>
           )}
