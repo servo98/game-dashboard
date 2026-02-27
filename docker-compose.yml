@@ -12,7 +12,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static-site:/var/www/aypapol:ro   # sitio estático aypapol.com
+      - ./static-site:/var/www/aypapol:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # certificados SSL
     depends_on:
       - backend
       - dashboard
