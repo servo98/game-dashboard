@@ -46,7 +46,10 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/game-panel && git pull origin main
+            set -e
+            cd /root/game-panel
+            git fetch origin main
+            git reset --hard origin/main
             docker compose up -d --build backend
 
       - name: Reseed DB (si cambiaron games/)
@@ -57,6 +60,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /root/game-panel
             docker compose exec backend bun run src/seed.ts
 
@@ -68,7 +72,10 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/game-panel && git pull origin main
+            set -e
+            cd /root/game-panel
+            git fetch origin main
+            git reset --hard origin/main
             docker compose up -d --build dashboard
 
       - name: Rebuild bot
@@ -79,7 +86,10 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/game-panel && git pull origin main
+            set -e
+            cd /root/game-panel
+            git fetch origin main
+            git reset --hard origin/main
             docker compose up -d --build bot
 
       - name: Registrar slash commands
@@ -90,6 +100,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /root/game-panel
             docker compose run --rm bot bun run src/register.ts
 
@@ -101,7 +112,10 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/game-panel && git pull origin main
+            set -e
+            cd /root/game-panel
+            git fetch origin main
+            git reset --hard origin/main
             docker compose exec nginx nginx -s reload
 
       - name: Actualizar sitio estático
@@ -112,5 +126,8 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /root/game-panel && git pull origin main
+            set -e
+            cd /root/game-panel
+            git fetch origin main
+            git reset --hard origin/main
             echo "static-site actualizado (nginx lo sirve directo)"
