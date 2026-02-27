@@ -65,7 +65,8 @@ jobs:
             cd /root/game-panel
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build backend
+            docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
+            docker compose up -d backend
 
       - name: Reseed DB (si cambiaron games/)
         if: |
@@ -95,7 +96,8 @@ jobs:
             cd /root/game-panel
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build dashboard
+            docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
+            docker compose up -d dashboard
 
       - name: Rebuild bot
         if: |
@@ -111,7 +113,8 @@ jobs:
             cd /root/game-panel
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build bot
+            docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
+            docker compose up -d bot
 
       - name: Registrar slash commands
         if: github.event_name == 'push' && steps.changed.outputs.commands == 'true'

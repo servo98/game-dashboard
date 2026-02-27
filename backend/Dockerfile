@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
 
-# Copy source
+ARG CACHE_BUST
 COPY src/ ./src/
 
 # Seed script runs at startup via entrypoint
