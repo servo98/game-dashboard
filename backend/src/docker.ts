@@ -214,14 +214,13 @@ export async function* streamContainerLogs(
     while (offset < chunk.length) {
       if (chunk.length - offset < 8) break;
       const size = chunk.readUInt32BE(offset + 4);
-      const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8");
-      // Docker prepends ISO timestamp: "2026-02-27T23:36:23.321Z <message>\n"
+      const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8").trimEnd();
+      // Docker prepends ISO timestamp: "2026-02-27T23:36:23.321Z <message>"
       // Format as: [HH:MM:SS] <message>
       const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))\.\d+Z\s?/);
-      const text = tsMatch
-        ? `[${tsMatch[2]}] ${raw.slice(tsMatch[0].length)}`
-        : raw;
-      yield text;
+      const msg = tsMatch ? raw.slice(tsMatch[0].length) : raw;
+      const ts = tsMatch ? `[${tsMatch[2]}]` : "";
+      yield ts ? `${ts} ${msg}` : msg;
       offset += 8 + size;
     }
   }
