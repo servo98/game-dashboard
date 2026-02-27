@@ -19,6 +19,31 @@ for (const cmd of [start, stop, status]) {
   commands.set(cmd.data.name, cmd as Command);
 }
 
+// --- Bot settings cache ---
+
+let cachedAllowedChannelId: string | null | undefined = undefined; // undefined = not yet loaded
+let lastSettingsFetch = 0;
+
+async function getAllowedChannelId(): Promise<string | null> {
+  const now = Date.now();
+  if (cachedAllowedChannelId !== undefined && now - lastSettingsFetch < 60_000) {
+    return cachedAllowedChannelId;
+  }
+  try {
+    const res = await fetch(`${process.env.BACKEND_URL}/api/bot/settings`, {
+      headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
+    });
+    const data = (await res.json()) as { allowed_channel_id: string | null };
+    cachedAllowedChannelId = data.allowed_channel_id;
+    lastSettingsFetch = now;
+  } catch {
+    // Keep stale cache on network errors
+  }
+  return cachedAllowedChannelId ?? null;
+}
+
+// --- Discord client ---
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once("ready", (c) => {
@@ -27,6 +52,16 @@ client.once("ready", (c) => {
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+
+  // Channel guard
+  const allowedChannelId = await getAllowedChannelId();
+  if (allowedChannelId && interaction.channelId !== allowedChannelId) {
+    await interaction.reply({
+      content: "Este canal no está autorizado para comandos.",
+      ephemeral: true,
+    });
+    return;
+  }
 
   const command = commands.get(interaction.commandName);
   if (!command) {

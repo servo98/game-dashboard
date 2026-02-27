@@ -24,6 +24,19 @@ db.exec(`
     avatar TEXT,
     expires_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS server_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    stopped_at INTEGER,
+    stop_reason TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS bot_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 export type Server = {
@@ -45,11 +58,22 @@ export type Session = {
   expires_at: number;
 };
 
+export type ServerSession = {
+  id: number;
+  server_id: string;
+  started_at: number;
+  stopped_at: number | null;
+  stop_reason: string | null;
+};
+
 export const serverQueries = {
   getAll: db.query<Server, []>("SELECT * FROM servers ORDER BY created_at ASC"),
   getById: db.query<Server, [string]>("SELECT * FROM servers WHERE id = ?"),
   insert: db.query<void, [string, string, string, string, number, string, string]>(
     "INSERT OR REPLACE INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ),
+  update: db.query<void, [string, string, string]>(
+    "UPDATE servers SET docker_image = ?, env_vars = ? WHERE id = ?"
   ),
 };
 
@@ -62,4 +86,28 @@ export const sessionQueries = {
   ),
   delete: db.query<void, [string]>("DELETE FROM sessions WHERE token = ?"),
   cleanup: db.query<void, []>("DELETE FROM sessions WHERE expires_at <= unixepoch()"),
+};
+
+export const serverSessionQueries = {
+  start: db.query<void, [string, number]>(
+    "INSERT INTO server_sessions (server_id, started_at) VALUES (?, ?)"
+  ),
+  stop: db.query<void, [number, string, string]>(
+    "UPDATE server_sessions SET stopped_at = ?, stop_reason = ? WHERE server_id = ? AND stopped_at IS NULL"
+  ),
+  history: db.query<ServerSession, [string]>(
+    "SELECT * FROM server_sessions WHERE server_id = ? ORDER BY started_at DESC LIMIT 10"
+  ),
+};
+
+export const botSettingsQueries = {
+  get: db.query<{ key: string; value: string }, [string]>(
+    "SELECT key, value FROM bot_settings WHERE key = ?"
+  ),
+  set: db.query<void, [string, string]>(
+    "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)"
+  ),
+  unset: db.query<void, [string]>(
+    "DELETE FROM bot_settings WHERE key = ?"
+  ),
 };

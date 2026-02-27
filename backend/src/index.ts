@@ -4,6 +4,8 @@ import { logger } from "hono/logger";
 import { sessionQueries } from "./db";
 import authRoutes from "./routes/auth";
 import serverRoutes from "./routes/servers";
+import serviceRoutes from "./routes/services";
+import botSettingsRoutes from "./routes/bot-settings";
 
 const app = new Hono();
 
@@ -24,6 +26,8 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 app.route("/api/auth", authRoutes);
 app.route("/api/servers", serverRoutes);
+app.route("/api/services", serviceRoutes);
+app.route("/api/bot", botSettingsRoutes);
 
 // Periodic session cleanup (every hour)
 setInterval(

@@ -41,6 +41,46 @@ export async function getContainerStatus(serverId: string): Promise<
   return "stopped";
 }
 
+// --- Crash watcher ---
+
+const activeWatchers = new Map<string, ReturnType<typeof setInterval>>();
+const intentionalStops = new Set<string>();
+
+/** Register a watcher that calls onCrash() if the container stops unexpectedly */
+export function watchContainer(serverId: string, onCrash: () => void): void {
+  const existing = activeWatchers.get(serverId);
+  if (existing) clearInterval(existing);
+  intentionalStops.delete(serverId);
+
+  const interval = setInterval(async () => {
+    try {
+      const status = await getContainerStatus(serverId);
+      if (status !== "running") {
+        clearInterval(interval);
+        activeWatchers.delete(serverId);
+        if (!intentionalStops.has(serverId)) {
+          onCrash();
+        }
+        intentionalStops.delete(serverId);
+      }
+    } catch {
+      // ignore transient errors
+    }
+  }, 30_000);
+
+  activeWatchers.set(serverId, interval);
+}
+
+/** Mark a stop as intentional so the watcher doesn't fire onCrash */
+export function markIntentionalStop(serverId: string): void {
+  intentionalStops.add(serverId);
+  const watcher = activeWatchers.get(serverId);
+  if (watcher) {
+    clearInterval(watcher);
+    activeWatchers.delete(serverId);
+  }
+}
+
 /** Start a game container. Stops any currently running game container first. */
 export async function startGameContainer(
   serverId: string,
@@ -162,6 +202,54 @@ export async function* streamContainerLogs(
       const text = chunk.slice(offset + 8, offset + 8 + size).toString("utf8");
       yield text;
       offset += 8 + size;
+    }
+  }
+}
+
+/** Stream CPU/RAM stats from a game container as an async generator */
+export async function* streamContainerStats(
+  serverId: string,
+  signal: AbortSignal
+): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+  const containerName = gameContainerName(serverId);
+  const container = docker.getContainer(containerName);
+
+  // @ts-ignore — dockerode typings don't expose the stream overload cleanly
+  const stream = (await container.stats({ stream: true })) as NodeJS.ReadableStream;
+
+  let buffer = "";
+
+  for await (const chunk of stream as AsyncIterable<Buffer>) {
+    if (signal.aborted) break;
+    buffer += chunk.toString("utf8");
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const s = JSON.parse(line);
+        const cpuDelta =
+          s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
+        const systemDelta =
+          (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
+        const numCpus =
+          s.cpu_stats.online_cpus ??
+          s.cpu_stats.cpu_usage.percpu_usage?.length ??
+          1;
+        const cpuPercent =
+          systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+        const memUsageMB = (s.memory_stats.usage ?? 0) / 1024 / 1024;
+        const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
+
+        yield {
+          cpuPercent: Math.max(0, Math.min(cpuPercent, 100)),
+          memUsageMB,
+          memLimitMB,
+        };
+      } catch {
+        // Ignore parse errors
+      }
     }
   }
 }
