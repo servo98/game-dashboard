@@ -42,6 +42,14 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 `);
 
 export type Server = {
@@ -109,6 +117,35 @@ export const serverSessionQueries = {
   ),
 };
 
+export type Backup = {
+  id: number;
+  server_id: string;
+  filename: string;
+  size_bytes: number;
+  created_at: number;
+};
+
+export const backupQueries = {
+  list: db.query<Backup, [string]>(
+    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at DESC"
+  ),
+  insert: db.query<void, [string, string, number, number]>(
+    "INSERT INTO backups (server_id, filename, size_bytes, created_at) VALUES (?, ?, ?, ?)"
+  ),
+  getById: db.query<Backup, [number]>(
+    "SELECT * FROM backups WHERE id = ?"
+  ),
+  deleteById: db.query<void, [number]>(
+    "DELETE FROM backups WHERE id = ?"
+  ),
+  count: db.query<{ cnt: number }, [string]>(
+    "SELECT COUNT(*) as cnt FROM backups WHERE server_id = ?"
+  ),
+  oldest: db.query<Backup, [string]>(
+    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at ASC LIMIT 1"
+  ),
+};
+
 export const botSettingsQueries = {
   get: db.query<{ key: string; value: string }, [string]>(
     "SELECT key, value FROM bot_settings WHERE key = ?"
@@ -126,6 +163,8 @@ const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
   game_memory_limit_gb: "6",
   game_cpu_limit: "3",
   auto_stop_hours: "0",
+  max_backups_per_server: "5",
+  auto_backup_interval_hours: "0",
 };
 
 export const panelSettingsQueries = {

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { serverQueries, serverSessionQueries, botSettingsQueries } from "../db";
+import { serverQueries, serverSessionQueries, botSettingsQueries, backupQueries } from "../db";
 import {
   startGameContainer,
   stopGameContainer,
@@ -10,9 +10,11 @@ import {
   watchContainer,
   markIntentionalStop,
 } from "../docker";
+import { createBackup, restoreBackup, deleteBackupFile, getBackupFilePath } from "../backup";
 import { requireAuth } from "../middleware/auth";
 import { GAME_CATALOG, findTemplate } from "../catalog";
 import type { Session } from "../db";
+import { existsSync } from "fs";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
 
@@ -422,6 +424,87 @@ servers.get("/:id/history", requireAuth, async (c) => {
   }));
 
   return c.json(formatted);
+});
+
+// --- Backup routes ---
+
+// List backups for a server
+servers.get("/:id/backups", requireAuth, (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const backups = backupQueries.list.all(id);
+  return c.json(backups);
+});
+
+// Create a backup
+servers.post("/:id/backups", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  try {
+    const record = await createBackup(id);
+    return c.json(record);
+  } catch (err) {
+    console.error("Backup error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
+});
+
+// Download a backup
+servers.get("/:id/backups/:bid/download", requireAuth, (c) => {
+  const { id, bid } = c.req.param();
+  const backup = backupQueries.getById.get(Number(bid));
+  if (!backup || backup.server_id !== id) {
+    return c.json({ error: "Backup not found" }, 404);
+  }
+
+  const filePath = getBackupFilePath(backup);
+  if (!existsSync(filePath)) {
+    return c.json({ error: "Backup file not found on disk" }, 404);
+  }
+
+  const file = Bun.file(filePath);
+  return new Response(file.stream(), {
+    headers: {
+      "Content-Type": "application/gzip",
+      "Content-Disposition": `attachment; filename="${backup.filename}"`,
+      "Content-Length": String(backup.size_bytes),
+    },
+  });
+});
+
+// Restore a backup
+servers.post("/:id/backups/:bid/restore", requireAuth, async (c) => {
+  const { id, bid } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  try {
+    await restoreBackup(id, Number(bid));
+    return c.json({ ok: true, message: "Backup restored" });
+  } catch (err) {
+    console.error("Restore error:", err);
+    return c.json({ error: (err as Error).message }, 400);
+  }
+});
+
+// Delete a backup
+servers.delete("/:id/backups/:bid", requireAuth, (c) => {
+  const { id, bid } = c.req.param();
+  const backup = backupQueries.getById.get(Number(bid));
+  if (!backup || backup.server_id !== id) {
+    return c.json({ error: "Backup not found" }, 404);
+  }
+
+  try {
+    deleteBackupFile(Number(bid));
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 function getCookie(req: Request, name: string): string | undefined {

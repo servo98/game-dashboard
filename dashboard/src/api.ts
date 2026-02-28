@@ -74,11 +74,21 @@ export type GameTemplate = {
   default_volumes: Record<string, string>;
 };
 
+export type BackupRecord = {
+  id: number;
+  server_id: string;
+  filename: string;
+  size_bytes: number;
+  created_at: number;
+};
+
 export type PanelSettings = {
   host_domain: string;
   game_memory_limit_gb: string;
   game_cpu_limit: string;
   auto_stop_hours: string;
+  max_backups_per_server: string;
+  auto_backup_interval_hours: string;
 };
 
 export type CreateServerRequest = {
@@ -160,6 +170,20 @@ export const api = {
     }),
   deleteServer: (id: string) =>
     request<{ ok: boolean }>(`/servers/${id}`, { method: "DELETE" }),
+
+  /** Backups */
+  listBackups: (serverId: string) =>
+    request<BackupRecord[]>(`/servers/${serverId}/backups`),
+  createBackup: (serverId: string) =>
+    request<BackupRecord>(`/servers/${serverId}/backups`, { method: "POST" }),
+  restoreBackup: (serverId: string, backupId: number) =>
+    request<{ ok: boolean; message: string }>(`/servers/${serverId}/backups/${backupId}/restore`, {
+      method: "POST",
+    }),
+  deleteBackup: (serverId: string, backupId: number) =>
+    request<{ ok: boolean }>(`/servers/${serverId}/backups/${backupId}`, { method: "DELETE" }),
+  downloadBackupUrl: (serverId: string, backupId: number) =>
+    `${BASE}/servers/${serverId}/backups/${backupId}/download`,
 
   /** Panel settings */
   getSettings: () => request<PanelSettings>("/settings"),

@@ -28,6 +28,7 @@ services:
       - backend-data:/data
       - /var/run/docker.sock:/var/run/docker.sock  # dockerode needs this
       - ./games:/app/games:ro
+      - /data:/host-data  # game volumes for backup/restore
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/servers').then(r=>{if(!r.ok)process.exit(1)})"]

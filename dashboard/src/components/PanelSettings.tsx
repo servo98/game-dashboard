@@ -101,6 +101,34 @@ export default function PanelSettings() {
         <span className="text-xs text-gray-500">Auto-stop server after N hours (0 = disabled)</span>
       </label>
 
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm text-gray-300">Max Backups per Server</span>
+        <input
+          type="number"
+          min="1"
+          max="20"
+          step="1"
+          value={settings.max_backups_per_server}
+          onChange={(e) => setSettings({ ...settings, max_backups_per_server: e.target.value })}
+          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
+        />
+        <span className="text-xs text-gray-500">Oldest backups are auto-pruned beyond this limit</span>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm text-gray-300">Auto-Backup Interval (hours)</span>
+        <input
+          type="number"
+          min="0"
+          max="168"
+          step="1"
+          value={settings.auto_backup_interval_hours}
+          onChange={(e) => setSettings({ ...settings, auto_backup_interval_hours: e.target.value })}
+          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
+        />
+        <span className="text-xs text-gray-500">Auto-backup the active server every N hours (0 = disabled)</span>
+      </label>
+
       <button
         type="submit"
         disabled={saving}

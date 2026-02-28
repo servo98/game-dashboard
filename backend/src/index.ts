@@ -8,6 +8,7 @@ import serviceRoutes from "./routes/services";
 import botSettingsRoutes from "./routes/bot-settings";
 import notificationRoutes from "./routes/notifications";
 import settingsRoutes from "./routes/settings";
+import { startAutoBackupTimer } from "./backup";
 
 const app = new Hono();
 
@@ -32,6 +33,9 @@ app.route("/api/services", serviceRoutes);
 app.route("/api/bot", botSettingsRoutes);
 app.route("/api/notifications", notificationRoutes);
 app.route("/api/settings", settingsRoutes);
+
+// Start auto-backup timer (checks every hour)
+startAutoBackupTimer();
 
 // Periodic session cleanup (every hour)
 setInterval(

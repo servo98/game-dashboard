@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GameServer, ServerSessionRecord } from "../api";
+import type { GameServer, ServerSessionRecord, BackupRecord } from "../api";
 import { api } from "../api";
 import StatsBar from "./StatsBar";
 
@@ -64,6 +64,11 @@ export default function ServerCard({
   const [history, setHistory] = useState<ServerSessionRecord[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showBackups, setShowBackups] = useState(false);
+  const [backups, setBackups] = useState<BackupRecord[] | null>(null);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [backupCreating, setBackupCreating] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
 
   const isRunning = server.status === "running";
   const address = connectAddress(server.game_type, server.port, hostDomain);
@@ -101,6 +106,66 @@ export default function ServerCard({
       setConfirmDelete(true);
       setTimeout(() => setConfirmDelete(false), 3000);
     }
+  }
+
+  async function toggleBackups() {
+    if (showBackups) {
+      setShowBackups(false);
+      return;
+    }
+    setShowBackups(true);
+    if (backups === null) {
+      setBackupsLoading(true);
+      try {
+        const rows = await api.listBackups(server.id);
+        setBackups(rows);
+      } catch {
+        setBackups([]);
+      } finally {
+        setBackupsLoading(false);
+      }
+    }
+  }
+
+  async function handleCreateBackup() {
+    setBackupCreating(true);
+    try {
+      const record = await api.createBackup(server.id);
+      setBackups((prev) => (prev ? [record, ...prev] : [record]));
+    } catch {
+      // ignore
+    } finally {
+      setBackupCreating(false);
+    }
+  }
+
+  async function handleDeleteBackup(backupId: number) {
+    try {
+      await api.deleteBackup(server.id, backupId);
+      setBackups((prev) => prev?.filter((b) => b.id !== backupId) ?? null);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleRestoreBackup(backupId: number) {
+    if (confirmRestore === backupId) {
+      try {
+        await api.restoreBackup(server.id, backupId);
+      } catch {
+        // ignore
+      }
+      setConfirmRestore(null);
+    } else {
+      setConfirmRestore(backupId);
+      setTimeout(() => setConfirmRestore(null), 3000);
+    }
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   }
 
   return (
@@ -195,6 +260,13 @@ export default function ServerCard({
           </button>
         )}
         <button
+          onClick={toggleBackups}
+          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-gray-300 transition-colors"
+          title="Backups"
+        >
+          📦
+        </button>
+        <button
           onClick={toggleHistory}
           className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-gray-300 transition-colors"
           title="Session history"
@@ -202,6 +274,76 @@ export default function ServerCard({
           ⏱
         </button>
       </div>
+
+      {/* Backups panel */}
+      {showBackups && (
+        <div className="border-t border-gray-800 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-500">Backups</p>
+            <button
+              onClick={handleCreateBackup}
+              disabled={backupCreating}
+              className="text-xs px-2.5 py-1 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
+            >
+              {backupCreating ? "Creating..." : "Create Backup"}
+            </button>
+          </div>
+          {backupsLoading ? (
+            <div className="text-xs text-gray-600 animate-pulse">Loading...</div>
+          ) : backups && backups.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {backups.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between text-xs text-gray-400"
+                >
+                  <div className="flex flex-col">
+                    <span>
+                      {new Date(b.created_at * 1000).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="text-gray-600">{formatSize(b.size_bytes)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={api.downloadBackupUrl(server.id, b.id)}
+                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                      title="Download"
+                    >
+                      ⬇
+                    </a>
+                    <button
+                      onClick={() => handleRestoreBackup(b.id)}
+                      disabled={isRunning}
+                      title={isRunning ? "Stop server first" : "Restore"}
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        confirmRestore === b.id
+                          ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                          : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      }`}
+                    >
+                      {confirmRestore === b.id ? "Confirm?" : "↩"}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBackup(b.id)}
+                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-600">No backups yet.</p>
+          )}
+        </div>
+      )}
 
       {/* Session history panel */}
       {showHistory && (
