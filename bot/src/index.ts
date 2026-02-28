@@ -8,6 +8,7 @@ import {
 import * as start from "./commands/start";
 import * as stop from "./commands/stop";
 import * as status from "./commands/status";
+import * as ip from "./commands/ip";
 
 type Command = {
   data: { name: string };
@@ -17,7 +18,7 @@ type Command = {
 
 const commands = new Collection<string, Command>();
 
-for (const cmd of [start, stop, status]) {
+for (const cmd of [start, stop, status, ip]) {
   commands.set(cmd.data.name, cmd as Command);
 }
 

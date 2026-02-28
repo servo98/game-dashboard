@@ -18,6 +18,7 @@ const BOT_COMMANDS = [
   { name: "start", description: "Start a game server" },
   { name: "stop", description: "Stop the active game server" },
   { name: "status", description: "Show the status of all game servers" },
+  { name: "ip", description: "Show the connect address for the active server" },
 ];
 
 const CHANNEL_KEYS = [

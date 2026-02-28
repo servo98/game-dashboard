@@ -7,8 +7,9 @@ import { REST, Routes } from "discord.js";
 import * as start from "./commands/start";
 import * as stop from "./commands/stop";
 import * as status from "./commands/status";
+import * as ip from "./commands/ip";
 
-const commands = [start.data, stop.data, status.data].map((c) => c.toJSON());
+const commands = [start.data, stop.data, status.data, ip.data].map((c) => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN!);
 
