@@ -1,6 +1,16 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireBotKey } from "../middleware/auth";
 import { botSettingsQueries } from "../db";
+import type { Context, Next } from "hono";
+
+/** Allow either dashboard session OR bot API key */
+async function requireAuthOrBotKey(c: Context, next: Next) {
+  const botKey = c.req.header("X-Bot-Api-Key");
+  if (botKey && botKey === process.env.BOT_API_KEY) {
+    return next();
+  }
+  return requireAuth(c, next);
+}
 
 const botSettings = new Hono();
 
@@ -17,7 +27,7 @@ const CHANNEL_KEYS = [
   "logs_channel_id",
 ] as const;
 
-botSettings.get("/settings", requireAuth, async (c) => {
+botSettings.get("/settings", requireAuthOrBotKey, async (c) => {
   const settings: Record<string, string | null> = {};
   for (const key of CHANNEL_KEYS) {
     const row = botSettingsQueries.get.get(key);
