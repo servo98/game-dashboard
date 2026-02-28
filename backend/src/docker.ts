@@ -198,12 +198,10 @@ function formatLogLine(raw: string): string {
 
 async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
   const container = docker.getContainer(containerName);
-
-  // Check if container uses TTY (changes log stream format)
   const info = await container.inspect();
   const isTty = info.Config.Tty;
 
-  const stream = await container.logs({
+  const logStream = await container.logs({
     follow: true,
     stdout: true,
     stderr: true,
@@ -211,33 +209,53 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     tail: 100,
   });
 
-  if (isTty) {
-    // TTY mode: plain text, no Docker frame headers
-    let buffer = "";
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
-      if (signal.aborted) break;
-      buffer += chunk.toString("utf8");
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (line.trim()) yield formatLogLine(line.trimEnd());
-      }
+  // Use a passthrough approach: collect lines via callback, yield from queue
+  const queue: string[] = [];
+  let resolve: (() => void) | null = null;
+  let done = false;
+
+  function pushLine(buf: Buffer) {
+    const text = buf.toString("utf8");
+    for (const line of text.split("\n")) {
+      const trimmed = line.trimEnd();
+      if (trimmed) queue.push(formatLogLine(trimmed));
     }
+    if (resolve) { resolve(); resolve = null; }
+  }
+
+  if (isTty) {
+    // TTY: plain text stream
+    (logStream as NodeJS.ReadableStream).on("data", pushLine);
   } else {
-    // Multiplexed mode: 8-byte header per frame
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
-      if (signal.aborted) break;
-      let offset = 0;
-      while (offset < chunk.length) {
-        if (chunk.length - offset < 8) break;
-        const size = chunk.readUInt32BE(offset + 4);
-        if (size === 0 || offset + 8 + size > chunk.length) break;
-        const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8").trimEnd();
-        if (raw) yield formatLogLine(raw);
-        offset += 8 + size;
-      }
+    // Multiplexed: use dockerode's demuxStream to split stdout/stderr
+    const { PassThrough } = await import("stream");
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    stdout.on("data", pushLine);
+    stderr.on("data", pushLine);
+    docker.modem.demuxStream(logStream as NodeJS.ReadableStream, stdout, stderr);
+  }
+
+  (logStream as NodeJS.ReadableStream).on("end", () => {
+    done = true;
+    if (resolve) { resolve(); resolve = null; }
+  });
+
+  while (!signal.aborted && !done) {
+    if (queue.length > 0) {
+      yield queue.shift()!;
+    } else {
+      await new Promise<void>((r) => {
+        resolve = r;
+        signal.addEventListener("abort", () => { resolve = null; r(); }, { once: true });
+      });
     }
   }
+  // Drain remaining
+  while (queue.length > 0) yield queue.shift()!;
+
+  // Cleanup
+  try { (logStream as any).destroy?.(); } catch {}
 }
 
 async function* _streamStats(
