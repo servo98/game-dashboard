@@ -46,7 +46,7 @@ async function getAllowedChannelId(): Promise<string | null> {
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.once("ready", (c) => {
+client.once("clientReady", (c) => {
   console.log(`Bot ready as ${c.user.tag}`);
 });
 
