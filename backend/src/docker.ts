@@ -212,53 +212,49 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     tail: 100,
   });
 
-  // Use a passthrough approach: collect lines via callback, yield from queue
-  const queue: string[] = [];
-  let resolve: (() => void) | null = null;
-  let done = false;
+  // Destroy the stream when the request is aborted so for-await exits
+  const onAbort = () => { try { (logStream as any).destroy?.(); } catch {} };
+  signal.addEventListener("abort", onAbort, { once: true });
 
-  function pushLine(buf: Buffer) {
-    const text = buf.toString("utf8");
-    for (const line of text.split("\n")) {
-      const trimmed = line.trimEnd();
-      if (trimmed) queue.push(formatLogLine(trimmed));
-    }
-    if (resolve) { resolve(); resolve = null; }
-  }
-
-  if (isTty) {
-    // TTY: plain text stream
-    (logStream as NodeJS.ReadableStream).on("data", pushLine);
-  } else {
-    // Multiplexed: use dockerode's demuxStream to split stdout/stderr
-    const { PassThrough } = await import("stream");
-    const stdout = new PassThrough();
-    const stderr = new PassThrough();
-    stdout.on("data", pushLine);
-    stderr.on("data", pushLine);
-    docker.modem.demuxStream(logStream as NodeJS.ReadableStream, stdout, stderr);
-  }
-
-  (logStream as NodeJS.ReadableStream).on("end", () => {
-    done = true;
-    if (resolve) { resolve(); resolve = null; }
-  });
-
-  while (!signal.aborted && !done) {
-    if (queue.length > 0) {
-      yield queue.shift()!;
+  try {
+    if (isTty) {
+      // TTY: plain text stream — iterate directly
+      for await (const chunk of logStream as AsyncIterable<Buffer>) {
+        if (signal.aborted) break;
+        const text = chunk.toString("utf8");
+        for (const line of text.split("\n")) {
+          const trimmed = line.trimEnd();
+          if (trimmed) yield formatLogLine(trimmed);
+        }
+      }
     } else {
-      await new Promise<void>((r) => {
-        resolve = r;
-        signal.addEventListener("abort", () => { resolve = null; r(); }, { once: true });
-      });
-    }
-  }
-  // Drain remaining
-  while (queue.length > 0) yield queue.shift()!;
+      // Multiplexed: manually parse Docker stream header format
+      // Each frame: [1 byte stream type][3 bytes padding][4 bytes payload length BE][payload]
+      let buf = Buffer.alloc(0);
+      for await (const chunk of logStream as AsyncIterable<Buffer>) {
+        if (signal.aborted) break;
+        buf = Buffer.concat([buf, chunk]);
 
-  // Cleanup
-  try { (logStream as any).destroy?.(); } catch {}
+        // Process all complete frames in the buffer
+        while (buf.length >= 8) {
+          const payloadLen = buf.readUInt32BE(4);
+          const frameSize = 8 + payloadLen;
+          if (buf.length < frameSize) break; // incomplete frame, wait for more data
+
+          const payload = buf.subarray(8, frameSize).toString("utf8");
+          buf = buf.subarray(frameSize);
+
+          for (const line of payload.split("\n")) {
+            const trimmed = line.trimEnd();
+            if (trimmed) yield formatLogLine(trimmed);
+          }
+        }
+      }
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    try { (logStream as any).destroy?.(); } catch {}
+  }
 }
 
 async function* _streamStats(

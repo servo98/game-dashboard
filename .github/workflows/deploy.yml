@@ -21,37 +21,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # ──────────────────────────────────────────────
+  # 1. Detect which services need deploying
+  # ──────────────────────────────────────────────
+  detect-changes:
     runs-on: ubuntu-latest
-
+    outputs:
+      backend: ${{ steps.result.outputs.backend }}
+      dashboard: ${{ steps.result.outputs.dashboard }}
+      bot: ${{ steps.result.outputs.bot }}
+      commands: ${{ steps.result.outputs.commands }}
+      nginx: ${{ steps.result.outputs.nginx }}
+      static: ${{ steps.result.outputs.static }}
+      games: ${{ steps.result.outputs.games }}
+      any_service: ${{ steps.result.outputs.any_service }}
+      services_list: ${{ steps.result.outputs.services_list }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Notificar deploy iniciado
-        env:
-          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          EVENT: ${{ github.event_name }}
-        run: |
-          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
-          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
-          SHORT=$(git rev-parse --short HEAD)
-          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
-          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          JSON=$(cat <<EOFJ
-          {"embeds":[{"title":"🚀 Deploy iniciado","description":"**${MSG}**","color":3447003,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true}],"timestamp":"${TS}"}]}
-          EOFJ
-          )
-          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
-            -H "Authorization: Bot ${BOT_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$JSON"
-
-      - name: Detectar cambios (solo en push automático)
+      - name: Detectar cambios (push)
         id: changed
         if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
@@ -77,10 +67,96 @@ jobs:
             games:
               - 'games/**'
 
+      - name: Unificar outputs
+        id: result
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BACKEND="${{ steps.changed.outputs.backend }}"
+            DASHBOARD="${{ steps.changed.outputs.dashboard }}"
+            BOT="${{ steps.changed.outputs.bot }}"
+            COMMANDS="${{ steps.changed.outputs.commands }}"
+            NGINX="${{ steps.changed.outputs.nginx }}"
+            STATIC="${{ steps.changed.outputs.static }}"
+            GAMES="${{ steps.changed.outputs.games }}"
+          else
+            SVC="${{ inputs.service }}"
+            BACKEND=$( [ "$SVC" = "backend" ] || [ "$SVC" = "all" ] && echo true || echo false )
+            DASHBOARD=$( [ "$SVC" = "dashboard" ] || [ "$SVC" = "all" ] && echo true || echo false )
+            BOT=$( [ "$SVC" = "bot" ] || [ "$SVC" = "all" ] && echo true || echo false )
+            COMMANDS="false"
+            NGINX=$( [ "$SVC" = "nginx" ] || [ "$SVC" = "all" ] && echo true || echo false )
+            STATIC="false"
+            GAMES="false"
+          fi
+
+          echo "backend=$BACKEND" >> $GITHUB_OUTPUT
+          echo "dashboard=$DASHBOARD" >> $GITHUB_OUTPUT
+          echo "bot=$BOT" >> $GITHUB_OUTPUT
+          echo "commands=$COMMANDS" >> $GITHUB_OUTPUT
+          echo "nginx=$NGINX" >> $GITHUB_OUTPUT
+          echo "static=$STATIC" >> $GITHUB_OUTPUT
+          echo "games=$GAMES" >> $GITHUB_OUTPUT
+
+          SERVICES=""
+          [ "$BACKEND" = "true" ] && SERVICES="${SERVICES:+$SERVICES, }backend"
+          [ "$DASHBOARD" = "true" ] && SERVICES="${SERVICES:+$SERVICES, }dashboard"
+          [ "$BOT" = "true" ] && SERVICES="${SERVICES:+$SERVICES, }bot"
+          [ "$NGINX" = "true" ] && SERVICES="${SERVICES:+$SERVICES, }nginx"
+          [ "$STATIC" = "true" ] && SERVICES="${SERVICES:+$SERVICES, }static"
+
+          if [ -n "$SERVICES" ]; then
+            echo "any_service=true" >> $GITHUB_OUTPUT
+          else
+            echo "any_service=false" >> $GITHUB_OUTPUT
+          fi
+          echo "services_list=$SERVICES" >> $GITHUB_OUTPUT
+
+  # ──────────────────────────────────────────────
+  # 2. Discord: deploy started
+  # ──────────────────────────────────────────────
+  notify-start:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any_service == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enviar notificación de inicio
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          SERVICES: ${{ needs.detect-changes.outputs.services_list }}
+        run: |
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
+          SHORT=$(git rev-parse --short HEAD)
+          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          JSON=$(cat <<EOFJ
+          {"embeds":[{"title":"🚀 Deploy iniciado","description":"**${MSG}**","color":3447003,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true},{"name":"Servicios","value":"${SERVICES}","inline":false},{"name":"Progreso","value":"[Ver en Actions](https://github.com/${REPO}/actions/runs/${RUN_ID})","inline":false}],"timestamp":"${TS}"}]}
+          EOFJ
+          )
+          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$JSON"
+
+  # ──────────────────────────────────────────────
+  # 3–7. Deploy services (parallel)
+  # ──────────────────────────────────────────────
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, notify-start]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.backend == 'true'
+    steps:
       - name: Rebuild backend
-        if: |
-          (github.event_name == 'push' && steps.changed.outputs.backend == 'true') ||
-          (github.event_name == 'workflow_dispatch' && (inputs.service == 'backend' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -94,24 +170,15 @@ jobs:
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
             docker compose up -d backend
 
-      - name: Reseed DB (si cambiaron games/)
-        if: |
-          (github.event_name == 'push' && steps.changed.outputs.games == 'true') ||
-          (github.event_name == 'workflow_dispatch' && inputs.service == 'all')
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            cd /root/game-panel
-            docker compose exec backend bun run src/seed.ts
-
+  deploy-dashboard:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, notify-start]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.dashboard == 'true'
+    steps:
       - name: Rebuild dashboard
-        if: |
-          (github.event_name == 'push' && steps.changed.outputs.dashboard == 'true') ||
-          (github.event_name == 'workflow_dispatch' && (inputs.service == 'dashboard' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -125,10 +192,15 @@ jobs:
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
             docker compose up -d dashboard
 
+  deploy-bot:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, notify-start]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.bot == 'true'
+    steps:
       - name: Rebuild bot
-        if: |
-          (github.event_name == 'push' && steps.changed.outputs.bot == 'true') ||
-          (github.event_name == 'workflow_dispatch' && (inputs.service == 'bot' || inputs.service == 'all'))
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -142,22 +214,15 @@ jobs:
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
             docker compose up -d bot
 
-      - name: Registrar slash commands
-        if: github.event_name == 'push' && steps.changed.outputs.commands == 'true'
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            cd /root/game-panel
-            docker compose run --rm bot bun run src/register.ts
-
-      - name: Recargar nginx (sin rebuild)
-        if: |
-          (github.event_name == 'push' && steps.changed.outputs.nginx == 'true') ||
-          (github.event_name == 'workflow_dispatch' && (inputs.service == 'nginx' || inputs.service == 'all'))
+  deploy-nginx:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, notify-start]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.nginx == 'true'
+    steps:
+      - name: Recargar nginx
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -170,8 +235,15 @@ jobs:
             git reset --hard origin/main
             docker compose exec nginx nginx -s reload
 
+  deploy-static:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, notify-start]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.static == 'true'
+    steps:
       - name: Actualizar sitio estático
-        if: github.event_name == 'push' && steps.changed.outputs.static == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -184,46 +256,133 @@ jobs:
             git reset --hard origin/main
             echo "static-site actualizado (nginx lo sirve directo)"
 
-      - name: Notificar deploy exitoso
-        if: success()
-        env:
-          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          EVENT: ${{ github.event_name }}
-        run: |
-          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
-          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
-          SHORT=$(git rev-parse --short HEAD)
-          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
-          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          JSON=$(cat <<EOFJ
-          {"embeds":[{"title":"✅ Deploy exitoso","description":"**${MSG}**","color":3066993,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true}],"timestamp":"${TS}"}]}
-          EOFJ
-          )
-          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
-            -H "Authorization: Bot ${BOT_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$JSON"
+  # ──────────────────────────────────────────────
+  # 8. Reseed DB (after backend deploys)
+  # ──────────────────────────────────────────────
+  reseed-db:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, deploy-backend]
+    if: >-
+      needs.deploy-backend.result == 'success' &&
+      needs.detect-changes.outputs.games == 'true'
+    steps:
+      - name: Reseed DB
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /root/game-panel
+            docker compose exec backend bun run src/seed.ts
 
-      - name: Notificar deploy fallido
-        if: failure()
+  # ──────────────────────────────────────────────
+  # 9. Register slash commands (after bot deploys)
+  # ──────────────────────────────────────────────
+  register-commands:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, deploy-bot]
+    if: >-
+      needs.deploy-bot.result == 'success' &&
+      needs.detect-changes.outputs.commands == 'true'
+    steps:
+      - name: Registrar slash commands
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /root/game-panel
+            docker compose run --rm bot bun run src/register.ts
+
+  # ──────────────────────────────────────────────
+  # 10. Discord: deploy finished (always runs)
+  # ──────────────────────────────────────────────
+  notify-end:
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - detect-changes
+      - notify-start
+      - deploy-backend
+      - deploy-dashboard
+      - deploy-bot
+      - deploy-nginx
+      - deploy-static
+      - reseed-db
+      - register-commands
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enviar notificación final
         env:
           BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
+          BACKEND: ${{ needs.deploy-backend.result }}
+          DASHBOARD: ${{ needs.deploy-dashboard.result }}
+          BOT_SVC: ${{ needs.deploy-bot.result }}
+          NGINX: ${{ needs.deploy-nginx.result }}
+          STATIC: ${{ needs.deploy-static.result }}
+          RESEED: ${{ needs.reseed-db.result }}
+          COMMANDS: ${{ needs.register-commands.result }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+
+          FIELDS=""
+          HAS_FAILURE="false"
+          HAS_SUCCESS="false"
+          HAS_CANCELLED="false"
+
+          add_field() {
+            local name=$1 result=$2
+            if [ "$result" = "skipped" ]; then return; fi
+            local icon="⚪"
+            case "$result" in
+              success)   icon="✅"; HAS_SUCCESS="true" ;;
+              failure)   icon="❌"; HAS_FAILURE="true" ;;
+              cancelled) HAS_CANCELLED="true" ;;
+            esac
+            if [ -n "$FIELDS" ]; then FIELDS="${FIELDS},"; fi
+            FIELDS="${FIELDS}{\"name\":\"${icon} ${name}\",\"value\":\"${result}\",\"inline\":true}"
+          }
+
+          add_field "Backend" "$BACKEND"
+          add_field "Dashboard" "$DASHBOARD"
+          add_field "Bot" "$BOT_SVC"
+          add_field "Nginx" "$NGINX"
+          add_field "Static" "$STATIC"
+          add_field "Reseed DB" "$RESEED"
+          add_field "Commands" "$COMMANDS"
+
+          # If no services actually ran, don't send notification
+          if [ -z "$FIELDS" ]; then exit 0; fi
+
+          if [ "$HAS_FAILURE" = "true" ]; then
+            TITLE="❌ Deploy fallido"
+            COLOR=15158332
+          elif [ "$HAS_CANCELLED" = "true" ]; then
+            TITLE="⚪ Deploy cancelado"
+            COLOR=9807270
+          else
+            TITLE="✅ Deploy exitoso"
+            COLOR=3066993
+          fi
+
           MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
           SHORT=$(git rev-parse --short HEAD)
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          JSON=$(cat <<EOFJ
-          {"embeds":[{"title":"❌ Deploy fallido","description":"**${MSG}**","color":15158332,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Logs","value":"[Ver logs](https://github.com/${REPO}/actions/runs/${RUN_ID})","inline":true}],"timestamp":"${TS}"}]}
-          EOFJ
-          )
+
+          COMMIT_FIELD="{\"name\":\"Commit\",\"value\":\"[${SHORT}](https://github.com/${REPO}/commit/${SHA})\",\"inline\":true}"
+          LOGS_FIELD="{\"name\":\"Logs\",\"value\":\"[Ver en Actions](https://github.com/${REPO}/actions/runs/${RUN_ID})\",\"inline\":true}"
+
+          JSON="{\"embeds\":[{\"title\":\"${TITLE}\",\"description\":\"**${MSG}**\",\"color\":${COLOR},\"fields\":[${COMMIT_FIELD},${LOGS_FIELD},${FIELDS}],\"timestamp\":\"${TS}\"}]}"
+
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
             -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
