@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type ServerConfig } from "../api";
+import MinecraftConfigEditor from "./MinecraftConfigEditor";
 
 type Props = {
   serverId: string;
@@ -9,12 +10,19 @@ type Props = {
   onSaved: () => void;
 };
 
+function isMinecraftImage(image: string): boolean {
+  return image.includes("itzg/minecraft-server");
+}
+
 export default function ConfigEditor({ serverId, serverName, open, onClose, onSaved }: Props) {
   const [dockerImage, setDockerImage] = useState("");
   const [envPairs, setEnvPairs] = useState<Array<{ key: string; value: string }>>([]);
+  const [envRecord, setEnvRecord] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isMinecraft = isMinecraftImage(dockerImage);
 
   useEffect(() => {
     if (!open) return;
@@ -27,6 +35,7 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
         setEnvPairs(
           Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value }))
         );
+        setEnvRecord(cfg.env_vars);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -38,9 +47,11 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
     setSaving(true);
     setError(null);
     try {
-      const env_vars = Object.fromEntries(
-        envPairs.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value])
-      );
+      const env_vars = isMinecraft
+        ? Object.fromEntries(Object.entries(envRecord).filter(([k]) => k.trim()))
+        : Object.fromEntries(
+            envPairs.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value])
+          );
       await api.updateServerConfig(serverId, { docker_image: dockerImage, env_vars });
       onSaved();
       onClose();
@@ -67,7 +78,7 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl">
+      <div className={`bg-gray-950 border border-gray-800 rounded-2xl w-full shadow-2xl ${isMinecraft ? "max-w-2xl" : "max-w-lg"}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h2 className="font-semibold text-white">Edit Config — {serverName}</h2>
@@ -91,6 +102,21 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
             <div className="flex justify-center py-8">
               <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : isMinecraft ? (
+            <>
+              {/* Docker Image (read-only for Minecraft) */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5">Docker Image</label>
+                <div className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg px-3 py-2 text-sm font-mono text-gray-400">
+                  {dockerImage}
+                </div>
+              </div>
+
+              {/* Minecraft guided editor */}
+              <div className="max-h-[60vh] overflow-y-auto pr-1">
+                <MinecraftConfigEditor envVars={envRecord} onChange={setEnvRecord} />
+              </div>
+            </>
           ) : (
             <>
               {/* Docker Image */}
