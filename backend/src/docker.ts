@@ -1,4 +1,5 @@
 import Dockerode from "dockerode";
+import { createConnection, type Socket } from "net";
 import { getPanelSetting } from "./db";
 
 export const docker = new Dockerode({ socketPath: "/var/run/docker.sock" });
@@ -199,61 +200,139 @@ function formatLogLine(raw: string): string {
   return raw;
 }
 
+/**
+ * Stream logs via raw Unix socket to work around Bun's broken HTTP streaming
+ * from Docker socket (follow=true response body never yields data via fetch/dockerode).
+ */
 async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
   const container = docker.getContainer(containerName);
   const info = await container.inspect();
   const isTty = info.Config.Tty;
 
-  const logStream = await container.logs({
-    follow: true,
-    stdout: true,
-    stderr: true,
-    timestamps: true,
-    tail: 100,
-  });
-
-  // Destroy the stream when the request is aborted so for-await exits
-  const onAbort = () => { try { (logStream as any).destroy?.(); } catch {} };
-  signal.addEventListener("abort", onAbort, { once: true });
+  const sock = createConnection("/var/run/docker.sock");
+  const cleanup = () => { try { sock.destroy(); } catch {} };
+  signal.addEventListener("abort", cleanup, { once: true });
 
   try {
-    if (isTty) {
-      // TTY: plain text stream — iterate directly
-      for await (const chunk of logStream as AsyncIterable<Buffer>) {
-        if (signal.aborted) break;
-        const text = chunk.toString("utf8");
+    // Wait for connection
+    await new Promise<void>((resolve, reject) => {
+      sock.once("connect", resolve);
+      sock.once("error", reject);
+    });
+
+    // Send raw HTTP request to Docker API
+    const query = `follow=1&stdout=1&stderr=1&timestamps=1&tail=100`;
+    sock.write(
+      `GET /containers/${encodeURIComponent(containerName)}/logs?${query} HTTP/1.1\r\nHost: localhost\r\n\r\n`
+    );
+
+    // Read response with async iterator via a queue
+    const queue: Buffer[] = [];
+    let resolve: (() => void) | null = null;
+    let ended = false;
+
+    sock.on("data", (chunk: Buffer) => {
+      queue.push(chunk);
+      resolve?.();
+    });
+    sock.on("end", () => { ended = true; resolve?.(); });
+    sock.on("error", () => { ended = true; resolve?.(); });
+
+    async function nextChunk(): Promise<Buffer | null> {
+      while (queue.length === 0 && !ended && !signal.aborted) {
+        await new Promise<void>((r) => { resolve = r; });
+        resolve = null;
+      }
+      return queue.shift() ?? null;
+    }
+
+    // Skip HTTP headers
+    let headerBuf = "";
+    let bodyRemainder = Buffer.alloc(0);
+    while (true) {
+      const chunk = await nextChunk();
+      if (!chunk) return;
+      headerBuf += chunk.toString("utf8");
+      const idx = headerBuf.indexOf("\r\n\r\n");
+      if (idx >= 0) {
+        bodyRemainder = Buffer.from(headerBuf.substring(idx + 4), "binary");
+        break;
+      }
+    }
+
+    // Parse chunked transfer encoding + Docker multiplexed frames
+    let rawBuf = bodyRemainder;
+
+    function dechunk(data: Buffer): Buffer {
+      // Parse chunked transfer encoding: "<hex-size>\r\n<data>\r\n"
+      let result = Buffer.alloc(0);
+      let pos = 0;
+      while (pos < data.length) {
+        const crlfIdx = data.indexOf("\r\n", pos);
+        if (crlfIdx < 0) break;
+        const sizeStr = data.subarray(pos, crlfIdx).toString("utf8").trim();
+        if (!sizeStr) { pos = crlfIdx + 2; continue; }
+        const chunkSize = parseInt(sizeStr, 16);
+        if (isNaN(chunkSize) || chunkSize === 0) break;
+        const dataStart = crlfIdx + 2;
+        if (dataStart + chunkSize > data.length) {
+          // Incomplete chunk — return what we have, keep remainder
+          rawBuf = data.subarray(pos);
+          return result;
+        }
+        result = Buffer.concat([result, data.subarray(dataStart, dataStart + chunkSize)]);
+        pos = dataStart + chunkSize + 2; // skip trailing \r\n
+      }
+      rawBuf = data.subarray(pos);
+      return result;
+    }
+
+    function* extractLines(data: Buffer, tty: boolean): Generator<string> {
+      if (tty) {
+        const text = data.toString("utf8");
         for (const line of text.split("\n")) {
           const trimmed = line.trimEnd();
-          if (trimmed) yield formatLogLine(trimmed);
+          if (trimmed) yield trimmed;
         }
-      }
-    } else {
-      // Multiplexed: manually parse Docker stream header format
-      // Each frame: [1 byte stream type][3 bytes padding][4 bytes payload length BE][payload]
-      let buf = Buffer.alloc(0);
-      for await (const chunk of logStream as AsyncIterable<Buffer>) {
-        if (signal.aborted) break;
-        buf = Buffer.concat([buf, chunk]);
-
-        // Process all complete frames in the buffer
-        while (buf.length >= 8) {
-          const payloadLen = buf.readUInt32BE(4);
-          const frameSize = 8 + payloadLen;
-          if (buf.length < frameSize) break; // incomplete frame, wait for more data
-
-          const payload = buf.subarray(8, frameSize).toString("utf8");
-          buf = buf.subarray(frameSize);
-
+      } else {
+        // Docker multiplexed: [1 byte type][3 pad][4 bytes BE length][payload]
+        let pos = 0;
+        while (pos + 8 <= data.length) {
+          const payloadLen = data.readUInt32BE(pos + 4);
+          if (pos + 8 + payloadLen > data.length) break;
+          const payload = data.subarray(pos + 8, pos + 8 + payloadLen).toString("utf8");
+          pos += 8 + payloadLen;
           for (const line of payload.split("\n")) {
             const trimmed = line.trimEnd();
-            if (trimmed) yield formatLogLine(trimmed);
+            if (trimmed) yield trimmed;
           }
         }
       }
     }
+
+    // Process initial body remainder
+    if (rawBuf.length > 0) {
+      const decoded = dechunk(rawBuf);
+      for (const line of extractLines(decoded, isTty)) {
+        yield formatLogLine(line);
+      }
+    }
+
+    // Stream ongoing chunks
+    while (!signal.aborted && !ended) {
+      const chunk = await nextChunk();
+      if (!chunk) break;
+      rawBuf = Buffer.concat([rawBuf, chunk]);
+      const decoded = dechunk(rawBuf);
+      if (decoded.length > 0) {
+        for (const line of extractLines(decoded, isTty)) {
+          yield formatLogLine(line);
+        }
+      }
+    }
   } finally {
-    signal.removeEventListener("abort", onAbort);
-    try { (logStream as any).destroy?.(); } catch {}
+    signal.removeEventListener("abort", cleanup);
+    cleanup();
   }
 }
 
