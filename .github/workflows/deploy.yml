@@ -25,6 +25,32 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Notificar deploy iniciado
+        if: ${{ secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          AUTHOR=$(git log -1 --pretty=%an)
+          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"🚀 Deploy iniciado\",
+                \"description\": \"**${COMMIT_MSG}**\",
+                \"color\": 3447003,
+                \"fields\": [
+                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
+                  { \"name\": \"Autor\", \"value\": \"${AUTHOR}\", \"inline\": true },
+                  { \"name\": \"Trigger\", \"value\": \"${{ github.event_name }}\", \"inline\": true }
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
+
       - name: Detectar cambios (solo en push automático)
         id: changed
         if: github.event_name == 'push'
