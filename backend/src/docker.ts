@@ -189,8 +189,19 @@ export async function stopGameContainer(serverId: string): Promise<void> {
 
 // --- Internal stream helpers ---
 
+function formatLogLine(raw: string): string {
+  const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))\.\d+Z\s?/);
+  const msg = tsMatch ? raw.slice(tsMatch[0].length) : raw;
+  const ts = tsMatch ? `[${tsMatch[2]}]` : "";
+  return ts ? `${ts} ${msg}` : msg;
+}
+
 async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
   const container = docker.getContainer(containerName);
+
+  // Check if container uses TTY (changes log stream format)
+  const info = await container.inspect();
+  const isTty = info.Config.Tty;
 
   const stream = await container.logs({
     follow: true,
@@ -200,18 +211,31 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     tail: 100,
   });
 
-  for await (const chunk of stream as AsyncIterable<Buffer>) {
-    if (signal.aborted) break;
-    let offset = 0;
-    while (offset < chunk.length) {
-      if (chunk.length - offset < 8) break;
-      const size = chunk.readUInt32BE(offset + 4);
-      const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8").trimEnd();
-      const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))\.\d+Z\s?/);
-      const msg = tsMatch ? raw.slice(tsMatch[0].length) : raw;
-      const ts = tsMatch ? `[${tsMatch[2]}]` : "";
-      yield ts ? `${ts} ${msg}` : msg;
-      offset += 8 + size;
+  if (isTty) {
+    // TTY mode: plain text, no Docker frame headers
+    let buffer = "";
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      if (signal.aborted) break;
+      buffer += chunk.toString("utf8");
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.trim()) yield formatLogLine(line.trimEnd());
+      }
+    }
+  } else {
+    // Multiplexed mode: 8-byte header per frame
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      if (signal.aborted) break;
+      let offset = 0;
+      while (offset < chunk.length) {
+        if (chunk.length - offset < 8) break;
+        const size = chunk.readUInt32BE(offset + 4);
+        if (size === 0 || offset + 8 + size > chunk.length) break;
+        const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8").trimEnd();
+        if (raw) yield formatLogLine(raw);
+        offset += 8 + size;
+      }
     }
   }
 }
