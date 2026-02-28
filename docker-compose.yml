@@ -38,7 +38,6 @@ services:
     logging: *default-logging
     networks:
       - panel
-      - game-panel  # same network as game containers
 
   dashboard:
     build: ./dashboard
@@ -69,7 +68,4 @@ volumes:
 
 networks:
   panel:
-    driver: bridge
-  game-panel:
-    name: game-panel   # must match docker.ts GAME_NETWORK const
     driver: bridge

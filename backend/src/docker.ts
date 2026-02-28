@@ -4,19 +4,10 @@ import { getPanelSetting } from "./db";
 
 export const docker = new Dockerode({ socketPath: "/var/run/docker.sock" });
 
-const GAME_NETWORK = "game-panel";
 const CONTAINER_PREFIX = "game-panel-";
 
 export function gameContainerName(serverId: string) {
   return `${CONTAINER_PREFIX}${serverId}`;
-}
-
-/** Ensure the game-panel Docker network exists */
-export async function ensureNetwork() {
-  const networks = await docker.listNetworks({ filters: { name: [GAME_NETWORK] } });
-  if (networks.length === 0) {
-    await docker.createNetwork({ Name: GAME_NETWORK, Driver: "bridge" });
-  }
 }
 
 /** Return the currently running game container (if any) */
@@ -94,8 +85,6 @@ export async function startGameContainer(
   envVars: Record<string, string>,
   volumes: Record<string, string>
 ): Promise<void> {
-  await ensureNetwork();
-
   // Stop any currently running game container
   const active = await getActiveContainer();
   if (active) {
@@ -123,10 +112,6 @@ export async function startGameContainer(
   // Build env array
   const env = Object.entries(resolvedEnv).map(([k, v]) => `${k}=${v}`);
 
-  // Build port bindings
-  const portStr = `${port}/udp`;
-  const portTcpStr = `${port}/tcp`;
-
   // Build volume bindings: host_path -> container_path
   const binds = Object.entries(volumes).map(([host, container]) => `${host}:${container}`);
 
@@ -145,18 +130,10 @@ export async function startGameContainer(
     name: containerName,
     Image: image,
     Env: env,
-    ExposedPorts: {
-      [portTcpStr]: {},
-      [portStr]: {},
-    },
     HostConfig: {
-      PortBindings: {
-        [portTcpStr]: [{ HostPort: String(port) }],
-        [portStr]: [{ HostPort: String(port), HostIp: "0.0.0.0" }],
-      },
+      NetworkMode: "host",  // zero network overhead — game binds directly to host ports
       Binds: binds,
       RestartPolicy: { Name: "unless-stopped" },
-      NetworkMode: GAME_NETWORK,
       // Resource limits from panel settings
       Memory: Number(getPanelSetting("game_memory_limit_gb")) * 1024 * 1024 * 1024,
       MemoryReservation: 512 * 1024 * 1024,  // 512 MB guaranteed
