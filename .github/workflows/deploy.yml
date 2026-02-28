@@ -159,39 +159,45 @@ jobs:
             echo "static-site actualizado (nginx lo sirve directo)"
 
       - name: Notificar deploy exitoso
-        if: success()
+        if: success() && secrets.DISCORD_BOT_TOKEN && secrets.DISCORD_DEPLOY_CHANNEL_ID
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           COMMIT_SHA=$(git rev-parse --short HEAD)
           AUTHOR=$(git log -1 --pretty=%an)
-          curl -s -H "Content-Type: application/json" -d "{
-            \"embeds\": [{
-              \"title\": \"✅ Deploy exitoso\",
-              \"description\": \"**${COMMIT_MSG}**\",
-              \"color\": 3066993,
-              \"fields\": [
-                { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
-                { \"name\": \"Autor\", \"value\": \"${AUTHOR}\", \"inline\": true },
-                { \"name\": \"Trigger\", \"value\": \"${{ github.event_name }}\", \"inline\": true }
-              ],
-              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }]
-          }" "${{ secrets.DISCORD_DEPLOY_WEBHOOK }}"
+          curl -s -X POST "https://discord.com/api/v10/channels/${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}/messages" \
+            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"✅ Deploy exitoso\",
+                \"description\": \"**${COMMIT_MSG}**\",
+                \"color\": 3066993,
+                \"fields\": [
+                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
+                  { \"name\": \"Autor\", \"value\": \"${AUTHOR}\", \"inline\": true },
+                  { \"name\": \"Trigger\", \"value\": \"${{ github.event_name }}\", \"inline\": true }
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
 
       - name: Notificar deploy fallido
-        if: failure()
+        if: failure() && secrets.DISCORD_BOT_TOKEN && secrets.DISCORD_DEPLOY_CHANNEL_ID
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          curl -s -H "Content-Type: application/json" -d "{
-            \"embeds\": [{
-              \"title\": \"❌ Deploy fallido\",
-              \"description\": \"**${COMMIT_MSG}**\",
-              \"color\": 15158332,
-              \"fields\": [
-                { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
-                { \"name\": \"Logs\", \"value\": \"[Ver logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\", \"inline\": true }
-              ],
-              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }]
-          }" "${{ secrets.DISCORD_DEPLOY_WEBHOOK }}"
+          curl -s -X POST "https://discord.com/api/v10/channels/${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}/messages" \
+            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"❌ Deploy fallido\",
+                \"description\": \"**${COMMIT_MSG}**\",
+                \"color\": 15158332,
+                \"fields\": [
+                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
+                  { \"name\": \"Logs\", \"value\": \"[Ver logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\", \"inline\": true }
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
