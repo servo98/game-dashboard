@@ -1,24 +1,39 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type GameServer, type User } from "../api";
+import {
+  api,
+  createLogStream,
+  createServiceLogStream,
+  createAllServiceStatsStream,
+  type GameServer,
+  type User,
+  type ServiceStats,
+} from "../api";
 import ServerCard from "../components/ServerCard";
 import LogViewer from "../components/LogViewer";
 import ConfigEditor from "../components/ConfigEditor";
 import BotSettings from "../components/BotSettings";
+import HostStatsBar from "../components/HostStatsBar";
+import ServiceStatsBar from "../components/ServiceStatsBar";
 
 type Tab = "servers" | "bot";
+
+const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
 export default function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [servers, setServers] = useState<GameServer[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [logServerId, setLogServerId] = useState<string | null>(null);
+  const [logTarget, setLogTarget] = useState<{ title: string; factory: () => EventSource } | null>(null);
   const [editConfigId, setEditConfigId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("servers");
   const [restartingService, setRestartingService] = useState<string | null>(null);
   const [restartMsg, setRestartMsg] = useState<string | null>(null);
+  const [hostMemTotalMB, setHostMemTotalMB] = useState<number | undefined>(undefined);
+  const [serviceStats, setServiceStats] = useState<Record<string, ServiceStats>>({});
+  const serviceStatsRef = useRef<EventSource | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -33,7 +48,6 @@ export default function Home() {
       setServers(list);
       setError(null);
     } catch {
-      // Only show if we have no data yet (first load)
       if (servers.length === 0) setError("Failed to load servers");
     }
   }, [servers.length]);
@@ -43,6 +57,25 @@ export default function Home() {
     const interval = setInterval(fetchServers, 5000);
     return () => clearInterval(interval);
   }, [fetchServers]);
+
+  // Multiplexed service stats SSE
+  useEffect(() => {
+    const es = createAllServiceStatsStream();
+    serviceStatsRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data as string) as ServiceStats;
+        if (data.service) {
+          setServiceStats((prev) => ({ ...prev, [data.service]: data }));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    return () => es.close();
+  }, []);
 
   const handleStart = async (id: string) => {
     setLoadingId(id);
@@ -63,7 +96,7 @@ export default function Home() {
     try {
       await api.stopServer(id);
       await fetchServers();
-      if (logServerId === id) setLogServerId(null);
+      if (logTarget) setLogTarget(null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -131,6 +164,9 @@ export default function Home() {
 
       {/* Main */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+        {/* Host stats */}
+        <HostStatsBar onMemTotal={setHostMemTotalMB} />
+
         {/* Active server banner */}
         {activeServer && (
           <div className="mb-6 bg-green-950/40 border border-green-800 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -187,9 +223,15 @@ export default function Home() {
                     server={server}
                     isActive={server.status === "running"}
                     loading={loadingId === server.id}
+                    hostMemTotalMB={hostMemTotalMB}
                     onStart={() => handleStart(server.id)}
                     onStop={() => handleStop(server.id)}
-                    onViewLogs={() => setLogServerId(server.id)}
+                    onViewLogs={() =>
+                      setLogTarget({
+                        title: server.id,
+                        factory: () => createLogStream(server.id),
+                      })
+                    }
                     onEditConfig={() => setEditConfigId(server.id)}
                   />
                 ))}
@@ -199,25 +241,43 @@ export default function Home() {
             {/* Infrastructure */}
             <div className="mt-10">
               <h2 className="text-lg font-semibold text-gray-200 mb-4">Infrastructure</h2>
-              <div className="flex flex-wrap gap-3">
-                {(["backend", "bot"] as const).map((svc) => (
-                  <button
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {INFRA_SERVICES.map((svc) => (
+                  <div
                     key={svc}
-                    onClick={() => handleRestartService(svc)}
-                    disabled={restartingService === svc}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-xl text-sm text-gray-300 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed capitalize"
+                    className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col"
                   >
-                    <span
-                      className={
-                        restartingService === svc ? "inline-block animate-spin" : ""
-                      }
-                    >
-                      ⟳
-                    </span>
-                    {restartingService === svc
-                      ? `Restarting ${svc}...`
-                      : `Restart ${svc}`}
-                  </button>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-200 capitalize">{svc}</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() =>
+                            setLogTarget({
+                              title: svc,
+                              factory: () => createServiceLogStream(svc),
+                            })
+                          }
+                          className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
+                        >
+                          Logs
+                        </button>
+                        {(svc === "backend" || svc === "bot") && (
+                          <button
+                            onClick={() => handleRestartService(svc)}
+                            disabled={restartingService === svc}
+                            className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {restartingService === svc ? (
+                              <span className="inline-block animate-spin">⟳</span>
+                            ) : (
+                              "⟳ Restart"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <ServiceStatsBar stats={serviceStats[svc] ?? null} />
+                  </div>
                 ))}
               </div>
               {restartMsg && (
@@ -235,8 +295,12 @@ export default function Home() {
       </main>
 
       {/* Log viewer modal */}
-      {logServerId && (
-        <LogViewer serverId={logServerId} onClose={() => setLogServerId(null)} />
+      {logTarget && (
+        <LogViewer
+          title={logTarget.title}
+          streamFactory={logTarget.factory}
+          onClose={() => setLogTarget(null)}
+        />
       )}
 
       {/* Config editor modal */}

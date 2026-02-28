@@ -3,9 +3,10 @@ import { createStatsStream, type ContainerStats } from "../api";
 
 type Props = {
   serverId: string;
+  hostMemTotalMB?: number;
 };
 
-export default function StatsBar({ serverId }: Props) {
+export default function StatsBar({ serverId, hostMemTotalMB }: Props) {
   const [stats, setStats] = useState<ContainerStats | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -34,9 +35,10 @@ export default function StatsBar({ serverId }: Props) {
   }
 
   const cpuPct = Math.min(100, Math.max(0, stats.cpuPercent));
+  const ramDenominator = hostMemTotalMB ?? stats.memLimitMB;
   const ramPct =
-    stats.memLimitMB > 0
-      ? Math.min(100, (stats.memUsageMB / stats.memLimitMB) * 100)
+    ramDenominator > 0
+      ? Math.min(100, (stats.memUsageMB / ramDenominator) * 100)
       : 0;
 
   return (

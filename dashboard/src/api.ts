@@ -37,7 +37,31 @@ export type ServerConfig = {
 
 export type BotSettings = {
   allowed_channel_id: string | null;
+  errors_channel_id: string | null;
+  crashes_channel_id: string | null;
+  logs_channel_id: string | null;
   commands: Array<{ name: string; description: string }>;
+};
+
+export type DiscordChannel = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+};
+
+export type HostStats = {
+  cpuPercent: number;
+  memUsageMB: number;
+  memTotalMB: number;
+  diskUsedGB: number;
+  diskTotalGB: number;
+};
+
+export type ServiceStats = {
+  service: string;
+  cpuPercent: number;
+  memUsageMB: number;
+  memLimitMB: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -89,14 +113,22 @@ export const api = {
 
   /** Bot settings */
   getBotSettings: () => request<BotSettings>("/bot/settings"),
-  updateBotSettings: (settings: { allowed_channel_id: string | null }) =>
+  updateBotSettings: (settings: Partial<Omit<BotSettings, "commands">>) =>
     request<{ ok: boolean }>("/bot/settings", {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
+  listChannels: () => request<DiscordChannel[]>("/bot/channels"),
+
+  /** Error reporting */
+  reportError: (data: { message: string; stack?: string; url?: string; component?: string }) =>
+    request<{ ok: boolean }>("/notifications/error", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
-/** Create an EventSource for live logs */
+/** Create an EventSource for live game server logs */
 export function createLogStream(serverId: string): EventSource {
   return new EventSource(`${BASE}/servers/${serverId}/logs`, { withCredentials: true });
 }
@@ -104,4 +136,19 @@ export function createLogStream(serverId: string): EventSource {
 /** Create an EventSource for real-time CPU/RAM stats */
 export function createStatsStream(serverId: string): EventSource {
   return new EventSource(`${BASE}/servers/${serverId}/stats`, { withCredentials: true });
+}
+
+/** Create an EventSource for host-level stats */
+export function createHostStatsStream(): EventSource {
+  return new EventSource(`${BASE}/services/host/stats`, { withCredentials: true });
+}
+
+/** Create a multiplexed EventSource for all compose service stats */
+export function createAllServiceStatsStream(): EventSource {
+  return new EventSource(`${BASE}/services/stats`, { withCredentials: true });
+}
+
+/** Create an EventSource for compose service logs */
+export function createServiceLogStream(name: string): EventSource {
+  return new EventSource(`${BASE}/services/${name}/logs`, { withCredentials: true });
 }

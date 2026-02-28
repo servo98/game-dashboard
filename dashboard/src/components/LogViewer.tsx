@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { createLogStream } from "../api";
 
 type Props = {
-  serverId: string;
+  title: string;
+  streamFactory: () => EventSource;
   onClose: () => void;
 };
 
 const MAX_LINES = 500;
 
-export default function LogViewer({ serverId, onClose }: Props) {
+export default function LogViewer({ title, streamFactory, onClose }: Props) {
   const [lines, setLines] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,7 +24,7 @@ export default function LogViewer({ serverId, onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    const es = createLogStream(serverId);
+    const es = streamFactory();
     esRef.current = es;
 
     es.onopen = () => setConnected(true);
@@ -49,7 +49,7 @@ export default function LogViewer({ serverId, onClose }: Props) {
     return () => {
       es.close();
     };
-  }, [serverId]);
+  }, [streamFactory]);
 
   // Auto-scroll to bottom (instant, not smooth)
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function LogViewer({ serverId, onClose }: Props) {
               }`}
             />
             <span className="text-sm font-medium text-gray-200">
-              Live Logs — {serverId}
+              Live Logs — {title}
             </span>
           </div>
           <button

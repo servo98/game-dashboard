@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { serverQueries, serverSessionQueries } from "../db";
+import { serverQueries, serverSessionQueries, botSettingsQueries } from "../db";
 import {
   startGameContainer,
   stopGameContainer,
@@ -79,22 +79,42 @@ servers.post("/:id/start", async (c) => {
         "crash",
         serverId
       );
+
+      const embed = {
+        title: "🔴 Servidor caído",
+        description: `El servidor **${serverName}** se ha detenido inesperadamente.`,
+        color: 15158332,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Try configured crash channel first
+      const crashChannelRow = botSettingsQueries.get.get("crashes_channel_id");
+      const botToken = process.env.DISCORD_BOT_TOKEN;
+
+      if (crashChannelRow?.value && botToken) {
+        try {
+          await fetch(`https://discord.com/api/v10/channels/${crashChannelRow.value}/messages`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bot ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ embeds: [embed] }),
+          });
+          return; // sent via bot API, skip webhook fallback
+        } catch (err) {
+          console.error("Failed to send crash notification via bot:", err);
+        }
+      }
+
+      // Fallback to webhook
       const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
       if (webhookUrl) {
         try {
           await fetch(webhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              embeds: [
-                {
-                  title: "🔴 Servidor caído",
-                  description: `El servidor **${serverName}** se ha detenido inesperadamente.`,
-                  color: 15158332,
-                  timestamp: new Date().toISOString(),
-                },
-              ],
-            }),
+            body: JSON.stringify({ embeds: [embed] }),
           });
         } catch (err) {
           console.error("Failed to send crash webhook:", err);

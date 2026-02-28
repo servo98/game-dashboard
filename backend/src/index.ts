@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth";
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
 import botSettingsRoutes from "./routes/bot-settings";
+import notificationRoutes from "./routes/notifications";
 
 const app = new Hono();
 
@@ -28,6 +29,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/servers", serverRoutes);
 app.route("/api/services", serviceRoutes);
 app.route("/api/bot", botSettingsRoutes);
+app.route("/api/notifications", notificationRoutes);
 
 // Periodic session cleanup (every hour)
 setInterval(

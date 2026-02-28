@@ -1,19 +1,32 @@
 import { useEffect, useState } from "react";
-import { api, type BotSettings } from "../api";
+import { api, type BotSettings as BotSettingsType, type DiscordChannel } from "../api";
+
+const CHANNEL_FIELDS = [
+  { key: "allowed_channel_id" as const, label: "Bot Commands Channel", desc: "Restrict bot commands to this channel (empty = all channels)" },
+  { key: "errors_channel_id" as const, label: "Error Notifications", desc: "Dashboard errors are sent here" },
+  { key: "crashes_channel_id" as const, label: "Crash Notifications", desc: "Game server crash alerts are sent here" },
+  { key: "logs_channel_id" as const, label: "Log Channel", desc: "General log messages" },
+];
 
 export default function BotSettings() {
-  const [settings, setSettings] = useState<BotSettings | null>(null);
-  const [channelId, setChannelId] = useState("");
+  const [settings, setSettings] = useState<BotSettingsType | null>(null);
+  const [channels, setChannels] = useState<DiscordChannel[]>([]);
+  const [draft, setDraft] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .getBotSettings()
-      .then((s) => {
+    Promise.all([api.getBotSettings(), api.listChannels()])
+      .then(([s, ch]) => {
         setSettings(s);
-        setChannelId(s.allowed_channel_id ?? "");
+        setChannels(ch);
+        setDraft({
+          allowed_channel_id: s.allowed_channel_id,
+          errors_channel_id: s.errors_channel_id,
+          crashes_channel_id: s.crashes_channel_id,
+          logs_channel_id: s.logs_channel_id,
+        });
       })
       .catch((err: Error) => setError(err.message));
   }, []);
@@ -22,7 +35,7 @@ export default function BotSettings() {
     setSaving(true);
     setError(null);
     try {
-      await api.updateBotSettings({ allowed_channel_id: channelId.trim() || null });
+      await api.updateBotSettings(draft);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -51,32 +64,42 @@ export default function BotSettings() {
         </div>
       )}
 
-      {/* Allowed channel */}
-      <div>
-        <label className="block text-xs text-gray-500 mb-1.5">
-          Allowed Channel ID
-          <span className="ml-1 text-gray-600">(leave empty to allow all channels)</span>
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={channelId}
-            onChange={(e) => setChannelId(e.target.value)}
-            placeholder="e.g. 1234567890123456789"
-            className="flex-1 bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
-          />
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors shrink-0"
-          >
-            {saved ? "Saved ✓" : saving ? "Saving..." : "Save"}
-          </button>
-        </div>
+      {/* Channel selectors */}
+      <div className="flex flex-col gap-3">
+        {CHANNEL_FIELDS.map((field) => (
+          <div key={field.key}>
+            <label className="block text-xs text-gray-400 mb-1">
+              {field.label}
+              <span className="ml-1 text-gray-600 font-normal">{field.desc}</span>
+            </label>
+            <select
+              value={draft[field.key] ?? ""}
+              onChange={(e) =>
+                setDraft((prev) => ({ ...prev, [field.key]: e.target.value || null }))
+              }
+              className="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 appearance-none"
+            >
+              <option value="">None</option>
+              {channels.map((ch) => (
+                <option key={ch.id} value={ch.id}>
+                  #{ch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
       </div>
 
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="self-start px-5 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+      >
+        {saved ? "Saved ✓" : saving ? "Saving..." : "Save"}
+      </button>
+
       {/* Commands list */}
-      <div>
+      <div className="border-t border-gray-800 pt-3">
         <p className="text-xs text-gray-500 mb-2">Available Commands</p>
         <div className="flex flex-col gap-1.5">
           {settings.commands.map((cmd) => (

@@ -173,7 +173,7 @@ export async function startGameContainer(
   await container.start();
 }
 
-/** Stop and remove a game container */
+/** Stop a game container (does NOT remove it — removal happens on next start) */
 export async function stopGameContainer(serverId: string): Promise<void> {
   const containerName = gameContainerName(serverId);
   try {
@@ -182,18 +182,14 @@ export async function stopGameContainer(serverId: string): Promise<void> {
     if (info.State.Running) {
       await container.stop({ t: 10 });
     }
-    await container.remove();
   } catch {
     // Container already gone
   }
 }
 
-/** Stream logs from a game container as an async generator */
-export async function* streamContainerLogs(
-  serverId: string,
-  signal: AbortSignal
-): AsyncGenerator<string> {
-  const containerName = gameContainerName(serverId);
+// --- Internal stream helpers ---
+
+async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
   const container = docker.getContainer(containerName);
 
   const stream = await container.logs({
@@ -204,19 +200,13 @@ export async function* streamContainerLogs(
     tail: 100,
   });
 
-  // dockerode returns a raw stream; we read it chunk by chunk
   for await (const chunk of stream as AsyncIterable<Buffer>) {
     if (signal.aborted) break;
-    // Docker log format has an 8-byte header per frame
-    // header[0]: stream type (1=stdout, 2=stderr)
-    // header[4..7]: frame size (big-endian uint32)
     let offset = 0;
     while (offset < chunk.length) {
       if (chunk.length - offset < 8) break;
       const size = chunk.readUInt32BE(offset + 4);
       const raw = chunk.slice(offset + 8, offset + 8 + size).toString("utf8").trimEnd();
-      // Docker prepends ISO timestamp: "2026-02-27T23:36:23.321Z <message>"
-      // Format as: [HH:MM:SS] <message>
       const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))\.\d+Z\s?/);
       const msg = tsMatch ? raw.slice(tsMatch[0].length) : raw;
       const ts = tsMatch ? `[${tsMatch[2]}]` : "";
@@ -226,12 +216,10 @@ export async function* streamContainerLogs(
   }
 }
 
-/** Stream CPU/RAM stats from a game container as an async generator */
-export async function* streamContainerStats(
-  serverId: string,
+async function* _streamStats(
+  containerName: string,
   signal: AbortSignal
 ): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
-  const containerName = gameContainerName(serverId);
   const container = docker.getContainer(containerName);
 
   // @ts-ignore — dockerode typings don't expose the stream overload cleanly
@@ -271,5 +259,119 @@ export async function* streamContainerStats(
         // Ignore parse errors
       }
     }
+  }
+}
+
+// --- Public stream functions ---
+
+/** Stream logs from a game container */
+export async function* streamContainerLogs(
+  serverId: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  yield* _streamLogs(gameContainerName(serverId), signal);
+}
+
+/** Stream CPU/RAM stats from a game container */
+export async function* streamContainerStats(
+  serverId: string,
+  signal: AbortSignal
+): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+  yield* _streamStats(gameContainerName(serverId), signal);
+}
+
+/** Stream logs from a compose service */
+export async function* streamServiceLogs(
+  serviceName: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
+  yield* _streamLogs(`${projectName}-${serviceName}-1`, signal);
+}
+
+/** Stream CPU/RAM stats from a compose service */
+export async function* streamServiceStats(
+  serviceName: string,
+  signal: AbortSignal
+): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+  const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
+  yield* _streamStats(`${projectName}-${serviceName}-1`, signal);
+}
+
+export type HostStats = {
+  cpuPercent: number;
+  memUsageMB: number;
+  memTotalMB: number;
+  diskUsedGB: number;
+  diskTotalGB: number;
+};
+
+/** Stream host-level stats (CPU, RAM, Disk) every 3s */
+export async function* streamHostStats(signal: AbortSignal): AsyncGenerator<HostStats> {
+  let prevIdle = 0;
+  let prevTotal = 0;
+
+  while (!signal.aborted) {
+    try {
+      // CPU from /proc/stat
+      const statContent = await Bun.file("/proc/stat").text();
+      const cpuLine = statContent.split("\n").find((l) => l.startsWith("cpu "));
+      let cpuPercent = 0;
+      if (cpuLine) {
+        const parts = cpuLine.split(/\s+/).slice(1).map(Number);
+        const idle = parts[3] + (parts[4] ?? 0); // idle + iowait
+        const total = parts.reduce((a, b) => a + b, 0);
+        if (prevTotal > 0) {
+          const deltaTotal = total - prevTotal;
+          const deltaIdle = idle - prevIdle;
+          cpuPercent = deltaTotal > 0 ? ((deltaTotal - deltaIdle) / deltaTotal) * 100 : 0;
+        }
+        prevIdle = idle;
+        prevTotal = total;
+      }
+
+      // RAM from /proc/meminfo
+      const meminfoContent = await Bun.file("/proc/meminfo").text();
+      const memLines = Object.fromEntries(
+        meminfoContent
+          .split("\n")
+          .filter((l) => l.includes(":"))
+          .map((l) => {
+            const [key, rest] = l.split(":");
+            return [key.trim(), parseInt(rest.trim()) / 1024]; // kB -> MB
+          })
+      );
+      const memTotalMB = memLines["MemTotal"] ?? 0;
+      const memAvailableMB = memLines["MemAvailable"] ?? 0;
+      const memUsageMB = memTotalMB - memAvailableMB;
+
+      // Disk from df
+      const dfResult = Bun.spawnSync(["df", "-B1", "/data"]);
+      let diskUsedGB = 0;
+      let diskTotalGB = 0;
+      const dfOutput = dfResult.stdout.toString();
+      const dfLines = dfOutput.trim().split("\n");
+      if (dfLines.length >= 2) {
+        const cols = dfLines[1].split(/\s+/);
+        diskTotalGB = parseInt(cols[1]) / 1024 / 1024 / 1024;
+        diskUsedGB = parseInt(cols[2]) / 1024 / 1024 / 1024;
+      }
+
+      yield {
+        cpuPercent: Math.max(0, Math.min(cpuPercent, 100)),
+        memUsageMB,
+        memTotalMB,
+        diskUsedGB,
+        diskTotalGB,
+      };
+    } catch {
+      // Ignore errors, retry next cycle
+    }
+
+    // Wait 3s
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 3000);
+      signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+    });
   }
 }

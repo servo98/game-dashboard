@@ -11,6 +11,7 @@ type Props = {
   onViewLogs: () => void;
   onEditConfig: () => void;
   loading: boolean;
+  hostMemTotalMB?: number;
 };
 
 const GAME_ICONS: Record<string, string> = {
@@ -21,7 +22,7 @@ const GAME_ICONS: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   running: "bg-green-500",
   stopped: "bg-gray-500",
-  missing: "bg-gray-700",
+  missing: "bg-gray-500",
 };
 
 const GAME_HOST: Record<string, (port: number) => string> = {
@@ -59,6 +60,7 @@ export default function ServerCard({
   onViewLogs,
   onEditConfig,
   loading,
+  hostMemTotalMB,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -113,7 +115,9 @@ export default function ServerCard({
           <span
             className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_COLOR[server.status]}`}
           />
-          <span className="text-xs text-gray-400 capitalize">{server.status}</span>
+          <span className="text-xs text-gray-400 capitalize">
+            {server.status === "missing" ? "Stopped" : server.status}
+          </span>
         </div>
       </div>
 
@@ -134,7 +138,7 @@ export default function ServerCard({
       )}
 
       {/* CPU/RAM stats — only when running */}
-      {isRunning && <StatsBar serverId={server.id} />}
+      {isRunning && <StatsBar serverId={server.id} hostMemTotalMB={hostMemTotalMB} />}
 
       {/* Actions */}
       <div className="flex gap-2">
