@@ -159,13 +159,16 @@ jobs:
             echo "static-site actualizado (nginx lo sirve directo)"
 
       - name: Notificar deploy exitoso
-        if: success() && secrets.DISCORD_BOT_TOKEN && secrets.DISCORD_DEPLOY_CHANNEL_ID
+        if: ${{ success() && secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           COMMIT_SHA=$(git rev-parse --short HEAD)
           AUTHOR=$(git log -1 --pretty=%an)
-          curl -s -X POST "https://discord.com/api/v10/channels/${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}/messages" \
-            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
@@ -182,12 +185,15 @@ jobs:
             }"
 
       - name: Notificar deploy fallido
-        if: failure() && secrets.DISCORD_BOT_TOKEN && secrets.DISCORD_DEPLOY_CHANNEL_ID
+        if: ${{ failure() && secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          curl -s -X POST "https://discord.com/api/v10/channels/${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}/messages" \
-            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
