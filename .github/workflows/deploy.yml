@@ -168,7 +168,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
-            docker compose up -d backend
+            docker compose up -d --force-recreate --no-deps backend
 
   deploy-dashboard:
     runs-on: ubuntu-latest
@@ -190,7 +190,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
-            docker compose up -d dashboard
+            docker compose up -d --no-deps dashboard
 
   deploy-bot:
     runs-on: ubuntu-latest
@@ -212,7 +212,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
-            docker compose up -d bot
+            docker compose up -d --no-deps bot
 
   deploy-nginx:
     runs-on: ubuntu-latest
