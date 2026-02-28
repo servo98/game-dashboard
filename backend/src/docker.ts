@@ -190,10 +190,12 @@ export async function stopGameContainer(serverId: string): Promise<void> {
 // --- Internal stream helpers ---
 
 function formatLogLine(raw: string): string {
-  const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))\.\d+Z\s?/);
-  const msg = tsMatch ? raw.slice(tsMatch[0].length) : raw;
-  const ts = tsMatch ? `[${tsMatch[2]}]` : "";
-  return ts ? `${ts} ${msg}` : msg;
+  const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s?/);
+  if (tsMatch) {
+    const msg = raw.slice(tsMatch[0].length);
+    return `${tsMatch[1]}Z\t${msg}`; // ISO timestamp + tab + message
+  }
+  return raw;
 }
 
 async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {

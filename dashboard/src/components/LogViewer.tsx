@@ -8,6 +8,20 @@ type Props = {
 
 const MAX_LINES = 500;
 
+/** Convert "2026-02-28T00:44:15Z\tmessage" to "[HH:MM:SS] message" in local time */
+function formatLine(raw: string): string {
+  const tabIdx = raw.indexOf("\t");
+  if (tabIdx > 0) {
+    const iso = raw.slice(0, tabIdx);
+    const date = new Date(iso);
+    if (!isNaN(date.getTime())) {
+      const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return `[${time}] ${raw.slice(tabIdx + 1)}`;
+    }
+  }
+  return raw;
+}
+
 export default function LogViewer({ title, streamFactory, onClose }: Props) {
   const [lines, setLines] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
@@ -30,7 +44,7 @@ export default function LogViewer({ title, streamFactory, onClose }: Props) {
     es.onopen = () => setConnected(true);
 
     es.onmessage = (e) => {
-      const text = JSON.parse(e.data as string) as string;
+      const text = formatLine(JSON.parse(e.data as string) as string);
       setLines((prev) => {
         if (prev.length >= MAX_LINES) {
           const next = prev.slice(-Math.floor(MAX_LINES * 0.75));
