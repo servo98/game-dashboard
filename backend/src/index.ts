@@ -45,4 +45,5 @@ console.log(`Backend running on port ${port}`);
 export default {
   port,
   fetch: app.fetch,
+  idleTimeout: 255, // max for Bun — needed for SSE connections
 };
