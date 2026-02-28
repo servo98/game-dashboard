@@ -30,30 +30,26 @@ jobs:
           fetch-depth: 2
 
       - name: Notificar deploy iniciado
-        if: ${{ secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
         env:
           BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          COMMIT_SHA=$(git rev-parse --short HEAD)
-          AUTHOR=$(git log -1 --pretty=%an)
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
+          SHORT=$(git rev-parse --short HEAD)
+          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          JSON=$(cat <<EOFJ
+          {"embeds":[{"title":"🚀 Deploy iniciado","description":"**${MSG}**","color":3447003,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true}],"timestamp":"${TS}"}]}
+          EOFJ
+          )
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
             -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [{
-                \"title\": \"🚀 Deploy iniciado\",
-                \"description\": \"**${COMMIT_MSG}**\",
-                \"color\": 3447003,
-                \"fields\": [
-                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
-                  { \"name\": \"Autor\", \"value\": \"${AUTHOR}\", \"inline\": true },
-                  { \"name\": \"Trigger\", \"value\": \"${{ github.event_name }}\", \"inline\": true }
-                ],
-                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-              }]
-            }"
+            -d "$JSON"
 
       - name: Detectar cambios (solo en push automático)
         id: changed
@@ -189,51 +185,46 @@ jobs:
             echo "static-site actualizado (nginx lo sirve directo)"
 
       - name: Notificar deploy exitoso
-        if: ${{ success() && secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
+        if: success()
         env:
           BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          COMMIT_SHA=$(git rev-parse --short HEAD)
-          AUTHOR=$(git log -1 --pretty=%an)
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
+          SHORT=$(git rev-parse --short HEAD)
+          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          JSON=$(cat <<EOFJ
+          {"embeds":[{"title":"✅ Deploy exitoso","description":"**${MSG}**","color":3066993,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true}],"timestamp":"${TS}"}]}
+          EOFJ
+          )
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
             -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [{
-                \"title\": \"✅ Deploy exitoso\",
-                \"description\": \"**${COMMIT_MSG}**\",
-                \"color\": 3066993,
-                \"fields\": [
-                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
-                  { \"name\": \"Autor\", \"value\": \"${AUTHOR}\", \"inline\": true },
-                  { \"name\": \"Trigger\", \"value\": \"${{ github.event_name }}\", \"inline\": true }
-                ],
-                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-              }]
-            }"
+            -d "$JSON"
 
       - name: Notificar deploy fallido
-        if: ${{ failure() && secrets.DISCORD_BOT_TOKEN != '' && secrets.DISCORD_DEPLOY_CHANNEL_ID != '' }}
+        if: failure()
         env:
           BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.DISCORD_DEPLOY_CHANNEL_ID }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          COMMIT_SHA=$(git rev-parse --short HEAD)
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+          MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
+          SHORT=$(git rev-parse --short HEAD)
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          JSON=$(cat <<EOFJ
+          {"embeds":[{"title":"❌ Deploy fallido","description":"**${MSG}**","color":15158332,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Logs","value":"[Ver logs](https://github.com/${REPO}/actions/runs/${RUN_ID})","inline":true}],"timestamp":"${TS}"}]}
+          EOFJ
+          )
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
             -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [{
-                \"title\": \"❌ Deploy fallido\",
-                \"description\": \"**${COMMIT_MSG}**\",
-                \"color\": 15158332,
-                \"fields\": [
-                  { \"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true },
-                  { \"name\": \"Logs\", \"value\": \"[Ver logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\", \"inline\": true }
-                ],
-                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-              }]
-            }"
+            -d "$JSON"
