@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
+  AutocompleteInteraction,
   EmbedBuilder,
 } from "discord.js";
 
@@ -12,11 +13,28 @@ export const data = new SlashCommandBuilder()
       .setName("game")
       .setDescription("Which game server to start")
       .setRequired(true)
-      .addChoices(
-        { name: "Valheim", value: "valheim" },
-        { name: "Minecraft", value: "minecraft" }
-      )
+      .setAutocomplete(true)
   );
+
+export async function autocomplete(interaction: AutocompleteInteraction) {
+  const focused = interaction.options.getFocused().toLowerCase();
+
+  try {
+    const res = await fetch(`${process.env.BACKEND_URL}/api/servers`, {
+      headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
+    });
+    const servers = (await res.json()) as Array<{ id: string; name: string }>;
+    const filtered = servers
+      .filter((s) => s.name.toLowerCase().includes(focused) || s.id.toLowerCase().includes(focused))
+      .slice(0, 25);
+
+    await interaction.respond(
+      filtered.map((s) => ({ name: s.name, value: s.id }))
+    );
+  } catch {
+    await interaction.respond([]);
+  }
+}
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const gameId = interaction.options.getString("game", true);

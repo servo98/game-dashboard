@@ -11,9 +11,108 @@ import {
   markIntentionalStop,
 } from "../docker";
 import { requireAuth } from "../middleware/auth";
+import { GAME_CATALOG, findTemplate } from "../catalog";
 import type { Session } from "../db";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
+
+// Game catalog — public
+servers.get("/catalog", (c) => {
+  const search = c.req.query("search")?.toLowerCase();
+  if (search) {
+    const filtered = GAME_CATALOG.filter((t) =>
+      t.name.toLowerCase().includes(search) || t.id.toLowerCase().includes(search)
+    );
+    return c.json(filtered);
+  }
+  return c.json(GAME_CATALOG);
+});
+
+// Create a new server from catalog template or custom config
+servers.post("/", requireAuth, async (c) => {
+  const body = await c.req.json<{
+    template_id?: string;
+    id?: string;
+    name?: string;
+    game_type?: string;
+    docker_image?: string;
+    port?: number;
+    env_vars?: Record<string, string>;
+    volumes?: Record<string, string>;
+  }>();
+
+  let id: string;
+  let name: string;
+  let game_type: string;
+  let docker_image: string;
+  let port: number;
+  let env_vars: Record<string, string>;
+  let volumes: Record<string, string>;
+
+  if (body.template_id) {
+    const template = findTemplate(body.template_id);
+    if (!template) return c.json({ error: "Template not found" }, 404);
+
+    id = body.id ?? template.id;
+    name = body.name ?? template.name;
+    game_type = template.category;
+    docker_image = body.docker_image ?? template.docker_image;
+    port = body.port ?? template.default_port;
+    env_vars = { ...template.default_env, ...(body.env_vars ?? {}) };
+    volumes = { ...template.default_volumes, ...(body.volumes ?? {}) };
+  } else {
+    if (!body.id || !body.name || !body.docker_image || !body.port) {
+      return c.json({ error: "Missing required fields: id, name, docker_image, port" }, 400);
+    }
+    id = body.id;
+    name = body.name;
+    game_type = body.game_type ?? "other";
+    docker_image = body.docker_image;
+    port = body.port;
+    env_vars = body.env_vars ?? {};
+    volumes = body.volumes ?? {};
+  }
+
+  // Validate id format
+  if (!/^[a-z0-9_-]+$/.test(id)) {
+    return c.json({ error: "Server ID must only contain lowercase letters, numbers, hyphens, and underscores" }, 400);
+  }
+
+  // Check uniqueness
+  const existing = serverQueries.getById.get(id);
+  if (existing) return c.json({ error: "A server with this ID already exists" }, 409);
+
+  // Check port conflict
+  const allServers = serverQueries.getAll.all();
+  const portConflict = allServers.find((s) => s.port === port);
+  if (portConflict) {
+    return c.json({ error: `Port ${port} is already used by ${portConflict.name}` }, 409);
+  }
+
+  try {
+    serverQueries.insert.run(id, name, game_type, docker_image, port, JSON.stringify(env_vars), JSON.stringify(volumes));
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: "Failed to create server" }, 500);
+  }
+});
+
+// Delete a server — only when stopped
+servers.delete("/:id", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const status = await getContainerStatus(id);
+  if (status === "running") {
+    return c.json({ error: "Cannot delete a running server. Stop it first." }, 400);
+  }
+
+  serverSessionQueries.deleteByServerId.run(id);
+  serverQueries.deleteById.run(id);
+
+  return c.json({ ok: true });
+});
 
 // Both dashboard users and bot can list servers
 servers.get("/", async (c) => {

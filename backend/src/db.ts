@@ -37,6 +37,11 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS panel_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 export type Server = {
@@ -70,8 +75,9 @@ export const serverQueries = {
   getAll: db.query<Server, []>("SELECT * FROM servers ORDER BY created_at ASC"),
   getById: db.query<Server, [string]>("SELECT * FROM servers WHERE id = ?"),
   insert: db.query<void, [string, string, string, string, number, string, string]>(
-    "INSERT OR REPLACE INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)"
   ),
+  deleteById: db.query<void, [string]>("DELETE FROM servers WHERE id = ?"),
   update: db.query<void, [string, string, string]>(
     "UPDATE servers SET docker_image = ?, env_vars = ? WHERE id = ?"
   ),
@@ -98,6 +104,9 @@ export const serverSessionQueries = {
   history: db.query<ServerSession, [string]>(
     "SELECT * FROM server_sessions WHERE server_id = ? ORDER BY started_at DESC LIMIT 10"
   ),
+  deleteByServerId: db.query<void, [string]>(
+    "DELETE FROM server_sessions WHERE server_id = ?"
+  ),
 };
 
 export const botSettingsQueries = {
@@ -111,3 +120,36 @@ export const botSettingsQueries = {
     "DELETE FROM bot_settings WHERE key = ?"
   ),
 };
+
+const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
+  host_domain: "aypapol.com",
+  game_memory_limit_gb: "6",
+  game_cpu_limit: "3",
+  auto_stop_hours: "0",
+};
+
+export const panelSettingsQueries = {
+  get: db.query<{ key: string; value: string }, [string]>(
+    "SELECT key, value FROM panel_settings WHERE key = ?"
+  ),
+  set: db.query<void, [string, string]>(
+    "INSERT OR REPLACE INTO panel_settings (key, value) VALUES (?, ?)"
+  ),
+  getAll: db.query<{ key: string; value: string }, []>(
+    "SELECT key, value FROM panel_settings"
+  ),
+};
+
+export function getPanelSetting(key: string): string {
+  const row = panelSettingsQueries.get.get(key);
+  return row?.value ?? PANEL_SETTINGS_DEFAULTS[key] ?? "";
+}
+
+export function getAllPanelSettings(): Record<string, string> {
+  const rows = panelSettingsQueries.getAll.all();
+  const result = { ...PANEL_SETTINGS_DEFAULTS };
+  for (const row of rows) {
+    result[row.key] = row.value;
+  }
+  return result;
+}

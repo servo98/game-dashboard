@@ -3,6 +3,7 @@ import {
   GatewayIntentBits,
   Collection,
   type ChatInputCommandInteraction,
+  type AutocompleteInteraction,
 } from "discord.js";
 import * as start from "./commands/start";
 import * as stop from "./commands/stop";
@@ -11,6 +12,7 @@ import * as status from "./commands/status";
 type Command = {
   data: { name: string };
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
+  autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
 };
 
 const commands = new Collection<string, Command>();
@@ -51,6 +53,19 @@ client.once("clientReady", (c) => {
 });
 
 client.on("interactionCreate", async (interaction) => {
+  // Handle autocomplete
+  if (interaction.isAutocomplete()) {
+    const command = commands.get(interaction.commandName);
+    if (command?.autocomplete) {
+      try {
+        await command.autocomplete(interaction);
+      } catch (err) {
+        console.error(`Error in autocomplete for /${interaction.commandName}:`, err);
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   // Channel guard

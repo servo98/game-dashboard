@@ -15,8 +15,10 @@ import ConfigEditor from "../components/ConfigEditor";
 import BotSettings from "../components/BotSettings";
 import HostStatsBar from "../components/HostStatsBar";
 import ServiceStatsBar from "../components/ServiceStatsBar";
+import GameStore from "../components/GameStore";
+import PanelSettings from "../components/PanelSettings";
 
-type Tab = "servers" | "bot";
+type Tab = "servers" | "bot" | "settings";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
@@ -34,6 +36,8 @@ export default function Home() {
   const [hostMemTotalMB, setHostMemTotalMB] = useState<number | undefined>(undefined);
   const [serviceStats, setServiceStats] = useState<Record<string, ServiceStats>>({});
   const serviceStatsRef = useRef<EventSource | null>(null);
+  const [showGameStore, setShowGameStore] = useState(false);
+  const [hostDomain, setHostDomain] = useState("aypapol.com");
 
   // Auth guard
   useEffect(() => {
@@ -41,6 +45,13 @@ export default function Home() {
       .then(setUser)
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
+
+  // Fetch host domain from settings
+  useEffect(() => {
+    api.getSettings()
+      .then((s) => setHostDomain(s.host_domain))
+      .catch(() => {});
+  }, []);
 
   const fetchServers = useCallback(async () => {
     try {
@@ -101,6 +112,16 @@ export default function Home() {
       setError((err as Error).message);
     } finally {
       setLoadingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setError(null);
+    try {
+      await api.deleteServer(id);
+      await fetchServers();
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -195,7 +216,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(["servers", "bot"] as const).map((t) => (
+          {(["servers", "bot", "settings"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -205,16 +226,35 @@ export default function Home() {
                   : "border-transparent text-gray-500 hover:text-gray-300"
               }`}
             >
-              {t === "servers" ? "Game Servers" : "Bot"}
+              {t === "servers" ? "Game Servers" : t === "bot" ? "Bot" : "Settings"}
             </button>
           ))}
         </div>
 
         {tab === "servers" && (
           <>
+            {/* Server grid header with add button */}
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm text-gray-400">{servers.length} server{servers.length !== 1 ? "s" : ""}</span>
+              <button
+                onClick={() => setShowGameStore(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                + Add Game
+              </button>
+            </div>
+
             {/* Server grid */}
             {servers.length === 0 ? (
-              <div className="text-center text-gray-600 py-16">No servers configured.</div>
+              <div className="text-center text-gray-600 py-16">
+                <p>No servers configured.</p>
+                <button
+                  onClick={() => setShowGameStore(true)}
+                  className="mt-3 text-brand-400 hover:text-brand-300 text-sm"
+                >
+                  Add your first game server
+                </button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {servers.map((server) => (
@@ -224,8 +264,10 @@ export default function Home() {
                     isActive={server.status === "running"}
                     loading={loadingId === server.id}
                     hostMemTotalMB={hostMemTotalMB}
+                    hostDomain={hostDomain}
                     onStart={() => handleStart(server.id)}
                     onStop={() => handleStop(server.id)}
+                    onDelete={() => handleDelete(server.id)}
                     onViewLogs={() =>
                       setLogTarget({
                         title: server.id,
@@ -292,6 +334,12 @@ export default function Home() {
             <BotSettings />
           </div>
         )}
+
+        {tab === "settings" && (
+          <div className="max-w-lg">
+            <PanelSettings />
+          </div>
+        )}
       </main>
 
       {/* Log viewer modal */}
@@ -313,6 +361,13 @@ export default function Home() {
           onSaved={fetchServers}
         />
       )}
+
+      {/* Game store modal */}
+      <GameStore
+        open={showGameStore}
+        onClose={() => setShowGameStore(false)}
+        onCreated={fetchServers}
+      />
     </div>
   );
 }

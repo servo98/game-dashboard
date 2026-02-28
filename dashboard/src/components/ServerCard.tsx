@@ -10,13 +10,10 @@ type Props = {
   onStop: () => void;
   onViewLogs: () => void;
   onEditConfig: () => void;
+  onDelete: () => void;
   loading: boolean;
   hostMemTotalMB?: number;
-};
-
-const GAME_ICONS: Record<string, string> = {
-  minecraft: "⛏️",
-  valheim: "🪓",
+  hostDomain?: string;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -25,13 +22,11 @@ const STATUS_COLOR: Record<string, string> = {
   missing: "bg-gray-500",
 };
 
-const GAME_HOST: Record<string, (port: number) => string> = {
-  minecraft: () => "mc.aypapol.com",
-};
-
-function connectAddress(game_type: string, port: number): string {
-  const fn = GAME_HOST[game_type];
-  return fn ? fn(port) : `aypapol.com:${port}`;
+function connectAddress(game_type: string, port: number, hostDomain: string): string {
+  if (game_type === "sandbox" && port === 25565) {
+    return `mc.${hostDomain}`;
+  }
+  return `${hostDomain}:${port}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -59,17 +54,19 @@ export default function ServerCard({
   onStop,
   onViewLogs,
   onEditConfig,
+  onDelete,
   loading,
   hostMemTotalMB,
+  hostDomain = "aypapol.com",
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ServerSessionRecord[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const icon = GAME_ICONS[server.game_type] ?? "🎮";
   const isRunning = server.status === "running";
-  const address = connectAddress(server.game_type, server.port);
+  const address = connectAddress(server.game_type, server.port, hostDomain);
 
   function handleCopy() {
     navigator.clipboard.writeText(address);
@@ -96,6 +93,16 @@ export default function ServerCard({
     }
   }
 
+  function handleDeleteClick() {
+    if (confirmDelete) {
+      onDelete();
+      setConfirmDelete(false);
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  }
+
   return (
     <div
       className={`bg-gray-900 border rounded-2xl p-5 flex flex-col gap-4 transition-all ${
@@ -105,7 +112,7 @@ export default function ServerCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{icon}</span>
+          <span className="text-3xl">🎮</span>
           <div>
             <h3 className="font-semibold text-white leading-tight">{server.name}</h3>
             <p className="text-xs text-gray-500">Port {server.port}</p>
@@ -125,14 +132,14 @@ export default function ServerCard({
       {isRunning && (
         <div className="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
           <div className="flex flex-col">
-            <span className="text-xs text-gray-500 leading-none mb-0.5">Conectar</span>
+            <span className="text-xs text-gray-500 leading-none mb-0.5">Connect</span>
             <span className="text-sm font-mono text-green-400">{address}</span>
           </div>
           <button
             onClick={handleCopy}
             className="text-xs px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors shrink-0"
           >
-            {copied ? "Copiado ✓" : "Copiar"}
+            {copied ? "Copied!" : "Copy"}
           </button>
         </div>
       )}
@@ -157,6 +164,17 @@ export default function ServerCard({
               className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-white transition-colors"
             >
               ⚙
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              title={confirmDelete ? "Click again to confirm" : "Delete server"}
+              className={`px-3 py-2 rounded-xl text-sm transition-colors ${
+                confirmDelete
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
+              }`}
+            >
+              {confirmDelete ? "Confirm?" : "🗑"}
             </button>
           </>
         ) : (

@@ -64,6 +64,34 @@ export type ServiceStats = {
   memLimitMB: number;
 };
 
+export type GameTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  docker_image: string;
+  default_port: number;
+  default_env: Record<string, string>;
+  default_volumes: Record<string, string>;
+};
+
+export type PanelSettings = {
+  host_domain: string;
+  game_memory_limit_gb: string;
+  game_cpu_limit: string;
+  auto_stop_hours: string;
+};
+
+export type CreateServerRequest = {
+  template_id?: string;
+  id?: string;
+  name?: string;
+  game_type?: string;
+  docker_image?: string;
+  port?: number;
+  env_vars?: Record<string, string>;
+  volumes?: Record<string, string>;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
@@ -119,6 +147,27 @@ export const api = {
       body: JSON.stringify(settings),
     }),
   listChannels: () => request<DiscordChannel[]>("/bot/channels"),
+
+  /** Game catalog */
+  getCatalog: (search?: string) =>
+    request<GameTemplate[]>(`/servers/catalog${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+
+  /** Create / delete servers */
+  createServer: (data: CreateServerRequest) =>
+    request<{ ok: boolean }>("/servers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteServer: (id: string) =>
+    request<{ ok: boolean }>(`/servers/${id}`, { method: "DELETE" }),
+
+  /** Panel settings */
+  getSettings: () => request<PanelSettings>("/settings"),
+  updateSettings: (settings: Partial<PanelSettings>) =>
+    request<{ ok: boolean }>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
 
   /** Error reporting */
   reportError: (data: { message: string; stack?: string; url?: string; component?: string }) =>

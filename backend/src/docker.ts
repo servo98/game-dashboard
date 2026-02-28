@@ -1,4 +1,5 @@
 import Dockerode from "dockerode";
+import { getPanelSetting } from "./db";
 
 export const docker = new Dockerode({ socketPath: "/var/run/docker.sock" });
 
@@ -155,10 +156,10 @@ export async function startGameContainer(
       Binds: binds,
       RestartPolicy: { Name: "unless-stopped" },
       NetworkMode: GAME_NETWORK,
-      // Resource limits — deja 1 vCPU + 1 GB para backend/nginx
-      Memory: 6 * 1024 * 1024 * 1024,       // 6 GB máx
-      MemoryReservation: 512 * 1024 * 1024,  // 512 MB garantizados
-      NanoCpus: 3 * 1e9,                     // 3 vCPUs máx
+      // Resource limits from panel settings
+      Memory: Number(getPanelSetting("game_memory_limit_gb")) * 1024 * 1024 * 1024,
+      MemoryReservation: 512 * 1024 * 1024,  // 512 MB guaranteed
+      NanoCpus: Number(getPanelSetting("game_cpu_limit")) * 1e9,
       // Log rotation — máx 150 MB por juego (3 × 50 MB)
       LogConfig: {
         Type: "json-file",
