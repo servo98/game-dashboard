@@ -168,13 +168,18 @@ export async function stopGameContainer(serverId: string): Promise<void> {
 
 // --- Internal stream helpers ---
 
+function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 function formatLogLine(raw: string): string {
-  const tsMatch = raw.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s?/);
+  const clean = stripAnsi(raw);
+  const tsMatch = clean.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s?/);
   if (tsMatch) {
-    const msg = raw.slice(tsMatch[0].length);
+    const msg = clean.slice(tsMatch[0].length);
     return `${tsMatch[1]}Z\t${msg}`; // ISO timestamp + tab + message
   }
-  return raw;
+  return clean;
 }
 
 /**
