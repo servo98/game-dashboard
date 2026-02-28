@@ -246,44 +246,47 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
       return queue.shift() ?? null;
     }
 
-    // Skip HTTP headers
-    let headerBuf = "";
-    let bodyRemainder = Buffer.alloc(0);
-    while (true) {
-      const chunk = await nextChunk();
-      if (!chunk) return;
-      headerBuf += chunk.toString("utf8");
-      const idx = headerBuf.indexOf("\r\n\r\n");
-      if (idx >= 0) {
-        bodyRemainder = Buffer.from(headerBuf.substring(idx + 4), "binary");
-        break;
+    // Parse chunked transfer encoding + Docker multiplexed frames
+    let rawBuf = Buffer.alloc(0);
+
+    // Skip HTTP headers — keep everything as raw Buffer to avoid corruption
+    {
+      let headerRaw = Buffer.alloc(0);
+      const CRLFCRLF = Buffer.from("\r\n\r\n");
+      while (true) {
+        const chunk = await nextChunk();
+        if (!chunk) return;
+        headerRaw = Buffer.concat([headerRaw, chunk]);
+        const idx = headerRaw.indexOf(CRLFCRLF);
+        if (idx >= 0) {
+          // Everything after \r\n\r\n is the start of the body
+          rawBuf = headerRaw.subarray(idx + 4);
+          break;
+        }
       }
     }
 
-    // Parse chunked transfer encoding + Docker multiplexed frames
-    let rawBuf = bodyRemainder;
-
-    function dechunk(data: Buffer): Buffer {
+    function dechunk(): Buffer {
       // Parse chunked transfer encoding: "<hex-size>\r\n<data>\r\n"
       let result = Buffer.alloc(0);
       let pos = 0;
-      while (pos < data.length) {
-        const crlfIdx = data.indexOf("\r\n", pos);
+      const CRLF = Buffer.from("\r\n");
+      while (pos < rawBuf.length) {
+        const crlfIdx = rawBuf.indexOf(CRLF, pos);
         if (crlfIdx < 0) break;
-        const sizeStr = data.subarray(pos, crlfIdx).toString("utf8").trim();
+        const sizeStr = rawBuf.subarray(pos, crlfIdx).toString("ascii").trim();
         if (!sizeStr) { pos = crlfIdx + 2; continue; }
         const chunkSize = parseInt(sizeStr, 16);
-        if (isNaN(chunkSize) || chunkSize === 0) break;
+        if (isNaN(chunkSize) || chunkSize === 0) { pos = crlfIdx + 2; break; }
         const dataStart = crlfIdx + 2;
-        if (dataStart + chunkSize > data.length) {
-          // Incomplete chunk — return what we have, keep remainder
-          rawBuf = data.subarray(pos);
-          return result;
+        if (dataStart + chunkSize + 2 > rawBuf.length) {
+          // Incomplete chunk — keep remainder for next iteration
+          break;
         }
-        result = Buffer.concat([result, data.subarray(dataStart, dataStart + chunkSize)]);
+        result = Buffer.concat([result, rawBuf.subarray(dataStart, dataStart + chunkSize)]);
         pos = dataStart + chunkSize + 2; // skip trailing \r\n
       }
-      rawBuf = data.subarray(pos);
+      rawBuf = rawBuf.subarray(pos);
       return result;
     }
 
@@ -312,7 +315,7 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
 
     // Process initial body remainder
     if (rawBuf.length > 0) {
-      const decoded = dechunk(rawBuf);
+      const decoded = dechunk();
       for (const line of extractLines(decoded, isTty)) {
         yield formatLogLine(line);
       }
@@ -323,7 +326,7 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
       const chunk = await nextChunk();
       if (!chunk) break;
       rawBuf = Buffer.concat([rawBuf, chunk]);
-      const decoded = dechunk(rawBuf);
+      const decoded = dechunk();
       if (decoded.length > 0) {
         for (const line of extractLines(decoded, isTty)) {
           yield formatLogLine(line);
