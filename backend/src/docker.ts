@@ -346,8 +346,7 @@ async function* _streamStats(
 ): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
   const container = docker.getContainer(containerName);
 
-  // @ts-expect-error — dockerode typings don't expose the stream overload cleanly
-  const stream = (await container.stats({ stream: true })) as NodeJS.ReadableStream;
+  const stream = (await container.stats({ stream: true })) as unknown as NodeJS.ReadableStream;
 
   let buffer = "";
 
