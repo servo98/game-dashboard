@@ -64,7 +64,8 @@ export default function HostStatsBar({ onMemTotal }: Props) {
           <div className="flex justify-between text-xs">
             <span className="text-gray-500">RAM</span>
             <span className="text-gray-400 tabular-nums">
-              {stats.memUsageMB.toFixed(0)} / {stats.memTotalMB.toFixed(0)} MB ({ramPct.toFixed(1)}%)
+              {stats.memUsageMB.toFixed(0)} / {stats.memTotalMB.toFixed(0)} MB ({ramPct.toFixed(1)}
+              %)
             </span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -79,7 +80,8 @@ export default function HostStatsBar({ onMemTotal }: Props) {
           <div className="flex justify-between text-xs">
             <span className="text-gray-500">Disk</span>
             <span className="text-gray-400 tabular-nums">
-              {stats.diskUsedGB.toFixed(1)} / {stats.diskTotalGB.toFixed(1)} GB ({diskPct.toFixed(1)}%)
+              {stats.diskUsedGB.toFixed(1)} / {stats.diskTotalGB.toFixed(1)} GB (
+              {diskPct.toFixed(1)}%)
             </span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">

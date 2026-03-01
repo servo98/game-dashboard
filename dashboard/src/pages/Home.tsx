@@ -1,24 +1,25 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   api,
+  createAllServiceStatsStream,
   createLogStream,
   createServiceLogStream,
-  createAllServiceStatsStream,
   type GameServer,
-  type User,
   type ServiceStats,
+  type User,
 } from "../api";
-import ServerCard from "../components/ServerCard";
-import LogViewer from "../components/LogViewer";
-import ConfigEditor from "../components/ConfigEditor";
+import BackupsTab from "../components/BackupsTab";
 import BotSettings from "../components/BotSettings";
-import HostStatsBar from "../components/HostStatsBar";
-import ServiceStatsBar from "../components/ServiceStatsBar";
+import ConfigEditor from "../components/ConfigEditor";
 import GameStore from "../components/GameStore";
+import HostStatsBar from "../components/HostStatsBar";
+import LogViewer from "../components/LogViewer";
 import PanelSettings from "../components/PanelSettings";
+import ServerCard from "../components/ServerCard";
+import ServiceStatsBar from "../components/ServiceStatsBar";
 
-type Tab = "servers" | "bot" | "settings";
+type Tab = "servers" | "bot" | "backups" | "settings";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
@@ -27,7 +28,9 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [servers, setServers] = useState<GameServer[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [logTarget, setLogTarget] = useState<{ title: string; factory: () => EventSource } | null>(null);
+  const [logTarget, setLogTarget] = useState<{ title: string; factory: () => EventSource } | null>(
+    null,
+  );
   const [editConfigId, setEditConfigId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("servers");
@@ -41,14 +44,16 @@ export default function Home() {
 
   // Auth guard
   useEffect(() => {
-    api.me()
+    api
+      .me()
       .then(setUser)
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
   // Fetch host domain from settings
   useEffect(() => {
-    api.getSettings()
+    api
+      .getSettings()
       .then((s) => setHostDomain(s.host_domain))
       .catch(() => {});
   }, []);
@@ -216,7 +221,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(["servers", "bot", "settings"] as const).map((t) => (
+          {(["servers", "bot", "backups", "settings"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -226,7 +231,13 @@ export default function Home() {
                   : "border-transparent text-gray-500 hover:text-gray-300"
               }`}
             >
-              {t === "servers" ? "Game Servers" : t === "bot" ? "Bot" : "Settings"}
+              {t === "servers"
+                ? "Game Servers"
+                : t === "bot"
+                  ? "Bot"
+                  : t === "backups"
+                    ? "Backups"
+                    : "Settings"}
             </button>
           ))}
         </div>
@@ -235,7 +246,9 @@ export default function Home() {
           <>
             {/* Server grid header with add button */}
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-400">{servers.length} server{servers.length !== 1 ? "s" : ""}</span>
+              <span className="text-sm text-gray-400">
+                {servers.length} server{servers.length !== 1 ? "s" : ""}
+              </span>
               <button
                 onClick={() => setShowGameStore(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
@@ -322,9 +335,7 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              {restartMsg && (
-                <p className="mt-2 text-xs text-green-400">{restartMsg}</p>
-              )}
+              {restartMsg && <p className="mt-2 text-xs text-green-400">{restartMsg}</p>}
             </div>
           </>
         )}
@@ -334,6 +345,8 @@ export default function Home() {
             <BotSettings />
           </div>
         )}
+
+        {tab === "backups" && <BackupsTab servers={servers} />}
 
         {tab === "settings" && (
           <div className="max-w-lg">

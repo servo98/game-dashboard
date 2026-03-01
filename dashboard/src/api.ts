@@ -140,8 +140,7 @@ export const api = {
     }),
 
   /** Session history */
-  getServerHistory: (id: string) =>
-    request<ServerSessionRecord[]>(`/servers/${id}/history`),
+  getServerHistory: (id: string) => request<ServerSessionRecord[]>(`/servers/${id}/history`),
 
   /** Infrastructure */
   restartService: (name: "backend" | "bot") =>
@@ -160,7 +159,9 @@ export const api = {
 
   /** Game catalog */
   getCatalog: (search?: string) =>
-    request<GameTemplate[]>(`/servers/catalog${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+    request<GameTemplate[]>(
+      `/servers/catalog${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    ),
 
   /** Create / delete servers */
   createServer: (data: CreateServerRequest) =>
@@ -168,12 +169,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  deleteServer: (id: string) =>
-    request<{ ok: boolean }>(`/servers/${id}`, { method: "DELETE" }),
+  deleteServer: (id: string) => request<{ ok: boolean }>(`/servers/${id}`, { method: "DELETE" }),
 
   /** Backups */
-  listBackups: (serverId: string) =>
-    request<BackupRecord[]>(`/servers/${serverId}/backups`),
+  listAllBackups: () => request<BackupRecord[]>("/servers/backups/all"),
+  listBackups: (serverId: string) => request<BackupRecord[]>(`/servers/${serverId}/backups`),
   createBackup: (serverId: string) =>
     request<BackupRecord>(`/servers/${serverId}/backups`, { method: "POST" }),
   restoreBackup: (serverId: string, backupId: number) =>

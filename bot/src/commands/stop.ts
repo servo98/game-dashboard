@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from "discord.js";
+import { type ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder()
   .setName("stop")
@@ -8,13 +8,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply();
 
   try {
-    const res = await fetch(
-      `${process.env.BACKEND_URL}/api/servers/active/stop`,
-      {
-        method: "POST",
-        headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
-      }
-    );
+    const res = await fetch(`${process.env.BACKEND_URL}/api/servers/active/stop`, {
+      method: "POST",
+      headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
+    });
 
     const data = (await res.json()) as { ok?: boolean; message?: string; error?: string };
 
@@ -38,7 +35,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setDescription(data.message ?? "Server has been stopped."),
       ],
     });
-  } catch (err) {
+  } catch (_err) {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()

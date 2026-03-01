@@ -2,10 +2,36 @@
   "name": "game-panel",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["backend", "dashboard", "bot"],
+  "workspaces": [
+    "backend",
+    "dashboard",
+    "bot"
+  ],
   "scripts": {
     "dev:backend": "bun run --cwd backend dev",
     "dev:dashboard": "bun run --cwd dashboard dev",
-    "dev:bot": "bun run --cwd bot dev"
+    "dev:bot": "bun run --cwd bot dev",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:changed": "biome check --changed --since=main",
+    "format": "biome format --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:changed": "vitest run --changed",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "vitest": "^3.1.0",
+    "@vitest/coverage-v8": "^3.1.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.4.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   }
 }

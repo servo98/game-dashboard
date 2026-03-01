@@ -1,8 +1,8 @@
 import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-  AutocompleteInteraction,
+  type AutocompleteInteraction,
+  type ChatInputCommandInteraction,
   EmbedBuilder,
+  SlashCommandBuilder,
 } from "discord.js";
 
 export const data = new SlashCommandBuilder()
@@ -13,7 +13,7 @@ export const data = new SlashCommandBuilder()
       .setName("game")
       .setDescription("Which game server to start")
       .setRequired(true)
-      .setAutocomplete(true)
+      .setAutocomplete(true),
   );
 
 export async function autocomplete(interaction: AutocompleteInteraction) {
@@ -28,9 +28,7 @@ export async function autocomplete(interaction: AutocompleteInteraction) {
       .filter((s) => s.name.toLowerCase().includes(focused) || s.id.toLowerCase().includes(focused))
       .slice(0, 25);
 
-    await interaction.respond(
-      filtered.map((s) => ({ name: s.name, value: s.id }))
-    );
+    await interaction.respond(filtered.map((s) => ({ name: s.name, value: s.id })));
   } catch {
     await interaction.respond([]);
   }
@@ -41,13 +39,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply();
 
   try {
-    const res = await fetch(
-      `${process.env.BACKEND_URL}/api/servers/${gameId}/start`,
-      {
-        method: "POST",
-        headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
-      }
-    );
+    const res = await fetch(`${process.env.BACKEND_URL}/api/servers/${gameId}/start`, {
+      method: "POST",
+      headers: { "X-Bot-Api-Key": process.env.BOT_API_KEY! },
+    });
 
     const data = (await res.json()) as { ok?: boolean; message?: string; error?: string };
 
@@ -72,7 +67,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setFooter({ text: "Check /status in a minute for connection details" }),
       ],
     });
-  } catch (err) {
+  } catch (_err) {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()

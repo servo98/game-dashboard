@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createStatsStream, type ContainerStats } from "../api";
+import { type ContainerStats, createStatsStream } from "../api";
 
 type Props = {
   serverId: string;
@@ -29,17 +29,12 @@ export default function StatsBar({ serverId, hostMemTotalMB }: Props) {
   }, [serverId]);
 
   if (!stats) {
-    return (
-      <div className="text-xs text-gray-600 animate-pulse">Loading stats...</div>
-    );
+    return <div className="text-xs text-gray-600 animate-pulse">Loading stats...</div>;
   }
 
   const cpuPct = Math.min(100, Math.max(0, stats.cpuPercent));
   const ramDenominator = hostMemTotalMB ?? stats.memLimitMB;
-  const ramPct =
-    ramDenominator > 0
-      ? Math.min(100, (stats.memUsageMB / ramDenominator) * 100)
-      : 0;
+  const ramPct = ramDenominator > 0 ? Math.min(100, (stats.memUsageMB / ramDenominator) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-1.5">

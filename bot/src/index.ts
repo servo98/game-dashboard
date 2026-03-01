@@ -1,14 +1,14 @@
 import {
-  Client,
-  GatewayIntentBits,
-  Collection,
-  type ChatInputCommandInteraction,
   type AutocompleteInteraction,
+  type ChatInputCommandInteraction,
+  Client,
+  Collection,
+  GatewayIntentBits,
 } from "discord.js";
-import * as start from "./commands/start";
-import * as stop from "./commands/stop";
-import * as status from "./commands/status";
 import * as ip from "./commands/ip";
+import * as start from "./commands/start";
+import * as status from "./commands/status";
+import * as stop from "./commands/stop";
 
 type Command = {
   data: { name: string };
@@ -24,7 +24,7 @@ for (const cmd of [start, stop, status, ip]) {
 
 // --- Bot settings cache ---
 
-let cachedAllowedChannelId: string | null | undefined = undefined; // undefined = not yet loaded
+let cachedAllowedChannelId: string | null | undefined; // undefined = not yet loaded
 let lastSettingsFetch = 0;
 
 async function getAllowedChannelId(): Promise<string | null> {

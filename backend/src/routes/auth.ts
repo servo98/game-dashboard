@@ -1,7 +1,7 @@
 import { Hono } from "hono";
+import type { Session } from "../db";
 import { sessionQueries } from "../db";
 import { requireAuth } from "../middleware/auth";
-import type { Session } from "../db";
 
 const auth = new Hono<{ Variables: { session: Session } }>();
 
@@ -41,7 +41,7 @@ auth.get("/callback", async (c) => {
     return c.json({ error: "Failed to exchange code" }, 400);
   }
 
-  const tokenData = await tokenRes.json() as { access_token: string };
+  const tokenData = (await tokenRes.json()) as { access_token: string };
 
   // Get user info
   const userRes = await fetch(`${DISCORD_API}/users/@me`, {
@@ -52,7 +52,7 @@ auth.get("/callback", async (c) => {
     return c.json({ error: "Failed to fetch user" }, 400);
   }
 
-  const user = await userRes.json() as {
+  const user = (await userRes.json()) as {
     id: string;
     username: string;
     global_name?: string;
@@ -60,9 +60,14 @@ auth.get("/callback", async (c) => {
   };
 
   // Whitelist check
-  const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (allowedIds.length > 0 && !allowedIds.includes(user.id)) {
-    return c.redirect(`${process.env.PUBLIC_URL ?? "http://localhost:5173"}/login?error=unauthorized`);
+    return c.redirect(
+      `${process.env.PUBLIC_URL ?? "http://localhost:5173"}/login?error=unauthorized`,
+    );
   }
 
   // Create session
@@ -74,7 +79,7 @@ auth.get("/callback", async (c) => {
     user.id,
     user.global_name ?? user.username,
     user.avatar,
-    expiresAt
+    expiresAt,
   );
 
   // Set cookie and redirect to dashboard
@@ -100,8 +105,8 @@ auth.get("/me", requireAuth, (c) => {
 });
 
 auth.post("/logout", requireAuth, (c) => {
-  const token = c.req.header("Authorization")?.replace("Bearer ", "")
-    ?? getCookie(c.req.raw, "session");
+  const token =
+    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
   if (token) {
     sessionQueries.delete.run(token);
   }

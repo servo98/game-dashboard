@@ -12,12 +12,14 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    api.reportError({
-      message: error.message,
-      stack: error.stack,
-      url: window.location.href,
-      component: "ErrorBoundary",
-    }).catch(() => {});
+    api
+      .reportError({
+        message: error.message,
+        stack: error.stack,
+        url: window.location.href,
+        component: "ErrorBoundary",
+      })
+      .catch(() => {});
   }
 
   render() {

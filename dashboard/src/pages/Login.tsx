@@ -9,9 +9,12 @@ export default function Login() {
 
   // If already logged in, redirect to home
   useEffect(() => {
-    api.me()
+    api
+      .me()
       .then(() => navigate("/", { replace: true }))
-      .catch(() => {/* not logged in, stay on login page */});
+      .catch(() => {
+        /* not logged in, stay on login page */
+      });
   }, [navigate]);
 
   return (

@@ -1,14 +1,14 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  SECTIONS,
-  MINECRAFT_FIELDS,
-  MODPACK_PLATFORMS,
-  isModpackType,
-  getModpackPlatformByType,
-  getModpackEnvKeys,
   getAllKnownKeys,
+  getModpackEnvKeys,
+  getModpackPlatformByType,
+  isModpackType,
+  MINECRAFT_FIELDS,
   type MinecraftField,
+  MODPACK_PLATFORMS,
   type ModpackPlatform,
+  SECTIONS,
 } from "./minecraft-config";
 
 type Props = {
@@ -119,14 +119,15 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
             >
               {field.options?.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}{opt.description ? ` — ${opt.description}` : ""}
+                  {opt.label}
+                  {opt.description ? ` — ${opt.description}` : ""}
                 </option>
               ))}
             </select>
           </div>
         );
 
-      case "toggle":
+      case "toggle": {
         const isOn = value.toUpperCase() === "TRUE";
         return (
           <div key={field.key} className="flex items-center justify-between py-1">
@@ -149,6 +150,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
             </button>
           </div>
         );
+      }
 
       case "number":
         return (
@@ -206,7 +208,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
 
   function renderModpackMode() {
     const platform: ModpackPlatform | undefined = MODPACK_PLATFORMS.find(
-      (p) => p.id === selectedPlatform
+      (p) => p.id === selectedPlatform,
     );
     const compatibleFields = MINECRAFT_FIELDS.filter((f) => f.modpackCompatible);
 

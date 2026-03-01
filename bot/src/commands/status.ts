@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from "discord.js";
+import { type ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 type ServerInfo = {
   id: string;
@@ -41,25 +41,21 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .setTimestamp();
 
     if (active) {
-      embed.setDescription(
-        `**${active.name}** is currently running on port \`${active.port}\``
-      );
+      embed.setDescription(`**${active.name}** is currently running on port \`${active.port}\``);
     } else {
       embed.setDescription("No server is currently running.");
     }
 
     const fields = servers.map((s) => ({
       name: s.name,
-      value: s.status === "running"
-        ? `🟢 Running (port ${s.port})`
-        : `⚫ ${s.status}`,
+      value: s.status === "running" ? `🟢 Running (port ${s.port})` : `⚫ ${s.status}`,
       inline: true,
     }));
 
     embed.addFields(fields);
 
     await interaction.editReply({ embeds: [embed] });
-  } catch (err) {
+  } catch (_err) {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()

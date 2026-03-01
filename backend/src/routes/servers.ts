@@ -1,20 +1,20 @@
+import { existsSync } from "fs";
 import { Hono } from "hono";
-import { serverQueries, serverSessionQueries, botSettingsQueries, backupQueries } from "../db";
+import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
+import { findTemplate, GAME_CATALOG } from "../catalog";
+import type { Session } from "../db";
+import { backupQueries, botSettingsQueries, serverQueries, serverSessionQueries } from "../db";
 import {
+  getActiveContainer,
+  getContainerStatus,
+  markIntentionalStop,
   startGameContainer,
   stopGameContainer,
-  getContainerStatus,
-  getActiveContainer,
   streamContainerLogs,
   streamContainerStats,
   watchContainer,
-  markIntentionalStop,
 } from "../docker";
-import { createBackup, restoreBackup, deleteBackupFile, getBackupFilePath } from "../backup";
 import { requireAuth } from "../middleware/auth";
-import { GAME_CATALOG, findTemplate } from "../catalog";
-import type { Session } from "../db";
-import { existsSync } from "fs";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
 
@@ -22,8 +22,8 @@ const servers = new Hono<{ Variables: { session: Session } }>();
 servers.get("/catalog", (c) => {
   const search = c.req.query("search")?.toLowerCase();
   if (search) {
-    const filtered = GAME_CATALOG.filter((t) =>
-      t.name.toLowerCase().includes(search) || t.id.toLowerCase().includes(search)
+    const filtered = GAME_CATALOG.filter(
+      (t) => t.name.toLowerCase().includes(search) || t.id.toLowerCase().includes(search),
     );
     return c.json(filtered);
   }
@@ -77,7 +77,10 @@ servers.post("/", requireAuth, async (c) => {
 
   // Validate id format
   if (!/^[a-z0-9_-]+$/.test(id)) {
-    return c.json({ error: "Server ID must only contain lowercase letters, numbers, hyphens, and underscores" }, 400);
+    return c.json(
+      { error: "Server ID must only contain lowercase letters, numbers, hyphens, and underscores" },
+      400,
+    );
   }
 
   // Check uniqueness
@@ -92,9 +95,17 @@ servers.post("/", requireAuth, async (c) => {
   }
 
   try {
-    serverQueries.insert.run(id, name, game_type, docker_image, port, JSON.stringify(env_vars), JSON.stringify(volumes));
+    serverQueries.insert.run(
+      id,
+      name,
+      game_type,
+      docker_image,
+      port,
+      JSON.stringify(env_vars),
+      JSON.stringify(volumes),
+    );
     return c.json({ ok: true });
-  } catch (err) {
+  } catch (_err) {
     return c.json({ error: "Failed to create server" }, 500);
   }
 });
@@ -126,7 +137,7 @@ servers.get("/", async (c) => {
       game_type: row.game_type,
       port: row.port,
       status: await getContainerStatus(row.id),
-    }))
+    })),
   );
   return c.json(result);
 });
@@ -138,8 +149,7 @@ servers.post("/:id/start", async (c) => {
 
   if (!isBotRequest) {
     const token =
-      c.req.header("Authorization")?.replace("Bearer ", "") ??
-      getCookie(c.req.raw, "session");
+      c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
     if (!token) return c.json({ error: "Unauthorized" }, 401);
 
     const { sessionQueries: sq } = await import("../db");
@@ -159,11 +169,7 @@ servers.post("/:id/start", async (c) => {
     const active = await getActiveContainer();
     if (active) {
       markIntentionalStop(active.name);
-      serverSessionQueries.stop.run(
-        Math.floor(Date.now() / 1000),
-        "replaced",
-        active.name
-      );
+      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
     }
 
     await startGameContainer(server.id, server.docker_image, server.port, envVars, volumes);
@@ -175,11 +181,7 @@ servers.post("/:id/start", async (c) => {
     const serverName = server.name;
     const serverId = server.id;
     watchContainer(serverId, async () => {
-      serverSessionQueries.stop.run(
-        Math.floor(Date.now() / 1000),
-        "crash",
-        serverId
-      );
+      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "crash", serverId);
 
       const embed = {
         title: "🔴 Servidor caído",
@@ -237,8 +239,7 @@ servers.post("/:id/stop", async (c) => {
 
   if (!isBotRequest) {
     const token =
-      c.req.header("Authorization")?.replace("Bearer ", "") ??
-      getCookie(c.req.raw, "session");
+      c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
     if (!token) return c.json({ error: "Unauthorized" }, 401);
     const { sessionQueries: sq } = await import("../db");
     const session = sq.get.get(token);
@@ -253,11 +254,7 @@ servers.post("/:id/stop", async (c) => {
     if (!active) return c.json({ ok: true, message: "No server running" });
     markIntentionalStop(active.name);
     await stopGameContainer(active.name);
-    serverSessionQueries.stop.run(
-      Math.floor(Date.now() / 1000),
-      "user",
-      active.name
-    );
+    serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", active.name);
     return c.json({ ok: true, message: `${active.name} stopped` });
   }
 
@@ -300,11 +297,9 @@ servers.get("/:id/logs", requireAuth, async (c) => {
           if (abortController.signal.aborted) break;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(line)}\n\n`));
         }
-      } catch (err) {
+      } catch (_err) {
         if (!abortController.signal.aborted) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify("[Log stream ended]")}\n\n`)
-          );
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify("[Log stream ended]")}\n\n`));
         }
       } finally {
         controller.close();
@@ -350,10 +345,10 @@ servers.get("/:id/stats", requireAuth, async (c) => {
           if (abortController.signal.aborted) break;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(stats)}\n\n`));
         }
-      } catch (err) {
+      } catch (_err) {
         if (!abortController.signal.aborted) {
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ error: "Stats stream ended" })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ error: "Stats stream ended" })}\n\n`),
           );
         }
       } finally {
@@ -427,6 +422,12 @@ servers.get("/:id/history", requireAuth, async (c) => {
 });
 
 // --- Backup routes ---
+
+// List ALL backups across all servers
+servers.get("/backups/all", requireAuth, (c) => {
+  const backups = backupQueries.listAll.all();
+  return c.json(backups);
+});
 
 // List backups for a server
 servers.get("/:id/backups", requireAuth, (c) => {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
+import { docker, streamHostStats, streamServiceLogs, streamServiceStats } from "../docker";
 import { requireAuth } from "../middleware/auth";
-import { docker, streamServiceLogs, streamServiceStats, streamHostStats } from "../docker";
 
 const services = new Hono();
 
@@ -13,7 +13,7 @@ function isAllowed(name: string): name is ServiceName {
 
 function sseResponse(
   req: Request,
-  generator: (signal: AbortSignal) => AsyncGenerator<unknown>
+  generator: (signal: AbortSignal) => AsyncGenerator<unknown>,
 ): Response {
   const abortController = new AbortController();
   req.signal.addEventListener("abort", () => abortController.abort());

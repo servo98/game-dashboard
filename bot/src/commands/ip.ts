@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from "discord.js";
+import { type ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 
 type ServerInfo = {
   id: string;
@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
   .setName("ip")
   .setDescription("Show the connect address for the active game server");
 
-function connectAddress(gameType: string, port: number, domain: string): string {
+export function connectAddress(gameType: string, port: number, domain: string): string {
   if (gameType === "sandbox" && port === 25565) {
     return `mc.${domain}`;
   }

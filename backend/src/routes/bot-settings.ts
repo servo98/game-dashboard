@@ -1,7 +1,7 @@
-import { Hono } from "hono";
-import { requireAuth, requireBotKey } from "../middleware/auth";
-import { botSettingsQueries } from "../db";
 import type { Context, Next } from "hono";
+import { Hono } from "hono";
+import { botSettingsQueries } from "../db";
+import { requireAuth } from "../middleware/auth";
 
 /** Allow either dashboard session OR bot API key */
 async function requireAuthOrBotKey(c: Context, next: Next) {

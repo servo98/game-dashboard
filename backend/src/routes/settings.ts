@@ -1,8 +1,8 @@
-import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { requireAuth } from "../middleware/auth";
-import { panelSettingsQueries, getAllPanelSettings } from "../db";
+import { Hono } from "hono";
 import type { Session } from "../db";
+import { getAllPanelSettings, panelSettingsQueries } from "../db";
+import { requireAuth } from "../middleware/auth";
 
 async function requireAuthOrBotKey(c: Context, next: Next) {
   const botKey = c.req.header("X-Bot-Api-Key");
@@ -21,7 +21,14 @@ settings.get("/", requireAuthOrBotKey, (c) => {
 settings.put("/", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, string | number>>();
 
-  const allowedKeys = ["host_domain", "game_memory_limit_gb", "game_cpu_limit", "auto_stop_hours", "max_backups_per_server", "auto_backup_interval_hours"];
+  const allowedKeys = [
+    "host_domain",
+    "game_memory_limit_gb",
+    "game_cpu_limit",
+    "auto_stop_hours",
+    "max_backups_per_server",
+    "auto_backup_interval_hours",
+  ];
   for (const [key, value] of Object.entries(body)) {
     if (allowedKeys.includes(key)) {
       panelSettingsQueries.set.run(key, String(value));

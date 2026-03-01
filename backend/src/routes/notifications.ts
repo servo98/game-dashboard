@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middleware/auth";
 import { botSettingsQueries } from "../db";
+import { requireAuth } from "../middleware/auth";
 
 const notifications = new Hono();
 
@@ -25,7 +25,7 @@ notifications.post("/error", requireAuth, async (c) => {
   if (body.stack) {
     fields.push({
       name: "Stack",
-      value: "```\n" + body.stack.slice(0, 1000) + "\n```",
+      value: `\`\`\`\n${body.stack.slice(0, 1000)}\n\`\`\``,
       inline: false,
     });
   }

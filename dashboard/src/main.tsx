@@ -1,15 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Home from "./pages/Home";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { api } from "./api";
+import ErrorBoundary from "./components/ErrorBoundary";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
 import "./index.css";
 
 // Global error reporting — throttled to 1 per 30s
 let lastReport = 0;
-function throttledReport(data: { message: string; stack?: string; url?: string; component?: string }) {
+function throttledReport(data: {
+  message: string;
+  stack?: string;
+  url?: string;
+  component?: string;
+}) {
   const now = Date.now();
   if (now - lastReport < 30_000) return;
   lastReport = now;
@@ -46,5 +51,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

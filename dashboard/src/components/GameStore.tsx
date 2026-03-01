@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api, type GameTemplate } from "../api";
 
 type Props = {
@@ -35,7 +35,10 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
 
   useEffect(() => {
     if (open) {
-      api.getCatalog().then(setCatalog).catch(() => {});
+      api
+        .getCatalog()
+        .then(setCatalog)
+        .catch(() => {});
     }
   }, [open]);
 
@@ -45,9 +48,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
       setFormName(selected.name);
       setFormImage(selected.docker_image);
       setFormPort(String(selected.default_port));
-      setFormEnv(
-        Object.entries(selected.default_env).map(([key, value]) => ({ key, value }))
-      );
+      setFormEnv(Object.entries(selected.default_env).map(([key, value]) => ({ key, value })));
       setCustomMode(false);
       setError(null);
     }
@@ -118,14 +119,22 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
 
   const filtered = catalog.filter((t) => {
     if (category !== "all" && t.category !== category) return false;
-    if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase())) return false;
+    if (
+      search &&
+      !t.name.toLowerCase().includes(search.toLowerCase()) &&
+      !t.id.toLowerCase().includes(search.toLowerCase())
+    )
+      return false;
     return true;
   });
 
   const showForm = selected || customMode;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
         className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -134,7 +143,10 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <div className="flex items-center gap-2">
             {showForm && (
-              <button onClick={handleBack} className="text-gray-400 hover:text-white transition-colors mr-1">
+              <button
+                onClick={handleBack}
+                className="text-gray-400 hover:text-white transition-colors mr-1"
+              >
                 &larr;
               </button>
             )}
@@ -142,7 +154,12 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
               {showForm ? (selected ? selected.name : "Custom Server") : "Game Store"}
             </h2>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors text-xl leading-none">&times;</button>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-white transition-colors text-xl leading-none"
+          >
+            &times;
+          </button>
         </div>
 
         {!showForm ? (
@@ -204,7 +221,9 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">+</span>
                     <div>
-                      <p className="text-sm font-medium text-gray-400 group-hover:text-brand-400 transition-colors">Custom Server</p>
+                      <p className="text-sm font-medium text-gray-400 group-hover:text-brand-400 transition-colors">
+                        Custom Server
+                      </p>
                       <p className="text-xs text-gray-600">Any Docker image</p>
                     </div>
                   </div>
@@ -214,7 +233,10 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
           </>
         ) : (
           /* Config form */
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3"
+          >
             {error && (
               <div className="bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-sm text-red-300">
                 {error}
@@ -226,7 +248,9 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
               <input
                 type="text"
                 value={formId}
-                onChange={(e) => setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+                onChange={(e) =>
+                  setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+                }
                 required
                 className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
                 placeholder="my-server"

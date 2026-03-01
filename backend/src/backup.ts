@@ -1,16 +1,16 @@
-import { mkdirSync, unlinkSync, existsSync } from "fs";
+import { existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { serverQueries, backupQueries, getPanelSetting } from "./db";
+import { backupQueries, getPanelSetting, serverQueries } from "./db";
 import { docker, gameContainerName, getActiveContainer, getContainerStatus } from "./docker";
 
 const BACKUP_DIR = "/data/backups";
 const HOST_DATA_DIR = "/host-data";
 
-function backupDir(serverId: string): string {
+export function backupDir(serverId: string): string {
   return join(BACKUP_DIR, serverId);
 }
 
-function timestamp(): string {
+export function timestamp(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
@@ -155,27 +155,30 @@ export function startAutoBackupTimer(): void {
   if (autoBackupInterval) return;
 
   // Check every 60 minutes
-  autoBackupInterval = setInterval(async () => {
-    try {
-      const intervalHours = Number(getPanelSetting("auto_backup_interval_hours"));
-      if (intervalHours <= 0) return;
+  autoBackupInterval = setInterval(
+    async () => {
+      try {
+        const intervalHours = Number(getPanelSetting("auto_backup_interval_hours"));
+        if (intervalHours <= 0) return;
 
-      const active = await getActiveContainer();
-      if (!active) return;
+        const active = await getActiveContainer();
+        if (!active) return;
 
-      const serverId = active.name;
-      const backups = backupQueries.list.all(serverId);
-      const lastBackupTime = backups.length > 0 ? backups[0].created_at : 0;
-      const now = Math.floor(Date.now() / 1000);
-      const intervalSeconds = intervalHours * 3600;
+        const serverId = active.name;
+        const backups = backupQueries.list.all(serverId);
+        const lastBackupTime = backups.length > 0 ? backups[0].created_at : 0;
+        const now = Math.floor(Date.now() / 1000);
+        const intervalSeconds = intervalHours * 3600;
 
-      if (now - lastBackupTime >= intervalSeconds) {
-        console.log(`[auto-backup] Creating backup for ${serverId}`);
-        await createBackup(serverId);
-        console.log(`[auto-backup] Backup created for ${serverId}`);
+        if (now - lastBackupTime >= intervalSeconds) {
+          console.log(`[auto-backup] Creating backup for ${serverId}`);
+          await createBackup(serverId);
+          console.log(`[auto-backup] Backup created for ${serverId}`);
+        }
+      } catch (err) {
+        console.error("[auto-backup] Error:", err);
       }
-    } catch (err) {
-      console.error("[auto-backup] Error:", err);
-    }
-  }, 60 * 60 * 1000);
+    },
+    60 * 60 * 1000,
+  );
 }

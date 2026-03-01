@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { formatLine } from "../utils/format";
 
 type Props = {
   title: string;
@@ -7,20 +8,6 @@ type Props = {
 };
 
 const MAX_LINES = 500;
-
-/** Convert "2026-02-28T00:44:15Z\tmessage" to "[HH:MM:SS] message" in local time */
-function formatLine(raw: string): string {
-  const tabIdx = raw.indexOf("\t");
-  if (tabIdx > 0) {
-    const iso = raw.slice(0, tabIdx);
-    const date = new Date(iso);
-    if (!isNaN(date.getTime())) {
-      const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      return `[${time}] ${raw.slice(tabIdx + 1)}`;
-    }
-  }
-  return raw;
-}
 
 export default function LogViewer({ title, streamFactory, onClose }: Props) {
   const [lines, setLines] = useState<string[]>([]);
@@ -70,7 +57,7 @@ export default function LogViewer({ title, streamFactory, onClose }: Props) {
     if (autoScroll.current && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [lines]);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
@@ -83,9 +70,7 @@ export default function LogViewer({ title, streamFactory, onClose }: Props) {
                 connected ? "bg-green-500 animate-pulse" : "bg-red-500"
               }`}
             />
-            <span className="text-sm font-medium text-gray-200">
-              Live Logs — {title}
-            </span>
+            <span className="text-sm font-medium text-gray-200">Live Logs — {title}</span>
           </div>
           <button
             onClick={onClose}

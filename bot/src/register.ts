@@ -4,10 +4,10 @@
  *   bun run src/register.ts
  */
 import { REST, Routes } from "discord.js";
-import * as start from "./commands/start";
-import * as stop from "./commands/stop";
-import * as status from "./commands/status";
 import * as ip from "./commands/ip";
+import * as start from "./commands/start";
+import * as status from "./commands/status";
+import * as stop from "./commands/stop";
 
 const commands = [start.data, stop.data, status.data, ip.data].map((c) => c.toJSON());
 

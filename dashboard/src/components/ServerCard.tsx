@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { GameServer, ServerSessionRecord, BackupRecord } from "../api";
+import type { BackupRecord, GameServer, ServerSessionRecord } from "../api";
 import { api } from "../api";
+import { connectAddress, formatDuration, formatSize } from "../utils/format";
 import StatsBar from "./StatsBar";
 
 type Props = {
@@ -21,25 +22,6 @@ const STATUS_COLOR: Record<string, string> = {
   stopped: "bg-gray-500",
   missing: "bg-gray-500",
 };
-
-function connectAddress(game_type: string, port: number, hostDomain: string): string {
-  if (game_type === "sandbox" && port === 25565) {
-    return `mc.${hostDomain}`;
-  }
-  return `${hostDomain}:${port}`;
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${s}s`;
-  }
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${h}h ${m}m`;
-}
 
 const REASON_LABEL: Record<string, string> = {
   user: "Stopped",
@@ -160,12 +142,6 @@ export default function ServerCard({
       setConfirmRestore(backupId);
       setTimeout(() => setConfirmRestore(null), 3000);
     }
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   }
 
   return (
@@ -293,10 +269,7 @@ export default function ServerCard({
           ) : backups && backups.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {backups.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center justify-between text-xs text-gray-400"
-                >
+                <div key={b.id} className="flex items-center justify-between text-xs text-gray-400">
                   <div className="flex flex-col">
                     <span>
                       {new Date(b.created_at * 1000).toLocaleString([], {
@@ -354,10 +327,7 @@ export default function ServerCard({
           ) : history && history.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {history.slice(0, 5).map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between text-xs text-gray-400"
-                >
+                <div key={s.id} className="flex items-center justify-between text-xs text-gray-400">
                   <span>
                     {new Date(s.started_at * 1000).toLocaleString([], {
                       month: "short",
@@ -368,22 +338,20 @@ export default function ServerCard({
                   </span>
                   <div className="flex items-center gap-2">
                     {s.duration_seconds !== null && (
-                      <span className="text-gray-500">
-                        {formatDuration(s.duration_seconds)}
-                      </span>
+                      <span className="text-gray-500">{formatDuration(s.duration_seconds)}</span>
                     )}
                     <span
                       className={`px-1.5 py-0.5 rounded text-xs ${
                         s.stop_reason === "crash"
                           ? "bg-red-950/50 text-red-400"
                           : s.stop_reason === "replaced"
-                          ? "bg-yellow-950/50 text-yellow-500"
-                          : s.stop_reason
-                          ? "bg-gray-800 text-gray-500"
-                          : "bg-green-950/50 text-green-500"
+                            ? "bg-yellow-950/50 text-yellow-500"
+                            : s.stop_reason
+                              ? "bg-gray-800 text-gray-500"
+                              : "bg-green-950/50 text-green-500"
                       }`}
                     >
-                      {s.stop_reason ? REASON_LABEL[s.stop_reason] ?? s.stop_reason : "Running"}
+                      {s.stop_reason ? (REASON_LABEL[s.stop_reason] ?? s.stop_reason) : "Running"}
                     </span>
                   </div>
                 </div>

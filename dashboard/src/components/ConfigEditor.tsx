@@ -32,9 +32,7 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
       .getServerConfig(serverId)
       .then((cfg: ServerConfig) => {
         setDockerImage(cfg.docker_image);
-        setEnvPairs(
-          Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value }))
-        );
+        setEnvPairs(Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value })));
         setEnvRecord(cfg.env_vars);
       })
       .catch((err: Error) => setError(err.message))
@@ -50,7 +48,7 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
       const env_vars = isMinecraft
         ? Object.fromEntries(Object.entries(envRecord).filter(([k]) => k.trim()))
         : Object.fromEntries(
-            envPairs.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value])
+            envPairs.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value]),
           );
       await api.updateServerConfig(serverId, { docker_image: dockerImage, env_vars });
       onSaved();
@@ -71,14 +69,14 @@ export default function ConfigEditor({ serverId, serverName, open, onClose, onSa
   }
 
   function updateEnvPair(index: number, field: "key" | "value", val: string) {
-    setEnvPairs((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, [field]: val } : p))
-    );
+    setEnvPairs((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: val } : p)));
   }
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`bg-gray-950 border border-gray-800 rounded-2xl w-full shadow-2xl ${isMinecraft ? "max-w-2xl" : "max-w-lg"}`}>
+      <div
+        className={`bg-gray-950 border border-gray-800 rounded-2xl w-full shadow-2xl ${isMinecraft ? "max-w-2xl" : "max-w-lg"}`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h2 className="font-semibold text-white">Edit Config — {serverName}</h2>

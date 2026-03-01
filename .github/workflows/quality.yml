@@ -1,0 +1,173 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Detect which workspaces changed
+  # ──────────────────────────────────────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+      bot: ${{ steps.filter.outputs.bot }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            dashboard:
+              - 'dashboard/**'
+            bot:
+              - 'bot/**'
+
+  # ──────────────────────────────────────────────
+  # 2. Lint (whole repo — Biome is fast enough)
+  # ──────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx biome check .
+
+  # ──────────────────────────────────────────────
+  # 3. Typecheck per workspace (only if changed)
+  # ──────────────────────────────────────────────
+  typecheck-backend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=backend
+
+  typecheck-dashboard:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dashboard == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=dashboard
+
+  typecheck-bot:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.bot == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=bot
+
+  # ──────────────────────────────────────────────
+  # 4. Tests per workspace (only if changed)
+  # ──────────────────────────────────────────────
+  test-backend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project backend --coverage
+
+  test-dashboard:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dashboard == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project dashboard --coverage
+
+  test-bot:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.bot == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project bot --coverage
+
+  # ──────────────────────────────────────────────
+  # 5. Quality gate — summary check
+  # ──────────────────────────────────────────────
+  quality-gate:
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - lint
+      - typecheck-backend
+      - typecheck-dashboard
+      - typecheck-bot
+      - test-backend
+      - test-dashboard
+      - test-bot
+    steps:
+      - name: Check results
+        run: |
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Typecheck backend: ${{ needs.typecheck-backend.result }}"
+          echo "Typecheck dashboard: ${{ needs.typecheck-dashboard.result }}"
+          echo "Typecheck bot: ${{ needs.typecheck-bot.result }}"
+          echo "Test backend: ${{ needs.test-backend.result }}"
+          echo "Test dashboard: ${{ needs.test-dashboard.result }}"
+          echo "Test bot: ${{ needs.test-bot.result }}"
+
+          # Fail if any required job failed (skipped is OK — means no changes)
+          for result in \
+            "${{ needs.lint.result }}" \
+            "${{ needs.typecheck-backend.result }}" \
+            "${{ needs.typecheck-dashboard.result }}" \
+            "${{ needs.typecheck-bot.result }}" \
+            "${{ needs.test-backend.result }}" \
+            "${{ needs.test-dashboard.result }}" \
+            "${{ needs.test-bot.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "::error::Quality gate failed: one or more checks did not pass"
+              exit 1
+            fi
+          done
+          echo "All quality checks passed!"

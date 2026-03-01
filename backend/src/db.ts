@@ -83,20 +83,20 @@ export const serverQueries = {
   getAll: db.query<Server, []>("SELECT * FROM servers ORDER BY created_at ASC"),
   getById: db.query<Server, [string]>("SELECT * FROM servers WHERE id = ?"),
   insert: db.query<void, [string, string, string, string, number, string, string]>(
-    "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)",
   ),
   deleteById: db.query<void, [string]>("DELETE FROM servers WHERE id = ?"),
   update: db.query<void, [string, string, string]>(
-    "UPDATE servers SET docker_image = ?, env_vars = ? WHERE id = ?"
+    "UPDATE servers SET docker_image = ?, env_vars = ? WHERE id = ?",
   ),
 };
 
 export const sessionQueries = {
   get: db.query<Session, [string]>(
-    "SELECT * FROM sessions WHERE token = ? AND expires_at > unixepoch()"
+    "SELECT * FROM sessions WHERE token = ? AND expires_at > unixepoch()",
   ),
   insert: db.query<void, [string, string, string, string | null, number]>(
-    "INSERT OR REPLACE INTO sessions (token, discord_id, username, avatar, expires_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT OR REPLACE INTO sessions (token, discord_id, username, avatar, expires_at) VALUES (?, ?, ?, ?, ?)",
   ),
   delete: db.query<void, [string]>("DELETE FROM sessions WHERE token = ?"),
   cleanup: db.query<void, []>("DELETE FROM sessions WHERE expires_at <= unixepoch()"),
@@ -104,17 +104,15 @@ export const sessionQueries = {
 
 export const serverSessionQueries = {
   start: db.query<void, [string, number]>(
-    "INSERT INTO server_sessions (server_id, started_at) VALUES (?, ?)"
+    "INSERT INTO server_sessions (server_id, started_at) VALUES (?, ?)",
   ),
   stop: db.query<void, [number, string, string]>(
-    "UPDATE server_sessions SET stopped_at = ?, stop_reason = ? WHERE server_id = ? AND stopped_at IS NULL"
+    "UPDATE server_sessions SET stopped_at = ?, stop_reason = ? WHERE server_id = ? AND stopped_at IS NULL",
   ),
   history: db.query<ServerSession, [string]>(
-    "SELECT * FROM server_sessions WHERE server_id = ? ORDER BY started_at DESC LIMIT 10"
+    "SELECT * FROM server_sessions WHERE server_id = ? ORDER BY started_at DESC LIMIT 10",
   ),
-  deleteByServerId: db.query<void, [string]>(
-    "DELETE FROM server_sessions WHERE server_id = ?"
-  ),
+  deleteByServerId: db.query<void, [string]>("DELETE FROM server_sessions WHERE server_id = ?"),
 };
 
 export type Backup = {
@@ -126,36 +124,31 @@ export type Backup = {
 };
 
 export const backupQueries = {
+  listAll: db.query<Backup, []>("SELECT * FROM backups ORDER BY created_at DESC"),
   list: db.query<Backup, [string]>(
-    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at DESC"
+    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at DESC",
   ),
   insert: db.query<void, [string, string, number, number]>(
-    "INSERT INTO backups (server_id, filename, size_bytes, created_at) VALUES (?, ?, ?, ?)"
+    "INSERT INTO backups (server_id, filename, size_bytes, created_at) VALUES (?, ?, ?, ?)",
   ),
-  getById: db.query<Backup, [number]>(
-    "SELECT * FROM backups WHERE id = ?"
-  ),
-  deleteById: db.query<void, [number]>(
-    "DELETE FROM backups WHERE id = ?"
-  ),
+  getById: db.query<Backup, [number]>("SELECT * FROM backups WHERE id = ?"),
+  deleteById: db.query<void, [number]>("DELETE FROM backups WHERE id = ?"),
   count: db.query<{ cnt: number }, [string]>(
-    "SELECT COUNT(*) as cnt FROM backups WHERE server_id = ?"
+    "SELECT COUNT(*) as cnt FROM backups WHERE server_id = ?",
   ),
   oldest: db.query<Backup, [string]>(
-    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at ASC LIMIT 1"
+    "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at ASC LIMIT 1",
   ),
 };
 
 export const botSettingsQueries = {
   get: db.query<{ key: string; value: string }, [string]>(
-    "SELECT key, value FROM bot_settings WHERE key = ?"
+    "SELECT key, value FROM bot_settings WHERE key = ?",
   ),
   set: db.query<void, [string, string]>(
-    "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)"
+    "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
   ),
-  unset: db.query<void, [string]>(
-    "DELETE FROM bot_settings WHERE key = ?"
-  ),
+  unset: db.query<void, [string]>("DELETE FROM bot_settings WHERE key = ?"),
 };
 
 const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
@@ -169,14 +162,12 @@ const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
 
 export const panelSettingsQueries = {
   get: db.query<{ key: string; value: string }, [string]>(
-    "SELECT key, value FROM panel_settings WHERE key = ?"
+    "SELECT key, value FROM panel_settings WHERE key = ?",
   ),
   set: db.query<void, [string, string]>(
-    "INSERT OR REPLACE INTO panel_settings (key, value) VALUES (?, ?)"
+    "INSERT OR REPLACE INTO panel_settings (key, value) VALUES (?, ?)",
   ),
-  getAll: db.query<{ key: string; value: string }, []>(
-    "SELECT key, value FROM panel_settings"
-  ),
+  getAll: db.query<{ key: string; value: string }, []>("SELECT key, value FROM panel_settings"),
 };
 
 export function getPanelSetting(key: string): string {

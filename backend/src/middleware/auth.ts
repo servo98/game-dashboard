@@ -2,8 +2,8 @@ import type { Context, Next } from "hono";
 import { sessionQueries } from "../db";
 
 export async function requireAuth(c: Context, next: Next) {
-  const token = c.req.header("Authorization")?.replace("Bearer ", "")
-    ?? getCookie(c.req.raw, "session");
+  const token =
+    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
 
   if (!token) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -26,7 +26,7 @@ export async function requireBotKey(c: Context, next: Next) {
   await next();
 }
 
-function getCookie(req: Request, name: string): string | undefined {
+export function getCookie(req: Request, name: string): string | undefined {
   const cookie = req.headers.get("cookie") ?? "";
   const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
   return match?.[1];

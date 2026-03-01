@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api, type PanelSettings as PanelSettingsType } from "../api";
 
 export default function PanelSettings() {
@@ -8,7 +8,10 @@ export default function PanelSettings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getSettings().then(setSettings).catch((err) => setError((err as Error).message));
+    api
+      .getSettings()
+      .then(setSettings)
+      .catch((err) => setError((err as Error).message));
   }, []);
 
   async function handleSave(e: React.FormEvent) {
@@ -56,7 +59,9 @@ export default function PanelSettings() {
           className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
           placeholder="aypapol.com"
         />
-        <span className="text-xs text-gray-500">Used for connect addresses (e.g. aypapol.com:27015)</span>
+        <span className="text-xs text-gray-500">
+          Used for connect addresses (e.g. aypapol.com:27015)
+        </span>
       </label>
 
       <label className="flex flex-col gap-1.5">
@@ -112,7 +117,9 @@ export default function PanelSettings() {
           onChange={(e) => setSettings({ ...settings, max_backups_per_server: e.target.value })}
           className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
         />
-        <span className="text-xs text-gray-500">Oldest backups are auto-pruned beyond this limit</span>
+        <span className="text-xs text-gray-500">
+          Oldest backups are auto-pruned beyond this limit
+        </span>
       </label>
 
       <label className="flex flex-col gap-1.5">
@@ -126,7 +133,9 @@ export default function PanelSettings() {
           onChange={(e) => setSettings({ ...settings, auto_backup_interval_hours: e.target.value })}
           className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
         />
-        <span className="text-xs text-gray-500">Auto-backup the active server every N hours (0 = disabled)</span>
+        <span className="text-xs text-gray-500">
+          Auto-backup the active server every N hours (0 = disabled)
+        </span>
       </label>
 
       <button

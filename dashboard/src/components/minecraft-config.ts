@@ -1,12 +1,6 @@
 // Pure data definitions for Minecraft server configuration (itzg/minecraft-server)
 
-export const SECTIONS = [
-  "Server Type",
-  "World",
-  "Gameplay",
-  "Network",
-  "Advanced",
-] as const;
+export const SECTIONS = ["Server Type", "World", "Gameplay", "Network", "Advanced"] as const;
 
 export type Section = (typeof SECTIONS)[number];
 
@@ -309,9 +303,7 @@ export function getModpackPlatformByType(typeValue: string): ModpackPlatform | u
 
 /** Get all env var keys used by modpack platforms (for cleanup) */
 export function getModpackEnvKeys(): string[] {
-  return MODPACK_PLATFORMS.flatMap((p) => [
-    ...p.fields.map((f) => f.key),
-  ]);
+  return MODPACK_PLATFORMS.flatMap((p) => [...p.fields.map((f) => f.key)]);
 }
 
 /** All known Minecraft env var keys (fields + modpack keys + EULA) */

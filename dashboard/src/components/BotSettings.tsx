@@ -2,9 +2,21 @@ import { useEffect, useState } from "react";
 import { api, type BotSettings as BotSettingsType, type DiscordChannel } from "../api";
 
 const CHANNEL_FIELDS = [
-  { key: "allowed_channel_id" as const, label: "Bot Commands Channel", desc: "Restrict bot commands to this channel (empty = all channels)" },
-  { key: "errors_channel_id" as const, label: "Error Notifications", desc: "Dashboard errors are sent here" },
-  { key: "crashes_channel_id" as const, label: "Crash Notifications", desc: "Game server crash alerts are sent here" },
+  {
+    key: "allowed_channel_id" as const,
+    label: "Bot Commands Channel",
+    desc: "Restrict bot commands to this channel (empty = all channels)",
+  },
+  {
+    key: "errors_channel_id" as const,
+    label: "Error Notifications",
+    desc: "Dashboard errors are sent here",
+  },
+  {
+    key: "crashes_channel_id" as const,
+    label: "Crash Notifications",
+    desc: "Game server crash alerts are sent here",
+  },
   { key: "logs_channel_id" as const, label: "Log Channel", desc: "General log messages" },
 ];
 

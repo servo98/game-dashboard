@@ -1,14 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { startAutoBackupTimer } from "./backup";
 import { sessionQueries } from "./db";
 import authRoutes from "./routes/auth";
-import serverRoutes from "./routes/servers";
-import serviceRoutes from "./routes/services";
 import botSettingsRoutes from "./routes/bot-settings";
 import notificationRoutes from "./routes/notifications";
+import serverRoutes from "./routes/servers";
+import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
-import { startAutoBackupTimer } from "./backup";
 
 const app = new Hono();
 
@@ -22,7 +22,7 @@ app.use(
       "http://localhost:4173",
     ],
     credentials: true,
-  })
+  }),
 );
 
 app.get("/health", (c) => c.json({ ok: true }));
@@ -42,7 +42,7 @@ setInterval(
   () => {
     sessionQueries.cleanup.run();
   },
-  60 * 60 * 1000
+  60 * 60 * 1000,
 );
 
 const port = Number(process.env.BACKEND_PORT ?? 3000);

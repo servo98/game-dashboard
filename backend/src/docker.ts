@@ -1,5 +1,5 @@
 import Dockerode from "dockerode";
-import { createConnection, type Socket } from "net";
+import { createConnection } from "net";
 import { getPanelSetting } from "./db";
 
 export const docker = new Dockerode({ socketPath: "/var/run/docker.sock" });
@@ -15,9 +15,10 @@ export async function getActiveContainer(): Promise<{ id: string; name: string }
   const containers = await docker.listContainers({ all: false });
   // Filter to game containers only — exclude Compose-managed services
   // (Compose containers have the "com.docker.compose.service" label)
-  const active = containers.find((c) =>
-    c.Names.some((n) => n.startsWith(`/${CONTAINER_PREFIX}`)) &&
-    !c.Labels["com.docker.compose.service"]
+  const active = containers.find(
+    (c) =>
+      c.Names.some((n) => n.startsWith(`/${CONTAINER_PREFIX}`)) &&
+      !c.Labels["com.docker.compose.service"],
   );
   if (!active) return null;
   const serverId = active.Names[0].replace(`/${CONTAINER_PREFIX}`, "");
@@ -25,12 +26,12 @@ export async function getActiveContainer(): Promise<{ id: string; name: string }
 }
 
 /** Get status of a specific game container */
-export async function getContainerStatus(serverId: string): Promise<
-  "running" | "stopped" | "missing"
-> {
+export async function getContainerStatus(
+  serverId: string,
+): Promise<"running" | "stopped" | "missing"> {
   const containers = await docker.listContainers({ all: true });
   const found = containers.find((c) =>
-    c.Names.some((n) => n === `/${gameContainerName(serverId)}`)
+    c.Names.some((n) => n === `/${gameContainerName(serverId)}`),
   );
   if (!found) return "missing";
   if (found.State === "running") return "running";
@@ -81,9 +82,9 @@ export function markIntentionalStop(serverId: string): void {
 export async function startGameContainer(
   serverId: string,
   image: string,
-  port: number,
+  _port: number,
   envVars: Record<string, string>,
-  volumes: Record<string, string>
+  volumes: Record<string, string>,
 ): Promise<void> {
   // Stop any currently running game container
   const active = await getActiveContainer();
@@ -106,7 +107,7 @@ export async function startGameContainer(
     Object.entries(envVars).map(([k, v]) => [
       k,
       v.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? ""),
-    ])
+    ]),
   );
 
   // Build env array
@@ -131,12 +132,12 @@ export async function startGameContainer(
     Image: image,
     Env: env,
     HostConfig: {
-      NetworkMode: "host",  // zero network overhead — game binds directly to host ports
+      NetworkMode: "host", // zero network overhead — game binds directly to host ports
       Binds: binds,
       RestartPolicy: { Name: "unless-stopped" },
       // Resource limits from panel settings
       Memory: Number(getPanelSetting("game_memory_limit_gb")) * 1024 * 1024 * 1024,
-      MemoryReservation: 512 * 1024 * 1024,  // 512 MB guaranteed
+      MemoryReservation: 512 * 1024 * 1024, // 512 MB guaranteed
       NanoCpus: Number(getPanelSetting("game_cpu_limit")) * 1e9,
       // Log rotation — máx 150 MB por juego (3 × 50 MB)
       LogConfig: {
@@ -168,11 +169,11 @@ export async function stopGameContainer(serverId: string): Promise<void> {
 
 // --- Internal stream helpers ---
 
-function stripAnsi(str: string): string {
+export function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-function formatLogLine(raw: string): string {
+export function formatLogLine(raw: string): string {
   const clean = stripAnsi(raw);
   const tsMatch = clean.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s?/);
   if (tsMatch) {
@@ -192,7 +193,11 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
   const isTty = info.Config.Tty;
 
   const sock = createConnection("/var/run/docker.sock");
-  const cleanup = () => { try { sock.destroy(); } catch {} };
+  const cleanup = () => {
+    try {
+      sock.destroy();
+    } catch {}
+  };
   signal.addEventListener("abort", cleanup, { once: true });
 
   try {
@@ -205,7 +210,7 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     // Send raw HTTP request to Docker API
     const query = `follow=1&stdout=1&stderr=1&timestamps=1&tail=100`;
     sock.write(
-      `GET /containers/${encodeURIComponent(containerName)}/logs?${query} HTTP/1.1\r\nHost: localhost\r\n\r\n`
+      `GET /containers/${encodeURIComponent(containerName)}/logs?${query} HTTP/1.1\r\nHost: localhost\r\n\r\n`,
     );
 
     // Read response with async iterator via a queue
@@ -217,12 +222,20 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
       queue.push(chunk);
       resolve?.();
     });
-    sock.on("end", () => { ended = true; resolve?.(); });
-    sock.on("error", () => { ended = true; resolve?.(); });
+    sock.on("end", () => {
+      ended = true;
+      resolve?.();
+    });
+    sock.on("error", () => {
+      ended = true;
+      resolve?.();
+    });
 
     async function nextChunk(): Promise<Buffer | null> {
       while (queue.length === 0 && !ended && !signal.aborted) {
-        await new Promise<void>((r) => { resolve = r; });
+        await new Promise<void>((r) => {
+          resolve = r;
+        });
         resolve = null;
       }
       return queue.shift() ?? null;
@@ -257,9 +270,15 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
         const crlfIdx = rawBuf.indexOf(CRLF, pos);
         if (crlfIdx < 0) break;
         const sizeStr = rawBuf.subarray(pos, crlfIdx).toString("ascii").trim();
-        if (!sizeStr) { pos = crlfIdx + 2; continue; }
+        if (!sizeStr) {
+          pos = crlfIdx + 2;
+          continue;
+        }
         const chunkSize = parseInt(sizeStr, 16);
-        if (isNaN(chunkSize) || chunkSize === 0) { pos = crlfIdx + 2; break; }
+        if (Number.isNaN(chunkSize) || chunkSize === 0) {
+          pos = crlfIdx + 2;
+          break;
+        }
         const dataStart = crlfIdx + 2;
         if (dataStart + chunkSize + 2 > rawBuf.length) {
           // Incomplete chunk — keep remainder for next iteration
@@ -323,11 +342,11 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
 
 async function* _streamStats(
   containerName: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
   const container = docker.getContainer(containerName);
 
-  // @ts-ignore — dockerode typings don't expose the stream overload cleanly
+  // @ts-expect-error — dockerode typings don't expose the stream overload cleanly
   const stream = (await container.stats({ stream: true })) as NodeJS.ReadableStream;
 
   let buffer = "";
@@ -342,16 +361,11 @@ async function* _streamStats(
       if (!line.trim()) continue;
       try {
         const s = JSON.parse(line);
-        const cpuDelta =
-          s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
+        const cpuDelta = s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
         const systemDelta =
           (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
-        const numCpus =
-          s.cpu_stats.online_cpus ??
-          s.cpu_stats.cpu_usage.percpu_usage?.length ??
-          1;
-        const cpuPercent =
-          systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+        const numCpus = s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
+        const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
         const memUsageMB = (s.memory_stats.usage ?? 0) / 1024 / 1024;
         const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
 
@@ -372,7 +386,7 @@ async function* _streamStats(
 /** Stream logs from a game container */
 export async function* streamContainerLogs(
   serverId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): AsyncGenerator<string> {
   yield* _streamLogs(gameContainerName(serverId), signal);
 }
@@ -380,7 +394,7 @@ export async function* streamContainerLogs(
 /** Stream CPU/RAM stats from a game container */
 export async function* streamContainerStats(
   serverId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
   yield* _streamStats(gameContainerName(serverId), signal);
 }
@@ -388,7 +402,7 @@ export async function* streamContainerStats(
 /** Stream logs from a compose service */
 export async function* streamServiceLogs(
   serviceName: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): AsyncGenerator<string> {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
   yield* _streamLogs(`${projectName}-${serviceName}-1`, signal);
@@ -397,7 +411,7 @@ export async function* streamServiceLogs(
 /** Stream CPU/RAM stats from a compose service */
 export async function* streamServiceStats(
   serviceName: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
   yield* _streamStats(`${projectName}-${serviceName}-1`, signal);
@@ -443,11 +457,11 @@ export async function* streamHostStats(signal: AbortSignal): AsyncGenerator<Host
           .filter((l) => l.includes(":"))
           .map((l) => {
             const [key, rest] = l.split(":");
-            return [key.trim(), parseInt(rest.trim()) / 1024]; // kB -> MB
-          })
+            return [key.trim(), parseInt(rest.trim(), 10) / 1024]; // kB -> MB
+          }),
       );
-      const memTotalMB = memLines["MemTotal"] ?? 0;
-      const memAvailableMB = memLines["MemAvailable"] ?? 0;
+      const memTotalMB = memLines.MemTotal ?? 0;
+      const memAvailableMB = memLines.MemAvailable ?? 0;
       const memUsageMB = memTotalMB - memAvailableMB;
 
       // Disk from df
@@ -458,8 +472,8 @@ export async function* streamHostStats(signal: AbortSignal): AsyncGenerator<Host
       const dfLines = dfOutput.trim().split("\n");
       if (dfLines.length >= 2) {
         const cols = dfLines[1].split(/\s+/);
-        diskTotalGB = parseInt(cols[1]) / 1024 / 1024 / 1024;
-        diskUsedGB = parseInt(cols[2]) / 1024 / 1024 / 1024;
+        diskTotalGB = parseInt(cols[1], 10) / 1024 / 1024 / 1024;
+        diskUsedGB = parseInt(cols[2], 10) / 1024 / 1024 / 1024;
       }
 
       yield {
@@ -476,7 +490,14 @@ export async function* streamHostStats(signal: AbortSignal): AsyncGenerator<Host
     // Wait 3s
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, 3000);
-      signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
     });
   }
 }
