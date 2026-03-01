@@ -256,7 +256,7 @@ jobs:
   notify-start:
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: needs.detect-changes.outputs.any_service == 'true'
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -268,10 +268,14 @@ jobs:
           SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
           RUN_ID: ${{ github.run_id }}
-          SERVICES: ${{ needs.detect-changes.outputs.services_list }}
-          SVC_DASHBOARD: ${{ needs.detect-changes.outputs.dashboard }}
+          ANY_SERVICE: ${{ needs.detect-changes.outputs.any_service }}
           SVC_BACKEND: ${{ needs.detect-changes.outputs.backend }}
+          SVC_DASHBOARD: ${{ needs.detect-changes.outputs.dashboard }}
           SVC_BOT: ${{ needs.detect-changes.outputs.bot }}
+          SVC_COMMANDS: ${{ needs.detect-changes.outputs.commands }}
+          SVC_NGINX: ${{ needs.detect-changes.outputs.nginx }}
+          SVC_STATIC: ${{ needs.detect-changes.outputs.static }}
+          SVC_GAMES: ${{ needs.detect-changes.outputs.games }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
           MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
@@ -279,23 +283,52 @@ jobs:
           AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-          CHECKS="✅ Lint"
-          [ "$SVC_DASHBOARD" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck dashboard\\n🔄 Test dashboard"
-          [ "$SVC_BACKEND" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck backend\\n🔄 Test backend"
-          [ "$SVC_BOT" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck bot\\n🔄 Test bot"
+          # Build job list — always starts with lint + quality-gate
+          JOBS="🔄 lint\\n🔄 quality-gate"
+
+          if [ "$SVC_BACKEND" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 typecheck-backend\\n🔄 test-backend\\n🔄 deploy-backend"
+          fi
+          if [ "$SVC_DASHBOARD" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 typecheck-dashboard\\n🔄 test-dashboard\\n🔄 deploy-dashboard"
+          fi
+          if [ "$SVC_BOT" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 typecheck-bot\\n🔄 test-bot\\n🔄 deploy-bot"
+          fi
+          if [ "$SVC_NGINX" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 deploy-nginx"
+          fi
+          if [ "$SVC_STATIC" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 deploy-static"
+          fi
+          if [ "$SVC_GAMES" = "true" ] && [ "$SVC_BACKEND" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 reseed-db"
+          fi
+          if [ "$SVC_COMMANDS" = "true" ] && [ "$SVC_BOT" = "true" ]; then
+            JOBS="${JOBS}\\n🔄 register-commands"
+          fi
+
+          JOBS="${JOBS}\\n🔄 notify-end"
+
+          if [ "$ANY_SERVICE" = "true" ]; then
+            TITLE="🚀 Pipeline Iniciado"
+            DESC="**${MSG}**"
+          else
+            TITLE="🚀 Pipeline Iniciado (sin deploys)"
+            DESC="**${MSG}**\\nSolo quality checks — ningún servicio cambió"
+          fi
 
           JSON=$(cat <<EOFJ
           {
             "embeds": [{
-              "title": "🚀 Pipeline Iniciado",
-              "description": "**${MSG}**",
+              "title": "${TITLE}",
+              "description": "${DESC}",
               "color": 3447003,
               "fields": [
                 {"name": "Commit", "value": "[\`${SHORT}\`](https://github.com/${REPO}/commit/${SHA})", "inline": true},
                 {"name": "Autor", "value": "${AUTHOR}", "inline": true},
                 {"name": "Trigger", "value": "${EVENT}", "inline": true},
-                {"name": "Servicios a deployar", "value": "${SERVICES}", "inline": false},
-                {"name": "Quality Checks", "value": "${CHECKS}", "inline": false}
+                {"name": "Jobs a ejecutar", "value": "${JOBS}", "inline": false}
               ],
               "footer": {"text": "game-panel CI/CD"},
               "timestamp": "${TS}"
