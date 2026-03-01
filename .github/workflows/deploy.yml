@@ -111,13 +111,154 @@ jobs:
           fi
           echo "services_list=$SERVICES" >> $GITHUB_OUTPUT
 
+  # ══════════════════════════════════════════════
+  # QUALITY GATE: lint -> typecheck -> test
+  # Si lint falla, no gasta minutos en lo demas.
+  # ══════════════════════════════════════════════
+
   # ──────────────────────────────────────────────
-  # 2. Discord: deploy started
+  # 2. Lint (whole repo — Biome is fast)
+  # ──────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx biome check .
+
+  # ──────────────────────────────────────────────
+  # 3. Typecheck — solo si lint pasa
+  # ──────────────────────────────────────────────
+  typecheck-backend:
+    runs-on: ubuntu-latest
+    needs: [lint, detect-changes]
+    if: needs.detect-changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=backend
+
+  typecheck-dashboard:
+    runs-on: ubuntu-latest
+    needs: [lint, detect-changes]
+    if: needs.detect-changes.outputs.dashboard == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=dashboard
+
+  typecheck-bot:
+    runs-on: ubuntu-latest
+    needs: [lint, detect-changes]
+    if: needs.detect-changes.outputs.bot == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=bot
+
+  # ──────────────────────────────────────────────
+  # 4. Tests — solo si typecheck pasa
+  # ──────────────────────────────────────────────
+  test-backend:
+    runs-on: ubuntu-latest
+    needs: [typecheck-backend, detect-changes]
+    if: needs.detect-changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project backend --coverage
+
+  test-dashboard:
+    runs-on: ubuntu-latest
+    needs: [typecheck-dashboard, detect-changes]
+    if: needs.detect-changes.outputs.dashboard == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project dashboard --coverage
+
+  test-bot:
+    runs-on: ubuntu-latest
+    needs: [typecheck-bot, detect-changes]
+    if: needs.detect-changes.outputs.bot == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project bot --coverage
+
+  # ──────────────────────────────────────────────
+  # 5. Quality gate — resumen antes de deployar
+  # ──────────────────────────────────────────────
+  quality-gate:
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - lint
+      - typecheck-backend
+      - typecheck-dashboard
+      - typecheck-bot
+      - test-backend
+      - test-dashboard
+      - test-bot
+    steps:
+      - name: Check results
+        run: |
+          for result in \
+            "${{ needs.lint.result }}" \
+            "${{ needs.typecheck-backend.result }}" \
+            "${{ needs.typecheck-dashboard.result }}" \
+            "${{ needs.typecheck-bot.result }}" \
+            "${{ needs.test-backend.result }}" \
+            "${{ needs.test-dashboard.result }}" \
+            "${{ needs.test-bot.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "::error::Quality gate failed — deploy blocked"
+              exit 1
+            fi
+          done
+          echo "All quality checks passed — proceeding to deploy"
+
+  # ══════════════════════════════════════════════
+  # DEPLOY — solo corre si quality-gate pasa
+  # ══════════════════════════════════════════════
+
+  # ──────────────────────────────────────────────
+  # 6. Discord: deploy started
   # ──────────────────────────────────────────────
   notify-start:
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.any_service == 'true'
+    needs: [quality-gate, detect-changes]
+    if: >-
+      needs.quality-gate.result == 'success' &&
+      needs.detect-changes.outputs.any_service == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -146,7 +287,7 @@ jobs:
             -d "$JSON"
 
   # ──────────────────────────────────────────────
-  # 3–7. Deploy services (parallel)
+  # 7–11. Deploy services (parallel)
   # ──────────────────────────────────────────────
   deploy-backend:
     runs-on: ubuntu-latest
@@ -257,7 +398,7 @@ jobs:
             echo "static-site actualizado (nginx lo sirve directo)"
 
   # ──────────────────────────────────────────────
-  # 8. Reseed DB (after backend deploys)
+  # 12. Reseed DB (after backend deploys)
   # ──────────────────────────────────────────────
   reseed-db:
     runs-on: ubuntu-latest
@@ -278,7 +419,7 @@ jobs:
             docker compose exec backend bun run src/seed.ts
 
   # ──────────────────────────────────────────────
-  # 9. Register slash commands (after bot deploys)
+  # 13. Register slash commands (after bot deploys)
   # ──────────────────────────────────────────────
   register-commands:
     runs-on: ubuntu-latest
@@ -299,13 +440,14 @@ jobs:
             docker compose run --rm bot bun run src/register.ts
 
   # ──────────────────────────────────────────────
-  # 10. Discord: deploy finished (always runs)
+  # 14. Discord: deploy finished (always runs)
   # ──────────────────────────────────────────────
   notify-end:
     runs-on: ubuntu-latest
     if: always()
     needs:
       - detect-changes
+      - quality-gate
       - notify-start
       - deploy-backend
       - deploy-dashboard
@@ -324,6 +466,7 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
+          QUALITY: ${{ needs.quality-gate.result }}
           BACKEND: ${{ needs.deploy-backend.result }}
           DASHBOARD: ${{ needs.deploy-dashboard.result }}
           BOT_SVC: ${{ needs.deploy-bot.result }}
@@ -352,6 +495,7 @@ jobs:
             FIELDS="${FIELDS}{\"name\":\"${icon} ${name}\",\"value\":\"${result}\",\"inline\":true}"
           }
 
+          add_field "Quality Gate" "$QUALITY"
           add_field "Backend" "$BACKEND"
           add_field "Dashboard" "$DASHBOARD"
           add_field "Bot" "$BOT_SVC"

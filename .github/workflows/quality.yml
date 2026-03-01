@@ -1,8 +1,6 @@
 name: Quality Gate
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -12,7 +10,7 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────────────
-  # 1. Detect which workspaces changed
+  # 1. Detect changes + Lint (parallel — both fast)
   # ──────────────────────────────────────────────
   detect-changes:
     runs-on: ubuntu-latest
@@ -33,9 +31,6 @@ jobs:
             bot:
               - 'bot/**'
 
-  # ──────────────────────────────────────────────
-  # 2. Lint (whole repo — Biome is fast enough)
-  # ──────────────────────────────────────────────
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -48,11 +43,11 @@ jobs:
       - run: npx biome check .
 
   # ──────────────────────────────────────────────
-  # 3. Typecheck per workspace (only if changed)
+  # 2. Typecheck — only runs if lint passes
   # ──────────────────────────────────────────────
   typecheck-backend:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [lint, detect-changes]
     if: needs.detect-changes.outputs.backend == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +60,7 @@ jobs:
 
   typecheck-dashboard:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [lint, detect-changes]
     if: needs.detect-changes.outputs.dashboard == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +73,7 @@ jobs:
 
   typecheck-bot:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [lint, detect-changes]
     if: needs.detect-changes.outputs.bot == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -90,11 +85,11 @@ jobs:
       - run: npm run typecheck --workspace=bot
 
   # ──────────────────────────────────────────────
-  # 4. Tests per workspace (only if changed)
+  # 3. Tests — only runs if typecheck passes
   # ──────────────────────────────────────────────
   test-backend:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [typecheck-backend, detect-changes]
     if: needs.detect-changes.outputs.backend == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +102,7 @@ jobs:
 
   test-dashboard:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [typecheck-dashboard, detect-changes]
     if: needs.detect-changes.outputs.dashboard == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +115,7 @@ jobs:
 
   test-bot:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [typecheck-bot, detect-changes]
     if: needs.detect-changes.outputs.bot == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -132,7 +127,7 @@ jobs:
       - run: npx vitest run --project bot --coverage
 
   # ──────────────────────────────────────────────
-  # 5. Quality gate — summary check
+  # 4. Quality gate summary
   # ──────────────────────────────────────────────
   quality-gate:
     runs-on: ubuntu-latest
@@ -148,15 +143,6 @@ jobs:
     steps:
       - name: Check results
         run: |
-          echo "Lint: ${{ needs.lint.result }}"
-          echo "Typecheck backend: ${{ needs.typecheck-backend.result }}"
-          echo "Typecheck dashboard: ${{ needs.typecheck-dashboard.result }}"
-          echo "Typecheck bot: ${{ needs.typecheck-bot.result }}"
-          echo "Test backend: ${{ needs.test-backend.result }}"
-          echo "Test dashboard: ${{ needs.test-dashboard.result }}"
-          echo "Test bot: ${{ needs.test-bot.result }}"
-
-          # Fail if any required job failed (skipped is OK — means no changes)
           for result in \
             "${{ needs.lint.result }}" \
             "${{ needs.typecheck-backend.result }}" \
@@ -166,7 +152,7 @@ jobs:
             "${{ needs.test-dashboard.result }}" \
             "${{ needs.test-bot.result }}"; do
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
-              echo "::error::Quality gate failed: one or more checks did not pass"
+              echo "::error::Quality gate failed"
               exit 1
             fi
           done
