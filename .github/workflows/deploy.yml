@@ -515,8 +515,10 @@ jobs:
           D_STATIC: ${{ needs.deploy-static.result }}
           D_RESEED: ${{ needs.reseed-db.result }}
           D_COMMANDS: ${{ needs.register-commands.result }}
+          ANY_SERVICE: ${{ needs.detect-changes.outputs.any_service }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
+          if [ "$ANY_SERVICE" != "true" ]; then exit 0; fi
 
           LINES=""
           FAILED=""
