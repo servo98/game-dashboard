@@ -270,26 +270,32 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {servers.map((server) => (
-                  <ServerCard
-                    key={server.id}
-                    server={server}
-                    isActive={server.status === "running"}
-                    loading={loadingId === server.id}
-                    hostMemTotalMB={hostMemTotalMB}
-                    hostDomain={hostDomain}
-                    onStart={() => handleStart(server.id)}
-                    onStop={() => handleStop(server.id)}
-                    onDelete={() => handleDelete(server.id)}
-                    onViewLogs={() =>
-                      setLogTarget({
-                        title: server.id,
-                        factory: () => createLogStream(server.id),
-                      })
-                    }
-                    onEditConfig={() => setEditConfigId(server.id)}
-                  />
-                ))}
+                {[...servers]
+                  .sort((a, b) => {
+                    if (a.status === "running" && b.status !== "running") return -1;
+                    if (a.status !== "running" && b.status === "running") return 1;
+                    return 0;
+                  })
+                  .map((server) => (
+                    <ServerCard
+                      key={server.id}
+                      server={server}
+                      isActive={server.status === "running"}
+                      loading={loadingId === server.id}
+                      hostMemTotalMB={hostMemTotalMB}
+                      hostDomain={hostDomain}
+                      onStart={() => handleStart(server.id)}
+                      onStop={() => handleStop(server.id)}
+                      onDelete={() => handleDelete(server.id)}
+                      onViewLogs={() =>
+                        setLogTarget({
+                          title: server.id,
+                          factory: () => createLogStream(server.id),
+                        })
+                      }
+                      onEditConfig={() => setEditConfigId(server.id)}
+                    />
+                  ))}
               </div>
             )}
 

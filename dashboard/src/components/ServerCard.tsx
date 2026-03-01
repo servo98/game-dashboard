@@ -146,8 +146,10 @@ export default function ServerCard({
 
   return (
     <div
-      className={`bg-gray-900 border rounded-2xl p-5 flex flex-col gap-4 transition-all ${
-        isActive ? "border-brand-500 shadow-lg shadow-brand-500/10" : "border-gray-800"
+      className={`border rounded-2xl p-5 flex flex-col gap-4 transition-all ${
+        isActive
+          ? "bg-gray-900 border-brand-500 shadow-lg shadow-brand-500/10 ring-1 ring-brand-500/20"
+          : "bg-gray-900 border-gray-800"
       }`}
     >
       {/* Header */}
