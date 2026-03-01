@@ -551,7 +551,6 @@ jobs:
           ANY_SERVICE: ${{ needs.detect-changes.outputs.any_service }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
-          if [ "$ANY_SERVICE" != "true" ]; then exit 0; fi
 
           LINES=""
           FAILED=""
@@ -587,7 +586,7 @@ jobs:
           # Remove leading \n
           LINES="${LINES#\\n}"
 
-          if [ -z "$LINES" ]; then exit 0; fi
+          if [ -z "$LINES" ]; then LINES="Solo quality checks — ningún servicio cambió"; fi
 
           MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
           SHORT=$(git rev-parse --short HEAD)
@@ -595,12 +594,16 @@ jobs:
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
           if [ -n "$FAILED" ]; then
-            TITLE="❌ Deploy Fallido"
+            TITLE="❌ Pipeline Fallido"
             COLOR=15158332
             DESC="Falló en: **${FAILED}**\\n\\n**${MSG}**"
           elif [ "$CANCELLED" = "true" ]; then
-            TITLE="⚪ Deploy Cancelado"
+            TITLE="⚪ Pipeline Cancelado"
             COLOR=9807270
+            DESC="**${MSG}**"
+          elif [ "$ANY_SERVICE" != "true" ]; then
+            TITLE="✅ Pipeline Completado (sin deploys)"
+            COLOR=3066993
             DESC="**${MSG}**"
           else
             TITLE="✅ Deploy Exitoso"
