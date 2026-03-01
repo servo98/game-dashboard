@@ -255,10 +255,8 @@ jobs:
   # ──────────────────────────────────────────────
   notify-start:
     runs-on: ubuntu-latest
-    needs: [quality-gate, detect-changes]
-    if: >-
-      needs.quality-gate.result == 'success' &&
-      needs.detect-changes.outputs.any_service == 'true'
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.any_service == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -271,14 +269,45 @@ jobs:
           EVENT: ${{ github.event_name }}
           RUN_ID: ${{ github.run_id }}
           SERVICES: ${{ needs.detect-changes.outputs.services_list }}
+          SVC_DASHBOARD: ${{ needs.detect-changes.outputs.dashboard }}
+          SVC_BACKEND: ${{ needs.detect-changes.outputs.backend }}
+          SVC_BOT: ${{ needs.detect-changes.outputs.bot }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
           MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
           SHORT=$(git rev-parse --short HEAD)
           AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          CHECKS="✅ Lint"
+          [ "$SVC_DASHBOARD" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck dashboard\\n🔄 Test dashboard"
+          [ "$SVC_BACKEND" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck backend\\n🔄 Test backend"
+          [ "$SVC_BOT" = "true" ] && CHECKS="${CHECKS}\\n🔄 Typecheck bot\\n🔄 Test bot"
+
           JSON=$(cat <<EOFJ
-          {"embeds":[{"title":"🚀 Deploy iniciado","description":"**${MSG}**","color":3447003,"fields":[{"name":"Commit","value":"[${SHORT}](https://github.com/${REPO}/commit/${SHA})","inline":true},{"name":"Autor","value":"${AUTHOR}","inline":true},{"name":"Trigger","value":"${EVENT}","inline":true},{"name":"Servicios","value":"${SERVICES}","inline":false},{"name":"Progreso","value":"[Ver en Actions](https://github.com/${REPO}/actions/runs/${RUN_ID})","inline":false}],"timestamp":"${TS}"}]}
+          {
+            "embeds": [{
+              "title": "🚀 Pipeline Iniciado",
+              "description": "**${MSG}**",
+              "color": 3447003,
+              "fields": [
+                {"name": "Commit", "value": "[\`${SHORT}\`](https://github.com/${REPO}/commit/${SHA})", "inline": true},
+                {"name": "Autor", "value": "${AUTHOR}", "inline": true},
+                {"name": "Trigger", "value": "${EVENT}", "inline": true},
+                {"name": "Servicios a deployar", "value": "${SERVICES}", "inline": false},
+                {"name": "Quality Checks", "value": "${CHECKS}", "inline": false}
+              ],
+              "footer": {"text": "game-panel CI/CD"},
+              "timestamp": "${TS}"
+            }],
+            "components": [{
+              "type": 1,
+              "components": [
+                {"type": 2, "style": 5, "label": "Ver en Actions", "url": "https://github.com/${REPO}/actions/runs/${RUN_ID}", "emoji": {"name": "🔗"}},
+                {"type": 2, "style": 5, "label": "Ver Commit", "url": "https://github.com/${REPO}/commit/${SHA}", "emoji": {"name": "📝"}}
+              ]
+            }]
+          }
           EOFJ
           )
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
@@ -291,10 +320,10 @@ jobs:
   # ──────────────────────────────────────────────
   deploy-backend:
     runs-on: ubuntu-latest
-    needs: [detect-changes, notify-start]
+    needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
-      needs.detect-changes.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
       needs.detect-changes.outputs.backend == 'true'
     steps:
       - name: Rebuild backend
@@ -313,10 +342,10 @@ jobs:
 
   deploy-dashboard:
     runs-on: ubuntu-latest
-    needs: [detect-changes, notify-start]
+    needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
-      needs.detect-changes.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
       needs.detect-changes.outputs.dashboard == 'true'
     steps:
       - name: Rebuild dashboard
@@ -335,10 +364,10 @@ jobs:
 
   deploy-bot:
     runs-on: ubuntu-latest
-    needs: [detect-changes, notify-start]
+    needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
-      needs.detect-changes.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
       needs.detect-changes.outputs.bot == 'true'
     steps:
       - name: Rebuild bot
@@ -357,10 +386,10 @@ jobs:
 
   deploy-nginx:
     runs-on: ubuntu-latest
-    needs: [detect-changes, notify-start]
+    needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
-      needs.detect-changes.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
       needs.detect-changes.outputs.nginx == 'true'
     steps:
       - name: Recargar nginx
@@ -378,10 +407,10 @@ jobs:
 
   deploy-static:
     runs-on: ubuntu-latest
-    needs: [detect-changes, notify-start]
+    needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
-      needs.detect-changes.result == 'success' &&
+      needs.quality-gate.result == 'success' &&
       needs.detect-changes.outputs.static == 'true'
     steps:
       - name: Actualizar sitio estático
@@ -447,8 +476,14 @@ jobs:
     if: always()
     needs:
       - detect-changes
+      - lint
+      - typecheck-backend
+      - typecheck-dashboard
+      - typecheck-bot
+      - test-backend
+      - test-dashboard
+      - test-bot
       - quality-gate
-      - notify-start
       - deploy-backend
       - deploy-dashboard
       - deploy-bot
@@ -466,67 +501,102 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
-          QUALITY: ${{ needs.quality-gate.result }}
-          BACKEND: ${{ needs.deploy-backend.result }}
-          DASHBOARD: ${{ needs.deploy-dashboard.result }}
-          BOT_SVC: ${{ needs.deploy-bot.result }}
-          NGINX: ${{ needs.deploy-nginx.result }}
-          STATIC: ${{ needs.deploy-static.result }}
-          RESEED: ${{ needs.reseed-db.result }}
-          COMMANDS: ${{ needs.register-commands.result }}
+          LINT: ${{ needs.lint.result }}
+          TC_BACKEND: ${{ needs.typecheck-backend.result }}
+          TC_DASHBOARD: ${{ needs.typecheck-dashboard.result }}
+          TC_BOT: ${{ needs.typecheck-bot.result }}
+          T_BACKEND: ${{ needs.test-backend.result }}
+          T_DASHBOARD: ${{ needs.test-dashboard.result }}
+          T_BOT: ${{ needs.test-bot.result }}
+          D_BACKEND: ${{ needs.deploy-backend.result }}
+          D_DASHBOARD: ${{ needs.deploy-dashboard.result }}
+          D_BOT: ${{ needs.deploy-bot.result }}
+          D_NGINX: ${{ needs.deploy-nginx.result }}
+          D_STATIC: ${{ needs.deploy-static.result }}
+          D_RESEED: ${{ needs.reseed-db.result }}
+          D_COMMANDS: ${{ needs.register-commands.result }}
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHANNEL_ID" ]; then exit 0; fi
 
-          FIELDS=""
-          HAS_FAILURE="false"
-          HAS_SUCCESS="false"
-          HAS_CANCELLED="false"
+          LINES=""
+          FAILED=""
+          CANCELLED=""
 
-          add_field() {
+          add_line() {
             local name=$1 result=$2
-            if [ "$result" = "skipped" ]; then return; fi
-            local icon="⚪"
             case "$result" in
-              success)   icon="✅"; HAS_SUCCESS="true" ;;
-              failure)   icon="❌"; HAS_FAILURE="true" ;;
-              cancelled) HAS_CANCELLED="true" ;;
+              success)   LINES="${LINES}\\n✅ ${name}" ;;
+              failure)   LINES="${LINES}\\n❌ ${name}"; FAILED="${FAILED:+${FAILED}, }${name}" ;;
+              cancelled) LINES="${LINES}\\n⚪ ${name} (cancelado)"; CANCELLED="true" ;;
+              skipped)   ;;
             esac
-            if [ -n "$FIELDS" ]; then FIELDS="${FIELDS},"; fi
-            FIELDS="${FIELDS}{\"name\":\"${icon} ${name}\",\"value\":\"${result}\",\"inline\":true}"
           }
 
-          add_field "Quality Gate" "$QUALITY"
-          add_field "Backend" "$BACKEND"
-          add_field "Dashboard" "$DASHBOARD"
-          add_field "Bot" "$BOT_SVC"
-          add_field "Nginx" "$NGINX"
-          add_field "Static" "$STATIC"
-          add_field "Reseed DB" "$RESEED"
-          add_field "Commands" "$COMMANDS"
+          # Quality checks
+          add_line "Lint" "$LINT"
+          add_line "Typecheck backend" "$TC_BACKEND"
+          add_line "Typecheck dashboard" "$TC_DASHBOARD"
+          add_line "Typecheck bot" "$TC_BOT"
+          add_line "Test backend" "$T_BACKEND"
+          add_line "Test dashboard" "$T_DASHBOARD"
+          add_line "Test bot" "$T_BOT"
+          # Deploy
+          add_line "Deploy backend" "$D_BACKEND"
+          add_line "Deploy dashboard" "$D_DASHBOARD"
+          add_line "Deploy bot" "$D_BOT"
+          add_line "Deploy nginx" "$D_NGINX"
+          add_line "Deploy static" "$D_STATIC"
+          add_line "Reseed DB" "$D_RESEED"
+          add_line "Register commands" "$D_COMMANDS"
 
-          # If no services actually ran, don't send notification
-          if [ -z "$FIELDS" ]; then exit 0; fi
+          # Remove leading \n
+          LINES="${LINES#\\n}"
 
-          if [ "$HAS_FAILURE" = "true" ]; then
-            TITLE="❌ Deploy fallido"
-            COLOR=15158332
-          elif [ "$HAS_CANCELLED" = "true" ]; then
-            TITLE="⚪ Deploy cancelado"
-            COLOR=9807270
-          else
-            TITLE="✅ Deploy exitoso"
-            COLOR=3066993
-          fi
+          if [ -z "$LINES" ]; then exit 0; fi
 
           MSG=$(git log -1 --pretty=%s | sed 's/"/\\"/g')
           SHORT=$(git rev-parse --short HEAD)
+          AUTHOR=$(git log -1 --pretty=%an | sed 's/"/\\"/g')
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-          COMMIT_FIELD="{\"name\":\"Commit\",\"value\":\"[${SHORT}](https://github.com/${REPO}/commit/${SHA})\",\"inline\":true}"
-          LOGS_FIELD="{\"name\":\"Logs\",\"value\":\"[Ver en Actions](https://github.com/${REPO}/actions/runs/${RUN_ID})\",\"inline\":true}"
+          if [ -n "$FAILED" ]; then
+            TITLE="❌ Deploy Fallido"
+            COLOR=15158332
+            DESC="Falló en: **${FAILED}**\\n\\n**${MSG}**"
+          elif [ "$CANCELLED" = "true" ]; then
+            TITLE="⚪ Deploy Cancelado"
+            COLOR=9807270
+            DESC="**${MSG}**"
+          else
+            TITLE="✅ Deploy Exitoso"
+            COLOR=3066993
+            DESC="**${MSG}**"
+          fi
 
-          JSON="{\"embeds\":[{\"title\":\"${TITLE}\",\"description\":\"**${MSG}**\",\"color\":${COLOR},\"fields\":[${COMMIT_FIELD},${LOGS_FIELD},${FIELDS}],\"timestamp\":\"${TS}\"}]}"
-
+          JSON=$(cat <<EOFJ
+          {
+            "embeds": [{
+              "title": "${TITLE}",
+              "description": "${DESC}",
+              "color": ${COLOR},
+              "fields": [
+                {"name": "Commit", "value": "[\`${SHORT}\`](https://github.com/${REPO}/commit/${SHA})", "inline": true},
+                {"name": "Autor", "value": "${AUTHOR}", "inline": true},
+                {"name": "Pipeline", "value": "${LINES}", "inline": false}
+              ],
+              "footer": {"text": "game-panel CI/CD"},
+              "timestamp": "${TS}"
+            }],
+            "components": [{
+              "type": 1,
+              "components": [
+                {"type": 2, "style": 5, "label": "Ver en Actions", "url": "https://github.com/${REPO}/actions/runs/${RUN_ID}", "emoji": {"name": "🔗"}},
+                {"type": 2, "style": 5, "label": "Ver Commit", "url": "https://github.com/${REPO}/commit/${SHA}", "emoji": {"name": "📝"}}
+              ]
+            }]
+          }
+          EOFJ
+          )
           curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
             -H "Authorization: Bot ${BOT_TOKEN}" \
             -H "Content-Type: application/json" \
