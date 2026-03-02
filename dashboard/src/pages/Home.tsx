@@ -386,6 +386,7 @@ export default function Home() {
           serverName={editConfigServer.name}
           gameType={editConfigServer.game_type}
           open={!!editConfigId}
+          isRunning={editConfigServer.status === "running"}
           onClose={() => setEditConfigId(null)}
           onSaved={fetchServers}
         />

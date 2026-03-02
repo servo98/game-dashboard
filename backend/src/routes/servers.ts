@@ -386,16 +386,11 @@ servers.get("/:id/config", requireAuth, async (c) => {
   });
 });
 
-// Update editable config for a stopped server
+// Update editable config for a server
 servers.put("/:id/config", requireAuth, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
-
-  const status = await getContainerStatus(id);
-  if (status === "running") {
-    return c.json({ error: "Cannot edit config while server is running" }, 400);
-  }
 
   const body = await c.req.json<{
     docker_image: string;

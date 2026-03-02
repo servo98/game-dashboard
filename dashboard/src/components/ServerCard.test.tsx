@@ -78,15 +78,15 @@ describe("ServerCard", () => {
    */
   it("renders Logs button only for running servers", () => {
     const { rerender } = render(<ServerCard server={stoppedServer} {...defaultProps} />);
-    expect(screen.queryByText("Logs")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Logs")).not.toBeInTheDocument();
 
     rerender(<ServerCard server={runningServer} {...defaultProps} isActive />);
-    expect(screen.getByText("Logs")).toBeInTheDocument();
+    expect(screen.getByTitle("Logs")).toBeInTheDocument();
   });
 
   it("Logs button calls onViewLogs on click", () => {
     render(<ServerCard server={runningServer} {...defaultProps} isActive />);
-    fireEvent.click(screen.getByText("Logs"));
+    fireEvent.click(screen.getByTitle("Logs"));
     expect(defaultProps.onViewLogs).toHaveBeenCalledTimes(1);
   });
 

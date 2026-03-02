@@ -9,6 +9,7 @@ type Props = {
   serverName: string;
   gameType?: string;
   open: boolean;
+  isRunning?: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -22,6 +23,7 @@ export default function ConfigEditor({
   serverName,
   gameType,
   open,
+  isRunning = false,
   onClose,
   onSaved,
 }: Props) {
@@ -31,6 +33,8 @@ export default function ConfigEditor({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRestartPrompt, setShowRestartPrompt] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   // Theme state
   const [bannerPath, setBannerPath] = useState<string | null>(null);
@@ -52,6 +56,8 @@ export default function ConfigEditor({
     setError(null);
     setSuggestedColors([]);
     setBannerPreview(null);
+    setShowRestartPrompt(false);
+    setRestarting(false);
     api
       .getServerConfig(serverId)
       .then((cfg: ServerConfig) => {
@@ -81,13 +87,39 @@ export default function ConfigEditor({
         env_vars,
         accent_color: accentColor,
       } as ServerConfig);
-      onSaved();
-      onClose();
+      if (isRunning) {
+        setShowRestartPrompt(true);
+      } else {
+        onSaved();
+        onClose();
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleRestartConfirm() {
+    setRestarting(true);
+    setError(null);
+    try {
+      await api.stopServer(serverId);
+      await api.startServer(serverId);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRestarting(false);
+      setShowRestartPrompt(false);
+    }
+  }
+
+  function handleRestartDecline() {
+    setShowRestartPrompt(false);
+    onSaved();
+    onClose();
   }
 
   async function handleBannerUpload(file: File) {
@@ -139,7 +171,7 @@ export default function ConfigEditor({
   const displayBanner = bannerPreview || (bannerPath ? bannerPath : defaultTheme.banner);
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div
         className={`bg-gray-950 border border-gray-800 rounded-2xl w-full shadow-2xl ${isMinecraft ? "max-w-2xl" : "max-w-lg"} max-h-[90vh] flex flex-col`}
       >
@@ -331,19 +363,43 @@ export default function ConfigEditor({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-800 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
+          {showRestartPrompt ? (
+            <>
+              <span className="text-sm text-gray-300 mr-auto">
+                Restart server for changes to take effect?
+              </span>
+              <button
+                onClick={handleRestartDecline}
+                disabled={restarting}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                No
+              </button>
+              <button
+                onClick={handleRestartConfirm}
+                disabled={restarting}
+                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                {restarting ? "Restarting..." : "Yes"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || loading}
+                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

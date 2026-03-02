@@ -2,6 +2,16 @@ import { useState } from "react";
 import type { BackupRecord, GameServer, ServerSessionRecord } from "../api";
 import { api } from "../api";
 import { connectAddress, formatDuration, formatSize } from "../utils/format";
+import {
+  BoxIcon,
+  ClockIcon,
+  DownloadIcon,
+  GamepadIcon,
+  LogsIcon,
+  RestoreIcon,
+  SettingsIcon,
+  TrashIcon,
+} from "./Icons";
 import StatsBar from "./StatsBar";
 
 type Props = {
@@ -155,7 +165,7 @@ export default function ServerCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🎮</span>
+          <GamepadIcon className="w-7 h-7 text-gray-400" />
           <div>
             <h3 className="font-semibold text-white leading-tight">{server.name}</h3>
             <p className="text-xs text-gray-500">Port {server.port}</p>
@@ -193,63 +203,72 @@ export default function ServerCard({
       {/* Actions */}
       <div className="flex gap-2">
         {!isRunning ? (
+          <button
+            onClick={onStart}
+            disabled={loading}
+            className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
+          >
+            {loading ? "Starting..." : "Start"}
+          </button>
+        ) : (
           <>
             <button
-              onClick={onStart}
+              onClick={onStop}
               disabled={loading}
-              className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
             >
-              {loading ? "Starting..." : "Start"}
+              {loading ? "Stopping..." : "Stop"}
             </button>
             <button
-              onClick={onEditConfig}
-              title="Edit config"
-              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-white transition-colors"
+              onClick={onViewLogs}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-300 transition-colors"
+              title="Logs"
             >
-              ⚙
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              title={confirmDelete ? "Click again to confirm" : "Delete server"}
-              className={`px-3 py-2 rounded-xl text-sm transition-colors ${
-                confirmDelete
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
-              }`}
-            >
-              {confirmDelete ? "Confirm?" : "🗑"}
+              <LogsIcon />
             </button>
           </>
-        ) : (
-          <button
-            onClick={onStop}
-            disabled={loading}
-            className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
-          >
-            {loading ? "Stopping..." : "Stop"}
-          </button>
         )}
-        {isRunning && (
+        <button
+          onClick={onEditConfig}
+          title="Edit config"
+          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
+        >
+          <SettingsIcon />
+        </button>
+        {!isRunning && (
           <button
-            onClick={onViewLogs}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-300 transition-colors"
+            onClick={handleDeleteClick}
+            title={confirmDelete ? "Click again to confirm" : "Delete server"}
+            className={`px-3 py-2 rounded-xl transition-colors ${
+              confirmDelete
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
+            }`}
           >
-            Logs
+            {confirmDelete ? "Confirm?" : <TrashIcon />}
           </button>
         )}
         <button
           onClick={toggleBackups}
-          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-gray-300 transition-colors"
+          className={`px-3 py-2 rounded-xl transition-colors ${
+            showBackups
+              ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
+              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
+          }`}
           title="Backups"
         >
-          📦
+          <BoxIcon />
         </button>
         <button
           onClick={toggleHistory}
-          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm text-gray-400 hover:text-gray-300 transition-colors"
+          className={`px-3 py-2 rounded-xl transition-colors ${
+            showHistory
+              ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
+              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
+          }`}
           title="Session history"
         >
-          ⏱
+          <ClockIcon />
         </button>
       </div>
 
@@ -286,29 +305,33 @@ export default function ServerCard({
                   <div className="flex items-center gap-1">
                     <a
                       href={api.downloadBackupUrl(server.id, b.id)}
-                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors inline-flex items-center"
                       title="Download"
                     >
-                      ⬇
+                      <DownloadIcon className="w-3.5 h-3.5" />
                     </a>
                     <button
                       onClick={() => handleRestoreBackup(b.id)}
                       disabled={isRunning}
                       title={isRunning ? "Stop server first" : "Restore"}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                      className={`px-1.5 py-0.5 rounded transition-colors inline-flex items-center ${
                         confirmRestore === b.id
                           ? "bg-yellow-600 text-white hover:bg-yellow-700"
                           : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                       }`}
                     >
-                      {confirmRestore === b.id ? "Confirm?" : "↩"}
+                      {confirmRestore === b.id ? (
+                        "Confirm?"
+                      ) : (
+                        <RestoreIcon className="w-3.5 h-3.5" />
+                      )}
                     </button>
                     <button
                       onClick={() => handleDeleteBackup(b.id)}
-                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"
+                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors inline-flex items-center"
                       title="Delete"
                     >
-                      🗑
+                      <TrashIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
