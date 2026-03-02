@@ -39,13 +39,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+
+      - name: Find base ref for comparison
+        id: base
+        if: github.event_name == 'push'
+        run: |
+          # Compare against the last successful deploy, not just the previous commit.
+          # This ensures that if a deploy fails and the fix only touches one service,
+          # ALL services that changed since the last successful deploy get redeployed.
+          if git rev-parse origin/deployed >/dev/null 2>&1; then
+            echo "ref=origin/deployed" >> $GITHUB_OUTPUT
+          else
+            echo "ref=HEAD~1" >> $GITHUB_OUTPUT
+          fi
 
       - name: Detectar cambios (push)
         id: changed
         if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
         with:
+          base: ${{ steps.base.outputs.ref }}
           filters: |
             backend:
               - 'backend/**'
@@ -517,7 +531,37 @@ jobs:
             docker compose run --rm bot bun run src/register.ts
 
   # ──────────────────────────────────────────────
-  # 14. Discord: deploy finished (always runs)
+  # 14. Tag successful deploy (moves the "deployed" branch marker)
+  # ──────────────────────────────────────────────
+  tag-deployed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs:
+      - quality-gate
+      - deploy-backend
+      - deploy-dashboard
+      - deploy-bot
+      - deploy-nginx
+      - deploy-static
+    if: >-
+      always() &&
+      needs.quality-gate.result == 'success' &&
+      !contains(needs.deploy-backend.result, 'failure') &&
+      !contains(needs.deploy-dashboard.result, 'failure') &&
+      !contains(needs.deploy-bot.result, 'failure') &&
+      !contains(needs.deploy-nginx.result, 'failure') &&
+      !contains(needs.deploy-static.result, 'failure')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update deployed ref
+        run: |
+          # Use a lightweight branch as the "last successful deploy" marker.
+          # Next run's detect-changes compares HEAD against this ref.
+          git push origin HEAD:refs/heads/deployed --force
+
+  # ──────────────────────────────────────────────
+  # 15. Discord: deploy finished (always runs)
   # ──────────────────────────────────────────────
   notify-end:
     runs-on: ubuntu-latest
