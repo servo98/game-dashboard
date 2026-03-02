@@ -18,6 +18,36 @@ function isMinecraftImage(image: string): boolean {
   return image.includes("itzg/minecraft-server");
 }
 
+/** Compress an image file using canvas (resize + JPEG compression) */
+function compressImage(file: File, maxWidth: number, quality: number): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas not supported"));
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Compression failed"));
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function ConfigEditor({
   serverId,
   serverName,
@@ -126,16 +156,19 @@ export default function ConfigEditor({
     setUploading(true);
     setError(null);
     try {
-      // Extract colors from the file before uploading
-      const colors = await extractColors(file, 4);
+      // Compress image client-side (max 1920px wide, JPEG 0.8 quality)
+      const compressed = await compressImage(file, 1920, 0.8);
+
+      // Extract colors from the compressed file before uploading
+      const colors = await extractColors(compressed, 4);
       setSuggestedColors(colors);
       if (colors.length > 0 && !accentColor) {
         setAccentColor(colors[0]);
       }
 
-      const result = await api.uploadBanner(serverId, file);
+      const result = await api.uploadBanner(serverId, compressed);
       setBannerPath(result.banner_path);
-      setBannerPreview(URL.createObjectURL(file));
+      setBannerPreview(URL.createObjectURL(compressed));
     } catch (err) {
       setError((err as Error).message);
     } finally {
