@@ -3,7 +3,7 @@ import { makeServer, makeSession } from "../__tests__/factories";
 
 const mockSessionGet = vi.fn();
 const mockServerGetById = vi.fn();
-const mockServerGetAll = vi.fn(() => []);
+const mockServerGetAll = vi.fn((): unknown[] => []);
 const mockServerInsert = vi.fn();
 const mockServerDeleteById = vi.fn();
 const mockGetContainerStatus = vi.fn();
