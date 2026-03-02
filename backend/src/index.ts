@@ -4,6 +4,7 @@ import { logger } from "hono/logger";
 import { startAutoBackupTimer } from "./backup";
 import { sessionQueries } from "./db";
 import { docker } from "./docker";
+import { getCachedStats, startStatsCache } from "./stats-cache";
 import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
@@ -44,28 +45,8 @@ app.get("/api/health/status", async (c) => {
         const info = await container.inspect();
         const state = info.State;
 
-        // Parse memory stats from container stats (quick snapshot)
-        let memUsageMB = 0;
-        let memLimitMB = 0;
-        let cpuPercent = 0;
-        try {
-          const stats = await container.stats({ stream: false });
-          const memUsage = stats.memory_stats?.usage ?? 0;
-          const memCache = stats.memory_stats?.stats?.cache ?? 0;
-          memUsageMB = Math.round((memUsage - memCache) / 1024 / 1024);
-          memLimitMB = Math.round((stats.memory_stats?.limit ?? 0) / 1024 / 1024);
-
-          const cpuDelta =
-            (stats.cpu_stats?.cpu_usage?.total_usage ?? 0) -
-            (stats.precpu_stats?.cpu_usage?.total_usage ?? 0);
-          const systemDelta =
-            (stats.cpu_stats?.system_cpu_usage ?? 0) - (stats.precpu_stats?.system_cpu_usage ?? 0);
-          const cpuCount = stats.cpu_stats?.online_cpus ?? 1;
-          cpuPercent =
-            systemDelta > 0 ? Math.round((cpuDelta / systemDelta) * cpuCount * 100 * 10) / 10 : 0;
-        } catch {
-          // stats may not be available
-        }
+        // Read from background cache instead of calling container.stats() per request
+        const cached = getCachedStats(name);
 
         return {
           name,
@@ -73,9 +54,9 @@ app.get("/api/health/status", async (c) => {
           health: state.Health?.Status ?? (state.Running ? "running" : "stopped"),
           uptime: state.Running ? state.StartedAt : null,
           restarts: info.RestartCount ?? 0,
-          memUsageMB,
-          memLimitMB,
-          cpuPercent,
+          memUsageMB: cached.memUsageMB,
+          memLimitMB: cached.memLimitMB,
+          cpuPercent: cached.cpuPercent,
         };
       } catch {
         return {
@@ -131,6 +112,9 @@ app.route("/api/settings", settingsRoutes);
 
 // Start auto-backup timer (checks every hour)
 startAutoBackupTimer();
+
+// Start background stats cache (refreshes every 10s, replaces per-request container.stats() calls)
+startStatsCache();
 
 // Periodic session cleanup (every hour)
 setInterval(

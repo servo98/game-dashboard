@@ -49,9 +49,13 @@ export function watchContainer(serverId: string, onCrash: () => void): void {
   if (existing) clearInterval(existing);
   intentionalStops.delete(serverId);
 
+  const MAX_CONSECUTIVE_ERRORS = 10;
+  let errorCount = 0;
+
   const interval = setInterval(async () => {
     try {
       const status = await getContainerStatus(serverId);
+      errorCount = 0; // reset on success
       if (status !== "running") {
         clearInterval(interval);
         activeWatchers.delete(serverId);
@@ -61,7 +65,12 @@ export function watchContainer(serverId: string, onCrash: () => void): void {
         intentionalStops.delete(serverId);
       }
     } catch {
-      // ignore transient errors
+      errorCount++;
+      if (errorCount >= MAX_CONSECUTIVE_ERRORS) {
+        console.error(`Crash watcher for ${serverId}: ${MAX_CONSECUTIVE_ERRORS} consecutive errors, cleaning up`);
+        clearInterval(interval);
+        activeWatchers.delete(serverId);
+      }
     }
   }, 30_000);
 
@@ -348,35 +357,44 @@ async function* _streamStats(
 
   const stream = (await container.stats({ stream: true })) as unknown as NodeJS.ReadableStream;
 
-  let buffer = "";
+  // Use Buffer queue instead of string concatenation to avoid O(n) copying
+  let remainder = Buffer.alloc(0);
+  const NEWLINE = 0x0a; // '\n'
 
   for await (const chunk of stream as AsyncIterable<Buffer>) {
     if (signal.aborted) break;
-    buffer += chunk.toString("utf8");
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const combined = remainder.length > 0 ? Buffer.concat([remainder, buf]) : buf;
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const s = JSON.parse(line);
-        const cpuDelta = s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
-        const systemDelta =
-          (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
-        const numCpus = s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
-        const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
-        const memUsageMB = (s.memory_stats.usage ?? 0) / 1024 / 1024;
-        const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
+    let start = 0;
+    for (let i = 0; i < combined.length; i++) {
+      if (combined[i] === NEWLINE) {
+        const line = combined.subarray(start, i).toString("utf8").trim();
+        start = i + 1;
+        if (!line) continue;
+        try {
+          const s = JSON.parse(line);
+          const cpuDelta =
+            s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
+          const systemDelta =
+            (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
+          const numCpus =
+            s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
+          const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+          const memUsageMB = (s.memory_stats.usage ?? 0) / 1024 / 1024;
+          const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
 
-        yield {
-          cpuPercent: Math.max(0, Math.min(cpuPercent, 100)),
-          memUsageMB,
-          memLimitMB,
-        };
-      } catch {
-        // Ignore parse errors
+          yield {
+            cpuPercent: Math.max(0, Math.min(cpuPercent, 100)),
+            memUsageMB,
+            memLimitMB,
+          };
+        } catch {
+          // Ignore parse errors
+        }
       }
     }
+    remainder = start < combined.length ? Buffer.from(combined.subarray(start)) : Buffer.alloc(0);
   }
 }
 
