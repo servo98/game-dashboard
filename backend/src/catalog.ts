@@ -1,8 +1,7 @@
 const steam = (appId: number) =>
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
 
-const MINECRAFT_ICON =
-  "https://www.minecraft.net/etc.clientlibs/minecraft/clientlibs/main/resources/favicon-96x96.png";
+const MINECRAFT_ICON = "https://media.rawg.io/media/games/b4e/b4e4c73d5aa4ec66bbf75375c4847a2b.jpg";
 
 export type GameTemplate = {
   id: string;
