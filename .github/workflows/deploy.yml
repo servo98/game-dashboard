@@ -368,6 +368,7 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
@@ -390,6 +391,7 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
@@ -412,6 +414,7 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
@@ -434,6 +437,7 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
             docker compose exec nginx nginx -s reload
@@ -455,6 +459,7 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
             echo "static-site actualizado (nginx lo sirve directo)"
