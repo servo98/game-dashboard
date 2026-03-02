@@ -15,13 +15,14 @@ import ConfigEditor from "../components/ConfigEditor";
 import GameStore from "../components/GameStore";
 import HostStatsBar from "../components/HostStatsBar";
 import LogViewer from "../components/LogViewer";
+import McpTokens from "../components/McpTokens";
 import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
 import ServiceStatsBar from "../components/ServiceStatsBar";
 import ThemeBanner from "../components/ThemeBanner";
 import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
-type Tab = "servers" | "bot" | "backups" | "settings";
+type Tab = "servers" | "bot" | "mcp" | "backups" | "settings";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
@@ -287,7 +288,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(["servers", "bot", "backups", "settings"] as const).map((t) => (
+          {(["servers", "bot", "mcp", "backups", "settings"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -301,9 +302,11 @@ export default function Home() {
                 ? "Game Servers"
                 : t === "bot"
                   ? "Bot"
-                  : t === "backups"
-                    ? "Backups"
-                    : "Settings"}
+                  : t === "mcp"
+                    ? "MCP"
+                    : t === "backups"
+                      ? "Backups"
+                      : "Settings"}
             </button>
           ))}
         </div>
@@ -405,6 +408,12 @@ export default function Home() {
         {tab === "bot" && (
           <div className="max-w-lg">
             <BotSettings />
+          </div>
+        )}
+
+        {tab === "mcp" && (
+          <div className="max-w-lg">
+            <McpTokens />
           </div>
         )}
 

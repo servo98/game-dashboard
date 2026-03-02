@@ -52,6 +52,20 @@ db.exec(`
   );
 `);
 
+// MCP tokens table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mcp_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    discord_id TEXT NOT NULL,
+    discord_username TEXT NOT NULL,
+    player_name TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    last_used_at INTEGER
+  );
+`);
+
 // Migration: add theme columns to servers
 try {
   db.exec(`ALTER TABLE servers ADD COLUMN banner_path TEXT`);
@@ -200,3 +214,31 @@ export function getAllPanelSettings(): Record<string, string> {
   }
   return result;
 }
+
+export type McpToken = {
+  id: number;
+  token: string;
+  discord_id: string;
+  discord_username: string;
+  player_name: string;
+  label: string;
+  created_at: number;
+  last_used_at: number | null;
+};
+
+export const mcpTokenQueries = {
+  getByToken: db.query<McpToken, [string]>("SELECT * FROM mcp_tokens WHERE token = ?"),
+  listByDiscordId: db.query<McpToken, [string]>(
+    "SELECT * FROM mcp_tokens WHERE discord_id = ? ORDER BY created_at DESC",
+  ),
+  listAll: db.query<McpToken, []>("SELECT * FROM mcp_tokens ORDER BY created_at DESC"),
+  insert: db.query<void, [string, string, string, string, string]>(
+    "INSERT INTO mcp_tokens (token, discord_id, discord_username, player_name, label) VALUES (?, ?, ?, ?, ?)",
+  ),
+  deleteById: db.query<void, [number, string]>(
+    "DELETE FROM mcp_tokens WHERE id = ? AND discord_id = ?",
+  ),
+  updateLastUsed: db.query<void, [number]>(
+    "UPDATE mcp_tokens SET last_used_at = unixepoch() WHERE id = ?",
+  ),
+};

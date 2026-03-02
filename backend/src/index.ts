@@ -4,14 +4,17 @@ import { logger } from "hono/logger";
 import { startAutoBackupTimer } from "./backup";
 import { sessionQueries } from "./db";
 import { docker } from "./docker";
-import { getCachedStats, startStatsCache } from "./stats-cache";
+import { startQuestPoller } from "./quest-poller";
 import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
+import mcpRoutes from "./routes/mcp";
+import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
+import { getCachedStats, startStatsCache } from "./stats-cache";
 
 const app = new Hono();
 
@@ -109,12 +112,17 @@ app.route("/api/bot", botSettingsRoutes);
 app.route("/api/curseforge", curseforgeRoutes);
 app.route("/api/notifications", notificationRoutes);
 app.route("/api/settings", settingsRoutes);
+app.route("/api", mcpRoutes);
+app.route("/api/mcp-tokens", mcpTokenRoutes);
 
 // Start auto-backup timer (checks every hour)
 startAutoBackupTimer();
 
 // Start background stats cache (refreshes every 10s, replaces per-request container.stats() calls)
 startStatsCache();
+
+// Start quest completion poller
+startQuestPoller();
 
 // Periodic session cleanup (every hour)
 setInterval(

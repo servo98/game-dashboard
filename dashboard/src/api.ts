@@ -20,6 +20,7 @@ export type User = {
 
 export type ContainerStats = {
   cpuPercent: number;
+  cpuCores: number;
   memUsageMB: number;
   memLimitMB: number;
 };
@@ -44,6 +45,7 @@ export type BotSettings = {
   errors_channel_id: string | null;
   crashes_channel_id: string | null;
   logs_channel_id: string | null;
+  quests_channel_id: string | null;
   commands: Array<{ name: string; description: string }>;
 };
 
@@ -94,6 +96,15 @@ export type PanelSettings = {
   auto_stop_hours: string;
   max_backups_per_server: string;
   auto_backup_interval_hours: string;
+};
+
+export type McpTokenRecord = {
+  id: number;
+  token_preview: string;
+  player_name: string;
+  label: string;
+  created_at: number;
+  last_used_at: number | null;
 };
 
 export type CurseForgeModpack = {
@@ -239,6 +250,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  /** MCP tokens */
+  listMcpTokens: () => request<McpTokenRecord[]>("/mcp-tokens"),
+  createMcpToken: (data: { player_name: string; label?: string }) =>
+    request<{ token: string; player_name: string }>("/mcp-tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteMcpToken: (id: number) =>
+    request<{ ok: boolean }>(`/mcp-tokens/${id}`, { method: "DELETE" }),
 };
 
 /** Create an EventSource for live game server logs */

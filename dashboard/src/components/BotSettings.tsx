@@ -18,6 +18,11 @@ const CHANNEL_FIELDS = [
     desc: "Game server crash alerts are sent here",
   },
   { key: "logs_channel_id" as const, label: "Log Channel", desc: "General log messages" },
+  {
+    key: "quests_channel_id" as const,
+    label: "Quest Notifications",
+    desc: "Quest completion announcements",
+  },
 ];
 
 export default function BotSettings() {
@@ -38,6 +43,7 @@ export default function BotSettings() {
           errors_channel_id: s.errors_channel_id,
           crashes_channel_id: s.crashes_channel_id,
           logs_channel_id: s.logs_channel_id,
+          quests_channel_id: s.quests_channel_id,
         });
       })
       .catch((err: Error) => setError(err.message));

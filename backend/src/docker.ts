@@ -67,7 +67,9 @@ export function watchContainer(serverId: string, onCrash: () => void): void {
     } catch {
       errorCount++;
       if (errorCount >= MAX_CONSECUTIVE_ERRORS) {
-        console.error(`Crash watcher for ${serverId}: ${MAX_CONSECUTIVE_ERRORS} consecutive errors, cleaning up`);
+        console.error(
+          `Crash watcher for ${serverId}: ${MAX_CONSECUTIVE_ERRORS} consecutive errors, cleaning up`,
+        );
         clearInterval(interval);
         activeWatchers.delete(serverId);
       }
@@ -352,7 +354,12 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
 async function* _streamStats(
   containerName: string,
   signal: AbortSignal,
-): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+): AsyncGenerator<{
+  cpuPercent: number;
+  cpuCores: number;
+  memUsageMB: number;
+  memLimitMB: number;
+}> {
   const container = docker.getContainer(containerName);
 
   const stream = (await container.stats({ stream: true })) as unknown as NodeJS.ReadableStream;
@@ -374,8 +381,7 @@ async function* _streamStats(
         if (!line) continue;
         try {
           const s = JSON.parse(line);
-          const cpuDelta =
-            s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
+          const cpuDelta = s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
           const systemDelta =
             (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
           const numCpus =
@@ -385,7 +391,8 @@ async function* _streamStats(
           const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
 
           yield {
-            cpuPercent: Math.max(0, Math.min(cpuPercent, 100)),
+            cpuPercent: Math.max(0, cpuPercent),
+            cpuCores: numCpus,
             memUsageMB,
             memLimitMB,
           };
@@ -412,7 +419,12 @@ export async function* streamContainerLogs(
 export async function* streamContainerStats(
   serverId: string,
   signal: AbortSignal,
-): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+): AsyncGenerator<{
+  cpuPercent: number;
+  cpuCores: number;
+  memUsageMB: number;
+  memLimitMB: number;
+}> {
   yield* _streamStats(gameContainerName(serverId), signal);
 }
 
@@ -429,7 +441,12 @@ export async function* streamServiceLogs(
 export async function* streamServiceStats(
   serviceName: string,
   signal: AbortSignal,
-): AsyncGenerator<{ cpuPercent: number; memUsageMB: number; memLimitMB: number }> {
+): AsyncGenerator<{
+  cpuPercent: number;
+  cpuCores: number;
+  memUsageMB: number;
+  memLimitMB: number;
+}> {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
   yield* _streamStats(`${projectName}-${serviceName}-1`, signal);
 }

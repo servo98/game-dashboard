@@ -10,8 +10,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "dockerode": "^4.0.2",
     "hono": "^4.6.0",
-    "dockerode": "^4.0.2"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.31",
