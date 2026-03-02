@@ -11,6 +11,7 @@ import curseforgeRoutes from "./routes/curseforge";
 import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
+import oauthRoutes, { oauthCodeQueries, registerWellKnown } from "./routes/oauth";
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
@@ -114,6 +115,8 @@ app.route("/api/notifications", notificationRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
+app.route("/oauth", oauthRoutes);
+registerWellKnown(app);
 
 // Start auto-backup timer (checks every hour)
 startAutoBackupTimer();
@@ -124,10 +127,11 @@ startStatsCache();
 // Start quest completion poller
 startQuestPoller();
 
-// Periodic session cleanup (every hour)
+// Periodic cleanup (every hour)
 setInterval(
   () => {
     sessionQueries.cleanup.run();
+    oauthCodeQueries.cleanup.run();
   },
   60 * 60 * 1000,
 );

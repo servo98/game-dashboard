@@ -439,7 +439,18 @@ mcpRoute.post("/mcp", async (c) => {
   const admin = isAdmin(c.req.raw);
 
   if (!mcpToken && !admin) {
-    return c.json({ error: "Unauthorized. Provide a valid MCP token as Bearer token." }, 401);
+    const proto = c.req.header("x-forwarded-proto") ?? "http";
+    const host = c.req.header("host") ?? "localhost:3000";
+    const resourceMetadata = `${proto}://${host}/.well-known/oauth-protected-resource`;
+    return c.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadata}"`,
+        },
+      },
+    );
   }
 
   const server = createMcpServer(mcpToken, admin);

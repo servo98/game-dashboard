@@ -216,7 +216,7 @@ export default function McpTokens() {
             <p className="text-gray-300 font-medium mb-1">Claude.ai (Integrations)</p>
             <ol className="list-decimal list-inside space-y-1 text-gray-500">
               <li>Go to claude.ai &rarr; Settings &rarr; Integrations</li>
-              <li>Click "Add custom integration"</li>
+              <li>Click &ldquo;Add custom integration&rdquo;</li>
               <li>
                 Name: <span className="text-gray-300">Game Panel</span>
               </li>
@@ -226,8 +226,11 @@ export default function McpTokens() {
                   https://game.aypapol.com/api/mcp
                 </code>
               </li>
-              <li>Auth: Bearer token (paste the token you generated above)</li>
+              <li>Click Save &mdash; OAuth login will happen automatically</li>
             </ol>
+            <p className="text-xs text-gray-600 mt-1">
+              Uses OAuth 2.0. You&apos;ll be asked to log in with Discord and authorize access.
+            </p>
           </div>
 
           <div>

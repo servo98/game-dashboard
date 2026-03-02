@@ -82,7 +82,26 @@ auth.get("/callback", async (c) => {
     expiresAt,
   );
 
-  // Set cookie and redirect to dashboard
+  // Check for pending OAuth authorization flow
+  const oauthReturn = getCookie(c.req.raw, "oauth_return");
+  if (oauthReturn) {
+    const returnPath = decodeURIComponent(oauthReturn);
+    if (returnPath.startsWith("/oauth/authorize")) {
+      return new Response(null, {
+        status: 302,
+        headers: [
+          ["Location", returnPath],
+          [
+            "Set-Cookie",
+            `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}`,
+          ],
+          ["Set-Cookie", "oauth_return=; Path=/; HttpOnly; Max-Age=0"],
+        ],
+      });
+    }
+  }
+
+  // Default: redirect to dashboard
   const publicUrl = process.env.PUBLIC_URL ?? "http://localhost:5173";
   return new Response(null, {
     status: 302,
