@@ -1,8 +1,14 @@
 import { act, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockEventSource } from "../__tests__/mock-event-source";
 
 const { default: LogViewer } = await import("./LogViewer");
+
+/** Flush one rAF cycle so batched lines land in state */
+function flushRaf() {
+  vi.runAllTimers();
+  vi.advanceTimersByTime(0);
+}
 
 describe("LogViewer", () => {
   const onClose = vi.fn();
@@ -10,6 +16,18 @@ describe("LogViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     MockEventSource.reset();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      return setTimeout(cb, 0) as unknown as number;
+    });
+    vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation((id) => {
+      clearTimeout(id);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   /**
@@ -46,7 +64,11 @@ describe("LogViewer", () => {
     const es = MockEventSource.instances[0];
     act(() => {
       es.__simulateMessage(JSON.stringify("Hello server log"));
+      flushRaf();
     });
+
+    // Flush the second rAF (auto-scroll) too
+    act(() => flushRaf());
 
     expect(screen.getByText(/Hello server log/)).toBeInTheDocument();
   });
