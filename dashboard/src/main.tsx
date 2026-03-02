@@ -5,6 +5,7 @@ import { api } from "./api";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Status from "./pages/Status";
 import "./index.css";
 
 // Global error reporting — throttled to 1 per 30s
@@ -46,6 +47,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/status" element={<Status />} />
           <Route path="/" element={<Home />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
