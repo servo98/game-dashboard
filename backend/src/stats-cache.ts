@@ -36,13 +36,10 @@ async function refreshStats(): Promise<void> {
           (stats.cpu_stats?.cpu_usage?.total_usage ?? 0) -
           (stats.precpu_stats?.cpu_usage?.total_usage ?? 0);
         const systemDelta =
-          (stats.cpu_stats?.system_cpu_usage ?? 0) -
-          (stats.precpu_stats?.system_cpu_usage ?? 0);
+          (stats.cpu_stats?.system_cpu_usage ?? 0) - (stats.precpu_stats?.system_cpu_usage ?? 0);
         const cpuCount = stats.cpu_stats?.online_cpus ?? 1;
         const cpuPercent =
-          systemDelta > 0
-            ? Math.round((cpuDelta / systemDelta) * cpuCount * 100 * 10) / 10
-            : 0;
+          systemDelta > 0 ? Math.round((cpuDelta / systemDelta) * cpuCount * 100 * 10) / 10 : 0;
 
         cache.set(name, { memUsageMB, memLimitMB, cpuPercent });
       } catch {

@@ -1,4 +1,3 @@
-import { readdir } from "fs/promises";
 import { join } from "path";
 import type { PlayerInfo } from "../adapter";
 

@@ -1,5 +1,4 @@
 import { existsSync } from "fs";
-import { readdir } from "fs/promises";
 import { join } from "path";
 import { serverQueries } from "../../db";
 import { getActiveContainer } from "../../docker";

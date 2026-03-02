@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type McpTokenRecord } from "../api";
 
 export default function McpTokens() {
@@ -16,7 +16,7 @@ export default function McpTokens() {
   const [newToken, setNewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const fetchTokens = async () => {
+  const fetchTokens = useCallback(async () => {
     try {
       const list = await api.listMcpTokens();
       setTokens(list);
@@ -26,11 +26,11 @@ export default function McpTokens() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTokens();
-  }, []);
+  }, [fetchTokens]);
 
   const handleCreate = async () => {
     if (!playerName.trim()) return;

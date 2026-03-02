@@ -144,7 +144,6 @@ class SNBTParser {
   }
 
   private parsePrimitive(): SNBTValue {
-    const start = this.pos;
     const raw = this.parseBareWord(false);
 
     if (raw === "") {

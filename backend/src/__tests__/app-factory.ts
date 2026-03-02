@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { makeSession } from "./factories";
 
 /**

@@ -1,4 +1,3 @@
-import type { QuestProgress } from "./adapters/adapter";
 import { createMinecraftAdapter, getServerDataPath } from "./adapters/minecraft/index";
 import { getQuestTitleMap } from "./adapters/minecraft/quests";
 import { botSettingsQueries, serverQueries } from "./db";

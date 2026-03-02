@@ -213,12 +213,7 @@ export default function Home() {
             accent_color: activeServer.accent_color,
           })
         : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors },
-    [
-      activeServer?.id,
-      activeServer?.game_type,
-      activeServer?.accent_color,
-      activeServer?.banner_path,
-    ],
+    [activeServer],
   );
 
   useEffect(() => {

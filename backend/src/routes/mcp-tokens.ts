@@ -18,7 +18,7 @@ mcpTokens.get("/", requireAuth, (c) => {
   return c.json(
     tokens.map((t) => ({
       id: t.id,
-      token_preview: t.token.slice(0, 8) + "...",
+      token_preview: `${t.token.slice(0, 8)}...`,
       player_name: t.player_name,
       label: t.label,
       created_at: t.created_at,
