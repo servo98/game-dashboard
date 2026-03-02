@@ -15,14 +15,16 @@ export default function LogViewer({ title, streamFactory, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
   const autoScroll = useRef(true);
+  const isScrolling = useRef(false);
   const bufferRef = useRef<string[]>([]);
   const rafRef = useRef<number>(0);
 
   // Track whether user has scrolled up (disable auto-scroll)
   const handleScroll = useCallback(() => {
+    if (isScrolling.current) return;
     const el = containerRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     autoScroll.current = atBottom;
   }, []);
 
@@ -53,7 +55,11 @@ export default function LogViewer({ title, streamFactory, onClose }: Props) {
           // Auto-scroll after state update paints
           requestAnimationFrame(() => {
             if (autoScroll.current && containerRef.current) {
+              isScrolling.current = true;
               containerRef.current.scrollTop = containerRef.current.scrollHeight;
+              requestAnimationFrame(() => {
+                isScrolling.current = false;
+              });
             }
           });
         });

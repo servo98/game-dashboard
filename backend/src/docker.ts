@@ -208,7 +208,7 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     });
 
     // Send raw HTTP request to Docker API
-    const query = `follow=1&stdout=1&stderr=1&timestamps=1&tail=100`;
+    const query = `follow=1&stdout=1&stderr=1&timestamps=1&tail=500`;
     sock.write(
       `GET /containers/${encodeURIComponent(containerName)}/logs?${query} HTTP/1.1\r\nHost: localhost\r\n\r\n`,
     );
