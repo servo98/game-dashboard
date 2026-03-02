@@ -10,9 +10,9 @@ import { getCraftTweakerScripts, getKubeJSScripts, getModList } from "./recipes"
 import { getPlayerStats, listPlayers } from "./stats";
 
 /**
- * Resolve the host-side data directory for the active Minecraft server.
- * Reads the server's volume config from the DB to find the host path
- * mapped to /data inside the container.
+ * Resolve the data directory for the active Minecraft server.
+ * The backend container has /data (host) mounted at /host-data,
+ * so we translate the host path accordingly.
  */
 export function getServerDataPath(serverId: string): string | null {
   const server = serverQueries.getById.get(serverId);
@@ -21,7 +21,14 @@ export function getServerDataPath(serverId: string): string | null {
   const volumes = JSON.parse(server.volumes) as Record<string, string>;
   // Find the volume that maps to /data (itzg/minecraft-server convention)
   for (const [hostPath, containerPath] of Object.entries(volumes)) {
-    if (containerPath === "/data") return hostPath;
+    if (containerPath === "/data") {
+      // The backend container mounts /data (host) at /host-data.
+      // Translate: /data/minecraft → /host-data/minecraft
+      if (hostPath.startsWith("/data/")) {
+        return `/host-data/${hostPath.slice(6)}`;
+      }
+      return hostPath;
+    }
   }
 
   return null;
