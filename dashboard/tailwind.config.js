@@ -5,10 +5,12 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: "#f0f4ff",
-          500: "#4f6ef7",
-          600: "#3a56d4",
-          700: "#2d43b0",
+          50: "rgb(var(--brand-50) / <alpha-value>)",
+          300: "rgb(var(--brand-300) / <alpha-value>)",
+          400: "rgb(var(--brand-400) / <alpha-value>)",
+          500: "rgb(var(--brand-500) / <alpha-value>)",
+          600: "rgb(var(--brand-600) / <alpha-value>)",
+          700: "rgb(var(--brand-700) / <alpha-value>)",
         },
         discord: "#5865F2",
       },

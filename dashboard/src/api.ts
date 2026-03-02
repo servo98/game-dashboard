@@ -8,6 +8,8 @@ export type GameServer = {
   game_type: string;
   port: number;
   status: ServerStatus;
+  banner_path?: string | null;
+  accent_color?: string | null;
 };
 
 export type User = {
@@ -33,6 +35,8 @@ export type ServerSessionRecord = {
 export type ServerConfig = {
   docker_image: string;
   env_vars: Record<string, string>;
+  banner_path: string | null;
+  accent_color: string | null;
 };
 
 export type BotSettings = {
@@ -192,6 +196,28 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
+
+  /** Theme / banner */
+  uploadBanner: async (
+    serverId: string,
+    file: File,
+  ): Promise<{ ok: boolean; banner_path: string }> => {
+    const form = new FormData();
+    form.append("banner", file);
+    const res = await fetch(`${BASE}/servers/${serverId}/banner`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error: string }).error ?? res.statusText);
+    }
+    return res.json() as Promise<{ ok: boolean; banner_path: string }>;
+  },
+  deleteBanner: (serverId: string) =>
+    request<{ ok: boolean }>(`/servers/${serverId}/banner`, { method: "DELETE" }),
+  getBannerUrl: (serverId: string) => `${BASE}/servers/${serverId}/banner`,
 
   /** Error reporting */
   reportError: (data: { message: string; stack?: string; url?: string; component?: string }) =>

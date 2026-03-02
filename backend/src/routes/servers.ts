@@ -137,6 +137,8 @@ servers.get("/", async (c) => {
       game_type: row.game_type,
       port: row.port,
       status: await getContainerStatus(row.id),
+      banner_path: row.banner_path ?? null,
+      accent_color: row.accent_color ?? null,
     })),
   );
   return c.json(result);
@@ -379,6 +381,8 @@ servers.get("/:id/config", requireAuth, async (c) => {
   return c.json({
     docker_image: server.docker_image,
     env_vars: JSON.parse(server.env_vars) as Record<string, string>,
+    banner_path: server.banner_path ?? null,
+    accent_color: server.accent_color ?? null,
   });
 });
 
@@ -396,9 +400,118 @@ servers.put("/:id/config", requireAuth, async (c) => {
   const body = await c.req.json<{
     docker_image: string;
     env_vars: Record<string, string>;
+    accent_color?: string | null;
   }>();
 
   serverQueries.update.run(body.docker_image, JSON.stringify(body.env_vars), id);
+
+  // Update theme accent color if provided
+  if (body.accent_color !== undefined) {
+    serverQueries.updateTheme.run(server.banner_path, body.accent_color, id);
+  }
+
+  return c.json({ ok: true });
+});
+
+// Upload custom banner image
+servers.post("/:id/banner", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    return c.json({ error: "Expected multipart/form-data" }, 400);
+  }
+
+  const formData = await c.req.formData();
+  const file = formData.get("banner");
+  if (!file || !(file instanceof File)) {
+    return c.json({ error: "No banner file provided" }, 400);
+  }
+
+  // Validate size (5MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    return c.json({ error: "File too large (max 5MB)" }, 400);
+  }
+
+  // Validate type
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    return c.json({ error: "Invalid file type. Allowed: JPEG, PNG, WebP" }, 400);
+  }
+
+  const ext = file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : "webp";
+  const dataDir = process.env.DATA_DIR ?? "/data";
+  const bannerDir = `${dataDir}/banners`;
+
+  // Ensure directory exists
+  const { mkdirSync } = await import("fs");
+  mkdirSync(bannerDir, { recursive: true });
+
+  const filename = `${id}.${ext}`;
+  const filePath = `${bannerDir}/${filename}`;
+
+  // Write file
+  const buffer = await file.arrayBuffer();
+  await Bun.write(filePath, buffer);
+
+  // Update DB
+  const bannerPath = `/api/servers/${id}/banner`;
+  serverQueries.updateTheme.run(bannerPath, server.accent_color, id);
+
+  return c.json({ ok: true, banner_path: bannerPath });
+});
+
+// Serve banner image
+servers.get("/:id/banner", async (c) => {
+  const { id } = c.req.param();
+  const dataDir = process.env.DATA_DIR ?? "/data";
+  const bannerDir = `${dataDir}/banners`;
+
+  // Try each extension
+  for (const ext of ["jpg", "png", "webp"]) {
+    const filePath = `${bannerDir}/${id}.${ext}`;
+    const file = Bun.file(filePath);
+    if (await file.exists()) {
+      const mimeMap: Record<string, string> = {
+        jpg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+      };
+      return new Response(file.stream(), {
+        headers: {
+          "Content-Type": mimeMap[ext],
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+  }
+
+  return c.json({ error: "No banner found" }, 404);
+});
+
+// Delete custom banner (reset to default)
+servers.delete("/:id/banner", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const dataDir = process.env.DATA_DIR ?? "/data";
+  const bannerDir = `${dataDir}/banners`;
+  const { unlinkSync } = await import("fs");
+
+  // Remove any existing banner file
+  for (const ext of ["jpg", "png", "webp"]) {
+    try {
+      unlinkSync(`${bannerDir}/${id}.${ext}`);
+    } catch (_) {
+      /* not found */
+    }
+  }
+
+  // Clear from DB
+  serverQueries.updateTheme.run(null, server.accent_color, id);
 
   return c.json({ ok: true });
 });

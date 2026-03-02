@@ -52,6 +52,18 @@ db.exec(`
   );
 `);
 
+// Migration: add theme columns to servers
+try {
+  db.exec(`ALTER TABLE servers ADD COLUMN banner_path TEXT`);
+} catch (_) {
+  /* column already exists */
+}
+try {
+  db.exec(`ALTER TABLE servers ADD COLUMN accent_color TEXT`);
+} catch (_) {
+  /* column already exists */
+}
+
 export type Server = {
   id: string;
   name: string;
@@ -61,6 +73,8 @@ export type Server = {
   env_vars: string;
   volumes: string;
   created_at: number;
+  banner_path: string | null;
+  accent_color: string | null;
 };
 
 export type Session = {
@@ -88,6 +102,9 @@ export const serverQueries = {
   deleteById: db.query<void, [string]>("DELETE FROM servers WHERE id = ?"),
   update: db.query<void, [string, string, string]>(
     "UPDATE servers SET docker_image = ?, env_vars = ? WHERE id = ?",
+  ),
+  updateTheme: db.query<void, [string | null, string | null, string]>(
+    "UPDATE servers SET banner_path = ?, accent_color = ? WHERE id = ?",
   ),
 };
 

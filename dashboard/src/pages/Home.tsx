@@ -18,6 +18,8 @@ import LogViewer from "../components/LogViewer";
 import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
 import ServiceStatsBar from "../components/ServiceStatsBar";
+import ThemeBanner from "../components/ThemeBanner";
+import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
 type Tab = "servers" | "bot" | "backups" | "settings";
 
@@ -153,6 +155,18 @@ export default function Home() {
   const activeServer = servers.find((s) => s.status === "running") ?? null;
   const editConfigServer = editConfigId ? servers.find((s) => s.id === editConfigId) : null;
 
+  // Dynamic theme based on active game
+  const currentTheme = activeServer
+    ? resolveTheme(activeServer.game_type, {
+        banner_path: activeServer.banner_path,
+        accent_color: activeServer.accent_color,
+      })
+    : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors };
+
+  useEffect(() => {
+    applyTheme(currentTheme.colors);
+  }, [activeServer?.id, activeServer?.game_type, activeServer?.accent_color]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -193,24 +207,13 @@ export default function Home() {
         {/* Host stats */}
         <HostStatsBar onMemTotal={setHostMemTotalMB} />
 
-        {/* Active server banner */}
-        {activeServer && (
-          <div className="mb-6 bg-green-950/40 border border-green-800 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm text-green-300 font-medium">
-                {activeServer.name} is running on port {activeServer.port}
-              </span>
-            </div>
-            <button
-              onClick={() => handleStop(activeServer.id)}
-              disabled={loadingId === activeServer.id}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
-            >
-              {loadingId === activeServer.id ? "Stopping..." : "Stop"}
-            </button>
-          </div>
-        )}
+        {/* Hero banner */}
+        <ThemeBanner
+          banner={currentTheme.banner}
+          activeServer={activeServer}
+          loading={!!activeServer && loadingId === activeServer.id}
+          onStop={handleStop}
+        />
 
         {/* Error */}
         {error && (
@@ -375,6 +378,7 @@ export default function Home() {
         <ConfigEditor
           serverId={editConfigId}
           serverName={editConfigServer.name}
+          gameType={editConfigServer.game_type}
           open={!!editConfigId}
           onClose={() => setEditConfigId(null)}
           onSaved={fetchServers}
