@@ -170,7 +170,7 @@ export const botSettingsQueries = {
 
 const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
   host_domain: "aypapol.com",
-  game_memory_limit_gb: "6",
+  game_memory_limit_gb: "12",
   game_cpu_limit: "3",
   auto_stop_hours: "0",
   max_backups_per_server: "5",
