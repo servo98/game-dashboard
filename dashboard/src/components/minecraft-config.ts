@@ -107,7 +107,7 @@ export const MINECRAFT_FIELDS: MinecraftField[] = [
     type: "select",
     description: "Game difficulty level",
     section: "Gameplay",
-    default: "easy",
+    default: "normal",
     modpackCompatible: true,
     options: [
       { value: "peaceful", label: "Peaceful" },

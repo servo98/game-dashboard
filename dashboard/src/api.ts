@@ -72,6 +72,7 @@ export type GameTemplate = {
   id: string;
   name: string;
   category: string;
+  icon: string;
   docker_image: string;
   default_port: number;
   default_env: Record<string, string>;

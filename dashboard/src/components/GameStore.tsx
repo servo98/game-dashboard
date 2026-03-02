@@ -202,7 +202,15 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                     className="bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-brand-500 rounded-xl p-3 text-left transition-all group"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">🎮</span>
+                      <img
+                        src={template.icon}
+                        alt=""
+                        className="w-6 h-6 rounded object-cover shrink-0"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-white truncate group-hover:text-brand-400 transition-colors">
                           {template.name}

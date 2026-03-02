@@ -25,6 +25,7 @@ type Props = {
   loading: boolean;
   hostMemTotalMB?: number;
   hostDomain?: string;
+  iconUrl?: string;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -50,6 +51,7 @@ export default memo(function ServerCard({
   loading,
   hostMemTotalMB,
   hostDomain = "aypapol.com",
+  iconUrl,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -165,7 +167,11 @@ export default memo(function ServerCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <GamepadIcon className="w-7 h-7 text-gray-400" />
+          {iconUrl ? (
+            <img src={iconUrl} alt="" className="w-7 h-7 rounded object-cover" />
+          ) : (
+            <GamepadIcon className="w-7 h-7 text-gray-400" />
+          )}
           <div>
             <h3 className="font-semibold text-white leading-tight">{server.name}</h3>
             <p className="text-xs text-gray-500">Port {server.port}</p>

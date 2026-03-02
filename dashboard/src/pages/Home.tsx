@@ -43,6 +43,7 @@ export default function Home() {
   const serviceStatsRef = useRef<EventSource | null>(null);
   const [showGameStore, setShowGameStore] = useState(false);
   const [hostDomain, setHostDomain] = useState("aypapol.com");
+  const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
 
   // Auth guard
   useEffect(() => {
@@ -57,6 +58,20 @@ export default function Home() {
     api
       .getSettings()
       .then((s) => setHostDomain(s.host_domain))
+      .catch(() => {});
+  }, []);
+
+  // Fetch game catalog for icons
+  useEffect(() => {
+    api
+      .getCatalog()
+      .then((catalog) => {
+        const map: Record<string, string> = {};
+        for (const t of catalog) {
+          if (t.icon) map[t.id] = t.icon;
+        }
+        setGameIcons(map);
+      })
       .catch(() => {});
   }, []);
 
@@ -329,6 +344,7 @@ export default function Home() {
                     loading={loadingId === server.id}
                     hostMemTotalMB={hostMemTotalMB}
                     hostDomain={hostDomain}
+                    iconUrl={gameIcons[server.id]}
                     onStart={handleStart}
                     onStop={handleStop}
                     onDelete={handleDelete}

@@ -48,6 +48,7 @@ vi.mock("../api", () => ({
     me: () => mockMe(),
     listServers: () => mockListServers(),
     getSettings: () => mockGetSettings(),
+    getCatalog: vi.fn().mockResolvedValue([]),
     startServer: vi.fn(),
     stopServer: vi.fn(),
     deleteServer: vi.fn(),
