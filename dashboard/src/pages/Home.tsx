@@ -184,6 +184,12 @@ export default function Home() {
             <span className="text-xl">🎮</span> Game Panel
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/status")}
+              className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
+            >
+              Status
+            </button>
             {user.avatar && (
               <img
                 src={user.avatar}
