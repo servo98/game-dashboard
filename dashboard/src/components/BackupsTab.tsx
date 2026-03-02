@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type BackupRecord, type GameServer, type PanelSettings } from "../api";
 import { formatSize } from "../utils/format";
 
@@ -14,7 +14,7 @@ export default function BackupsTab({ servers }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<PanelSettings | null>(null);
 
-  const serverMap = Object.fromEntries(servers.map((s) => [s.id, s]));
+  const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s.id, s])), [servers]);
 
   async function fetchBackups() {
     try {
@@ -69,12 +69,16 @@ export default function BackupsTab({ servers }: Props) {
   }
 
   // Group backups by server
-  const grouped = backups.reduce<Record<string, BackupRecord[]>>((acc, b) => {
-    (acc[b.server_id] ??= []).push(b);
-    return acc;
-  }, {});
+  const grouped = useMemo(
+    () =>
+      backups.reduce<Record<string, BackupRecord[]>>((acc, b) => {
+        (acc[b.server_id] ??= []).push(b);
+        return acc;
+      }, {}),
+    [backups],
+  );
 
-  const totalSize = backups.reduce((sum, b) => sum + b.size_bytes, 0);
+  const totalSize = useMemo(() => backups.reduce((sum, b) => sum + b.size_bytes, 0), [backups]);
 
   if (loading) {
     return (

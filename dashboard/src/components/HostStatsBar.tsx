@@ -54,7 +54,7 @@ export default function HostStatsBar({ onMemTotal }: Props) {
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-brand-500 rounded-full transition-all duration-1000"
+              className="h-full bg-brand-500 rounded-full transition-[width] duration-300"
               style={{ width: `${cpuPct}%` }}
             />
           </div>
@@ -70,7 +70,7 @@ export default function HostStatsBar({ onMemTotal }: Props) {
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-purple-500 rounded-full transition-all duration-1000"
+              className="h-full bg-purple-500 rounded-full transition-[width] duration-300"
               style={{ width: `${ramPct}%` }}
             />
           </div>
@@ -86,7 +86,7 @@ export default function HostStatsBar({ onMemTotal }: Props) {
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-amber-500 rounded-full transition-all duration-1000"
+              className="h-full bg-amber-500 rounded-full transition-[width] duration-300"
               style={{ width: `${diskPct}%` }}
             />
           </div>

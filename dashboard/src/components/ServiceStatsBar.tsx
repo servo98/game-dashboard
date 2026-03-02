@@ -1,10 +1,11 @@
+import { memo } from "react";
 import type { ServiceStats } from "../api";
 
 type Props = {
   stats: ServiceStats | null;
 };
 
-export default function ServiceStatsBar({ stats }: Props) {
+export default memo(function ServiceStatsBar({ stats }: Props) {
   if (!stats) {
     return <div className="text-xs text-gray-600 animate-pulse">...</div>;
   }
@@ -18,7 +19,7 @@ export default function ServiceStatsBar({ stats }: Props) {
         <span className="text-gray-500 w-8 shrink-0">CPU</span>
         <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-brand-500 rounded-full transition-all duration-1000"
+            className="h-full bg-brand-500 rounded-full transition-[width] duration-300"
             style={{ width: `${cpuPct}%` }}
           />
         </div>
@@ -30,7 +31,7 @@ export default function ServiceStatsBar({ stats }: Props) {
         <span className="text-gray-500 w-8 shrink-0">RAM</span>
         <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-purple-500 rounded-full transition-all duration-1000"
+            className="h-full bg-purple-500 rounded-full transition-[width] duration-300"
             style={{ width: `${stats.memLimitMB > 0 ? (ramMB / stats.memLimitMB) * 100 : 0}%` }}
           />
         </div>
@@ -40,4 +41,4 @@ export default function ServiceStatsBar({ stats }: Props) {
       </div>
     </div>
   );
-}
+});

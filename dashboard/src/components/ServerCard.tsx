@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { BackupRecord, GameServer, ServerSessionRecord } from "../api";
 import { api } from "../api";
 import { connectAddress, formatDuration, formatSize } from "../utils/format";
@@ -17,11 +17,11 @@ import StatsBar from "./StatsBar";
 type Props = {
   server: GameServer;
   isActive: boolean;
-  onStart: () => void;
-  onStop: () => void;
-  onViewLogs: () => void;
-  onEditConfig: () => void;
-  onDelete: () => void;
+  onStart: (id: string) => void;
+  onStop: (id: string) => void;
+  onViewLogs: (id: string) => void;
+  onEditConfig: (id: string) => void;
+  onDelete: (id: string) => void;
   loading: boolean;
   hostMemTotalMB?: number;
   hostDomain?: string;
@@ -39,7 +39,7 @@ const REASON_LABEL: Record<string, string> = {
   replaced: "Replaced",
 };
 
-export default function ServerCard({
+export default memo(function ServerCard({
   server,
   isActive,
   onStart,
@@ -92,7 +92,7 @@ export default function ServerCard({
 
   function handleDeleteClick() {
     if (confirmDelete) {
-      onDelete();
+      onDelete(server.id);
       setConfirmDelete(false);
     } else {
       setConfirmDelete(true);
@@ -158,7 +158,7 @@ export default function ServerCard({
     <div
       className={`border rounded-2xl p-5 flex flex-col gap-4 transition-all ${
         isActive
-          ? "bg-gray-900 border-brand-500 shadow-lg shadow-brand-500/10 ring-1 ring-brand-500/20"
+          ? "bg-gray-900 border-brand-500 ring-1 ring-brand-500/20"
           : "bg-gray-900 border-gray-800"
       }`}
     >
@@ -204,7 +204,7 @@ export default function ServerCard({
       <div className="flex gap-2">
         {!isRunning ? (
           <button
-            onClick={onStart}
+            onClick={() => onStart(server.id)}
             disabled={loading}
             className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
           >
@@ -213,14 +213,14 @@ export default function ServerCard({
         ) : (
           <>
             <button
-              onClick={onStop}
+              onClick={() => onStop(server.id)}
               disabled={loading}
               className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
             >
               {loading ? "Stopping..." : "Stop"}
             </button>
             <button
-              onClick={onViewLogs}
+              onClick={() => onViewLogs(server.id)}
               className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-300 transition-colors"
               title="Logs"
             >
@@ -229,7 +229,7 @@ export default function ServerCard({
           </>
         )}
         <button
-          onClick={onEditConfig}
+          onClick={() => onEditConfig(server.id)}
           title="Edit config"
           className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
         >
@@ -389,4 +389,4 @@ export default function ServerCard({
       )}
     </div>
   );
-}
+});

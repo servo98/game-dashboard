@@ -62,7 +62,7 @@ describe("ServerCard", () => {
     const startBtn = screen.getByText("Start");
     expect(startBtn).toBeInTheDocument();
     fireEvent.click(startBtn);
-    expect(defaultProps.onStart).toHaveBeenCalledTimes(1);
+    expect(defaultProps.onStart).toHaveBeenCalledWith("minecraft");
   });
 
   it("renders Stop button for running servers and calls onStop on click", () => {
@@ -70,7 +70,7 @@ describe("ServerCard", () => {
     const stopBtn = screen.getByText("Stop");
     expect(stopBtn).toBeInTheDocument();
     fireEvent.click(stopBtn);
-    expect(defaultProps.onStop).toHaveBeenCalledTimes(1);
+    expect(defaultProps.onStop).toHaveBeenCalledWith("minecraft");
   });
 
   /**

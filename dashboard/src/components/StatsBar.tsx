@@ -43,7 +43,7 @@ export default function StatsBar({ serverId, hostMemTotalMB }: Props) {
         <span className="text-gray-500 w-8 shrink-0">CPU</span>
         <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-brand-500 rounded-full transition-all duration-1000"
+            className="h-full bg-brand-500 rounded-full transition-[width] duration-300"
             style={{ width: `${cpuPct}%` }}
           />
         </div>
@@ -56,7 +56,7 @@ export default function StatsBar({ serverId, hostMemTotalMB }: Props) {
         <span className="text-gray-500 w-8 shrink-0">RAM</span>
         <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-purple-500 rounded-full transition-all duration-1000"
+            className="h-full bg-purple-500 rounded-full transition-[width] duration-300"
             style={{ width: `${ramPct}%` }}
           />
         </div>

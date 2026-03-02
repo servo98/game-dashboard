@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   api,
@@ -60,15 +60,18 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
+
   const fetchServers = useCallback(async () => {
     try {
       const list = await api.listServers();
       setServers(list);
       setError(null);
     } catch {
-      if (servers.length === 0) setError("Failed to load servers");
+      if (serversRef.current.length === 0) setError("Failed to load servers");
     }
-  }, [servers.length]);
+  }, []);
 
   useEffect(() => {
     fetchServers();
@@ -95,42 +98,51 @@ export default function Home() {
     return () => es.close();
   }, []);
 
-  const handleStart = async (id: string) => {
-    setLoadingId(id);
-    setError(null);
-    try {
-      await api.startServer(id);
-      await fetchServers();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoadingId(null);
-    }
-  };
+  const handleStart = useCallback(
+    async (id: string) => {
+      setLoadingId(id);
+      setError(null);
+      try {
+        await api.startServer(id);
+        await fetchServers();
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoadingId(null);
+      }
+    },
+    [fetchServers],
+  );
 
-  const handleStop = async (id: string) => {
-    setLoadingId(id);
-    setError(null);
-    try {
-      await api.stopServer(id);
-      await fetchServers();
-      if (logTarget) setLogTarget(null);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoadingId(null);
-    }
-  };
+  const handleStop = useCallback(
+    async (id: string) => {
+      setLoadingId(id);
+      setError(null);
+      try {
+        await api.stopServer(id);
+        await fetchServers();
+        setLogTarget(null);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoadingId(null);
+      }
+    },
+    [fetchServers],
+  );
 
-  const handleDelete = async (id: string) => {
-    setError(null);
-    try {
-      await api.deleteServer(id);
-      await fetchServers();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setError(null);
+      try {
+        await api.deleteServer(id);
+        await fetchServers();
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    },
+    [fetchServers],
+  );
 
   const handleLogout = async () => {
     await api.logout().catch(() => {});
@@ -152,20 +164,50 @@ export default function Home() {
     }
   };
 
-  const activeServer = servers.find((s) => s.status === "running") ?? null;
+  const handleViewLogs = useCallback((id: string) => {
+    setLogTarget({ title: id, factory: () => createLogStream(id) });
+  }, []);
+
+  const handleEditConfig = useCallback((id: string) => {
+    setEditConfigId(id);
+  }, []);
+
+  const sortedServers = useMemo(
+    () =>
+      [...servers].sort((a, b) => {
+        if (a.status === "running" && b.status !== "running") return -1;
+        if (a.status !== "running" && b.status === "running") return 1;
+        return 0;
+      }),
+    [servers],
+  );
+
+  const activeServer = useMemo(
+    () => servers.find((s) => s.status === "running") ?? null,
+    [servers],
+  );
   const editConfigServer = editConfigId ? servers.find((s) => s.id === editConfigId) : null;
 
   // Dynamic theme based on active game
-  const currentTheme = activeServer
-    ? resolveTheme(activeServer.game_type, {
-        banner_path: activeServer.banner_path,
-        accent_color: activeServer.accent_color,
-      })
-    : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors };
+  const currentTheme = useMemo(
+    () =>
+      activeServer
+        ? resolveTheme(activeServer.game_type, {
+            banner_path: activeServer.banner_path,
+            accent_color: activeServer.accent_color,
+          })
+        : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors },
+    [
+      activeServer?.id,
+      activeServer?.game_type,
+      activeServer?.accent_color,
+      activeServer?.banner_path,
+    ],
+  );
 
   useEffect(() => {
     applyTheme(currentTheme.colors);
-  }, [activeServer?.id, activeServer?.game_type, activeServer?.accent_color]);
+  }, [currentTheme]);
 
   if (!user) {
     return (
@@ -178,7 +220,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Navbar */}
-      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-10">
+      <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold text-white">
             <span className="text-xl">🎮</span> Game Panel
@@ -279,32 +321,21 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[...servers]
-                  .sort((a, b) => {
-                    if (a.status === "running" && b.status !== "running") return -1;
-                    if (a.status !== "running" && b.status === "running") return 1;
-                    return 0;
-                  })
-                  .map((server) => (
-                    <ServerCard
-                      key={server.id}
-                      server={server}
-                      isActive={server.status === "running"}
-                      loading={loadingId === server.id}
-                      hostMemTotalMB={hostMemTotalMB}
-                      hostDomain={hostDomain}
-                      onStart={() => handleStart(server.id)}
-                      onStop={() => handleStop(server.id)}
-                      onDelete={() => handleDelete(server.id)}
-                      onViewLogs={() =>
-                        setLogTarget({
-                          title: server.id,
-                          factory: () => createLogStream(server.id),
-                        })
-                      }
-                      onEditConfig={() => setEditConfigId(server.id)}
-                    />
-                  ))}
+                {sortedServers.map((server) => (
+                  <ServerCard
+                    key={server.id}
+                    server={server}
+                    isActive={server.status === "running"}
+                    loading={loadingId === server.id}
+                    hostMemTotalMB={hostMemTotalMB}
+                    hostDomain={hostDomain}
+                    onStart={handleStart}
+                    onStop={handleStop}
+                    onDelete={handleDelete}
+                    onViewLogs={handleViewLogs}
+                    onEditConfig={handleEditConfig}
+                  />
+                ))}
               </div>
             )}
 
