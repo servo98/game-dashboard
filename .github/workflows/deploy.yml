@@ -470,7 +470,9 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            docker compose exec nginx nginx -s reload
+            # Restart (not just reload) because git reset --hard creates new inodes
+            # and Docker bind mounts keep pointing to the old inode after file replacement
+            docker compose restart nginx
 
   deploy-static:
     runs-on: ubuntu-latest
