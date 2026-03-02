@@ -284,7 +284,7 @@ jobs:
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
           # Build job list — always starts with lint + quality-gate
-          JOBS="🔄 lint\\n🔄 quality-gate"
+          JOBS="🔄 lint\\n🔄 quality-gate\\n🔄 sync-code"
 
           if [ "$SVC_BACKEND" = "true" ]; then
             JOBS="${JOBS}\\n🔄 typecheck-backend\\n🔄 test-backend\\n🔄 deploy-backend"
@@ -349,14 +349,39 @@ jobs:
             -d "$JSON"
 
   # ──────────────────────────────────────────────
-  # 7–11. Deploy services (parallel)
+  # 7. Sync code on server (single job to avoid ref lock races)
   # ──────────────────────────────────────────────
-  deploy-backend:
+  sync-code:
     runs-on: ubuntu-latest
     needs: [detect-changes, quality-gate]
     if: >-
       !cancelled() &&
       needs.quality-gate.result == 'success' &&
+      needs.detect-changes.outputs.any_service == 'true'
+    steps:
+      - name: Pull latest code on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /root/game-panel
+            git gc --prune=now -q 2>/dev/null || true
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Synced to $(git rev-parse --short HEAD)"
+
+  # ──────────────────────────────────────────────
+  # 8–12. Deploy services (parallel, after sync)
+  # ──────────────────────────────────────────────
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, sync-code]
+    if: >-
+      !cancelled() &&
+      needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.backend == 'true'
     steps:
       - name: Rebuild backend
@@ -368,18 +393,15 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            git gc --prune=now -q 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
             docker compose up -d --force-recreate --no-deps backend
 
   deploy-dashboard:
     runs-on: ubuntu-latest
-    needs: [detect-changes, quality-gate]
+    needs: [detect-changes, sync-code]
     if: >-
       !cancelled() &&
-      needs.quality-gate.result == 'success' &&
+      needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.dashboard == 'true'
     steps:
       - name: Rebuild dashboard
@@ -391,18 +413,15 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            git gc --prune=now -q 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
             docker compose up -d --no-deps dashboard
 
   deploy-bot:
     runs-on: ubuntu-latest
-    needs: [detect-changes, quality-gate]
+    needs: [detect-changes, sync-code]
     if: >-
       !cancelled() &&
-      needs.quality-gate.result == 'success' &&
+      needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.bot == 'true'
     steps:
       - name: Rebuild bot
@@ -414,18 +433,15 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            git gc --prune=now -q 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
             docker compose up -d --no-deps bot
 
   deploy-nginx:
     runs-on: ubuntu-latest
-    needs: [detect-changes, quality-gate]
+    needs: [detect-changes, sync-code]
     if: >-
       !cancelled() &&
-      needs.quality-gate.result == 'success' &&
+      needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.nginx == 'true'
     steps:
       - name: Recargar nginx
@@ -437,17 +453,14 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            git gc --prune=now -q 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
             docker compose exec nginx nginx -s reload
 
   deploy-static:
     runs-on: ubuntu-latest
-    needs: [detect-changes, quality-gate]
+    needs: [detect-changes, sync-code]
     if: >-
       !cancelled() &&
-      needs.quality-gate.result == 'success' &&
+      needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.static == 'true'
     steps:
       - name: Actualizar sitio estático
@@ -459,9 +472,6 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            git gc --prune=now -q 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
             echo "static-site actualizado (nginx lo sirve directo)"
 
   # ──────────────────────────────────────────────
@@ -522,6 +532,7 @@ jobs:
       - test-dashboard
       - test-bot
       - quality-gate
+      - sync-code
       - deploy-backend
       - deploy-dashboard
       - deploy-bot
