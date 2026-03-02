@@ -48,10 +48,13 @@ jobs:
           # Compare against the last successful deploy, not just the previous commit.
           # This ensures that if a deploy fails and the fix only touches one service,
           # ALL services that changed since the last successful deploy get redeployed.
+          # IMPORTANT: dorny/paths-filter needs a commit SHA — relative refs like HEAD~1
+          # fail because it tries "git fetch origin HEAD~1" which is invalid.
+          git fetch origin deployed 2>/dev/null || true
           if git rev-parse origin/deployed >/dev/null 2>&1; then
-            echo "ref=origin/deployed" >> $GITHUB_OUTPUT
+            echo "ref=$(git rev-parse origin/deployed)" >> $GITHUB_OUTPUT
           else
-            echo "ref=HEAD~1" >> $GITHUB_OUTPUT
+            echo "ref=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
           fi
 
       - name: Detectar cambios (push)
@@ -538,6 +541,7 @@ jobs:
     permissions:
       contents: write
     needs:
+      - detect-changes
       - quality-gate
       - deploy-backend
       - deploy-dashboard
@@ -546,6 +550,7 @@ jobs:
       - deploy-static
     if: >-
       always() &&
+      needs.detect-changes.result == 'success' &&
       needs.quality-gate.result == 'success' &&
       !contains(needs.deploy-backend.result, 'failure') &&
       !contains(needs.deploy-dashboard.result, 'failure') &&
