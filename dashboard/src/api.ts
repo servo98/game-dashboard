@@ -95,6 +95,15 @@ export type PanelSettings = {
   auto_backup_interval_hours: string;
 };
 
+export type CurseForgeModpack = {
+  id: number;
+  name: string;
+  slug: string;
+  summary: string;
+  downloadCount: number;
+  thumbnailUrl: string | null;
+};
+
 export type CreateServerRequest = {
   template_id?: string;
   id?: string;
@@ -218,6 +227,10 @@ export const api = {
   deleteBanner: (serverId: string) =>
     request<{ ok: boolean }>(`/servers/${serverId}/banner`, { method: "DELETE" }),
   getBannerUrl: (serverId: string) => `${BASE}/servers/${serverId}/banner`,
+
+  /** CurseForge */
+  searchCurseForge: (q: string) =>
+    request<CurseForgeModpack[]>(`/curseforge/search?q=${encodeURIComponent(q)}`),
 
   /** Error reporting */
   reportError: (data: { message: string; stack?: string; url?: string; component?: string }) =>

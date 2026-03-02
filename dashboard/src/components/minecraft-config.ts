@@ -256,13 +256,6 @@ export const MODPACK_PLATFORMS: ModpackPlatform[] = [
     typeValue: "AUTO_CURSEFORGE",
     fields: [
       {
-        key: "CF_API_KEY",
-        label: "CurseForge API Key",
-        type: "password",
-        placeholder: "$2a$...",
-        description: "Get one at console.curseforge.com",
-      },
-      {
         key: "CF_SLUG",
         label: "Modpack Slug",
         type: "text",

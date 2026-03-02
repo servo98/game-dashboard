@@ -166,6 +166,11 @@ servers.post("/:id/start", async (c) => {
   const envVars = JSON.parse(server.env_vars) as Record<string, string>;
   const volumes = JSON.parse(server.volumes) as Record<string, string>;
 
+  // Inject CF_API_KEY from backend env when using CurseForge modpacks
+  if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
+    envVars.CF_API_KEY = process.env.CF_API_KEY;
+  }
+
   try {
     // Mark any currently running server's session as replaced
     const active = await getActiveContainer();

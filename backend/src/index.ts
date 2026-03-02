@@ -6,6 +6,7 @@ import { sessionQueries } from "./db";
 import { docker } from "./docker";
 import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
+import curseforgeRoutes from "./routes/curseforge";
 import notificationRoutes from "./routes/notifications";
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
@@ -124,6 +125,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/servers", serverRoutes);
 app.route("/api/services", serviceRoutes);
 app.route("/api/bot", botSettingsRoutes);
+app.route("/api/curseforge", curseforgeRoutes);
 app.route("/api/notifications", notificationRoutes);
 app.route("/api/settings", settingsRoutes);
 

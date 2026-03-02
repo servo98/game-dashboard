@@ -52,7 +52,6 @@ describe("getModpackEnvKeys", () => {
   it("returns all modpack-related env keys", () => {
     const keys = getModpackEnvKeys();
     expect(keys).toContain("MODRINTH_MODPACK");
-    expect(keys).toContain("CF_API_KEY");
     expect(keys).toContain("CF_SLUG");
     expect(keys).toContain("FTB_MODPACK_ID");
   });
