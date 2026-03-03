@@ -114,8 +114,8 @@ export const serverQueries = {
     "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)",
   ),
   deleteById: db.query<void, [string]>("DELETE FROM servers WHERE id = ?"),
-  update: db.query<void, [string, string, string, string]>(
-    "UPDATE servers SET docker_image = ?, env_vars = ?, volumes = ? WHERE id = ?",
+  update: db.query<void, [string, number, string, string, string, string]>(
+    "UPDATE servers SET name = ?, port = ?, docker_image = ?, env_vars = ?, volumes = ? WHERE id = ?",
   ),
   updateTheme: db.query<void, [string | null, string | null, string]>(
     "UPDATE servers SET banner_path = ?, accent_color = ? WHERE id = ?",

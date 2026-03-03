@@ -57,6 +57,8 @@ export default function ConfigEditor({
   onClose,
   onSaved,
 }: Props) {
+  const [name, setName] = useState("");
+  const [port, setPort] = useState(0);
   const [dockerImage, setDockerImage] = useState("");
   const [envPairs, setEnvPairs] = useState<Array<{ key: string; value: string }>>([]);
   const [envRecord, setEnvRecord] = useState<Record<string, string>>({});
@@ -92,6 +94,8 @@ export default function ConfigEditor({
     api
       .getServerConfig(serverId)
       .then((cfg: ServerConfig) => {
+        setName(cfg.name);
+        setPort(cfg.port);
         setDockerImage(cfg.docker_image);
         setEnvPairs(Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value })));
         setEnvRecord(cfg.env_vars);
@@ -122,6 +126,8 @@ export default function ConfigEditor({
           .map((v) => [v.host.trim(), v.container.trim()]),
       );
       await api.updateServerConfig(serverId, {
+        name,
+        port,
         docker_image: dockerImage,
         env_vars,
         volumes,
@@ -220,7 +226,7 @@ export default function ConfigEditor({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
-          <h2 className="font-semibold text-white">Edit Config — {serverName}</h2>
+          <h2 className="font-semibold text-white">Edit Config — {name || serverName}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors p-1"
@@ -243,6 +249,28 @@ export default function ConfigEditor({
             </div>
           ) : (
             <>
+              {/* Name & Port */}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1.5">Server Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="block text-xs text-gray-500 mb-1.5">Port</label>
+                  <input
+                    type="number"
+                    value={port}
+                    onChange={(e) => setPort(Number(e.target.value))}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              </div>
+
               {isMinecraft ? (
                 <>
                   {/* Docker Image (read-only for Minecraft) */}

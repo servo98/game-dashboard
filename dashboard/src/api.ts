@@ -34,6 +34,8 @@ export type ServerSessionRecord = {
 };
 
 export type ServerConfig = {
+  name: string;
+  port: number;
   docker_image: string;
   env_vars: Record<string, string>;
   volumes: Record<string, string>;

@@ -404,6 +404,8 @@ servers.get("/:id/config", requireAuth, async (c) => {
   if (!server) return c.json({ error: "Server not found" }, 404);
 
   return c.json({
+    name: server.name,
+    port: server.port,
     docker_image: server.docker_image,
     env_vars: JSON.parse(server.env_vars) as Record<string, string>,
     volumes: JSON.parse(server.volumes) as Record<string, string>,
@@ -419,14 +421,20 @@ servers.put("/:id/config", requireAuth, async (c) => {
   if (!server) return c.json({ error: "Server not found" }, 404);
 
   const body = await c.req.json<{
+    name?: string;
+    port?: number;
     docker_image: string;
     env_vars: Record<string, string>;
     volumes?: Record<string, string>;
     accent_color?: string | null;
   }>();
 
+  const name = body.name?.trim() || server.name;
+  const port = body.port ?? server.port;
   const volumes = body.volumes ?? (JSON.parse(server.volumes) as Record<string, string>);
   serverQueries.update.run(
+    name,
+    port,
     body.docker_image,
     JSON.stringify(body.env_vars),
     JSON.stringify(volumes),
