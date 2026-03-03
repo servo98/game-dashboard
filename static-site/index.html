@@ -3,91 +3,1175 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aypapol.com</title>
+  <title>aypapol</title>
+  <meta name="description" content="todos somos papol. musica, epepes, juegos y puro desmadre creativo." />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #0f0f18;
+      --green: #22c55e;
+      --lime: #a3e635;
+      --purple: #a855f7;
+      --blue: #4f6ef7;
+      --pink: #ec4899;
+      --orange: #f97316;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --card: #111119;
+      --border: #1e293b;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: var(--purple) var(--bg);
+    }
+
     body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ═══ CURSOR GLOW ═══ */
+    .cursor-glow {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      transform: translate(-50%, -50%);
+      transition: left 0.3s ease-out, top 0.3s ease-out;
+    }
+
+    /* ═══ PARTICLES CANVAS ═══ */
+    #particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ═══ NAV ═══ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(12px);
+      background: rgba(10, 10, 15, 0.7);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: transform 0.3s;
+    }
+
+    nav.hidden { transform: translateY(-100%); }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--green);
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ═══ HERO ═══ */
+    .hero {
+      position: relative;
       min-height: 100svh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #0a0a0f;
-      color: #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      gap: 2rem;
+      text-align: center;
+      padding: 2rem;
+      z-index: 1;
     }
 
-    .dot {
-      width: 12px;
-      height: 12px;
+    /* Glitch title */
+    .glitch-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .glitch {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(3.5rem, 12vw, 9rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 0%, var(--purple) 50%, var(--green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      animation: glitchShift 8s ease-in-out infinite;
+    }
+
+    .glitch::before,
+    .glitch::after {
+      content: 'aypapol';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #fff 0%, var(--purple) 50%, var(--green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .glitch::before {
+      animation: glitch1 3s infinite linear alternate-reverse;
+      clip-path: inset(0 0 65% 0);
+    }
+
+    .glitch::after {
+      animation: glitch2 3s infinite linear alternate-reverse;
+      clip-path: inset(65% 0 0 0);
+    }
+
+    @keyframes glitch1 {
+      0%, 90%  { transform: translate(0); }
+      92%      { transform: translate(-4px, 2px); }
+      94%      { transform: translate(4px, -1px); }
+      96%      { transform: translate(-2px, -2px); }
+      98%      { transform: translate(3px, 1px); }
+      100%     { transform: translate(0); }
+    }
+
+    @keyframes glitch2 {
+      0%, 90%  { transform: translate(0); }
+      91%      { transform: translate(3px, -2px); }
+      93%      { transform: translate(-3px, 1px); }
+      95%      { transform: translate(2px, 2px); }
+      97%      { transform: translate(-4px, -1px); }
+      100%     { transform: translate(0); }
+    }
+
+    @keyframes glitchShift {
+      0%, 100% { filter: hue-rotate(0deg); }
+      50%      { filter: hue-rotate(30deg); }
+    }
+
+    .hero-sub {
+      margin-top: 1.5rem;
+      font-size: clamp(1rem, 3vw, 1.4rem);
+      color: var(--muted);
+      max-width: 500px;
+      opacity: 0;
+      animation: fadeUp 1s 0.5s forwards;
+    }
+
+    .hero-sub span {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    /* Status pill */
+    .status-pill {
+      margin-top: 2rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.2rem;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: var(--green);
+      font-family: 'JetBrains Mono', monospace;
+      opacity: 0;
+      animation: fadeUp 1s 0.8s forwards;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 12px #22c55e;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: .6; transform: scale(.85); }
+      50%      { opacity: 0.5; transform: scale(0.8); }
     }
 
-    h1 {
-      font-size: clamp(2rem, 6vw, 3.5rem);
-      font-weight: 800;
-      letter-spacing: -.02em;
-      background: linear-gradient(135deg, #fff 40%, #94a3b8);
+    /* Scroll indicator */
+    .scroll-indicator {
+      position: absolute;
+      bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      animation: fadeUp 1s 1.2s forwards;
+    }
+
+    .scroll-indicator span {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .scroll-arrow {
+      width: 20px;
+      height: 20px;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg);
+      animation: scrollBounce 2s infinite;
+    }
+
+    @keyframes scrollBounce {
+      0%, 100% { transform: rotate(45deg) translate(0, 0); opacity: 0.5; }
+      50%      { transform: rotate(45deg) translate(5px, 5px); opacity: 1; }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══ SECTIONS ═══ */
+    section {
+      position: relative;
+      z-index: 1;
+      padding: 6rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--purple);
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #fff 30%, var(--purple));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    p {
-      color: #64748b;
-      font-size: 1.05rem;
+    .gradient-green {
+      background: linear-gradient(135deg, var(--lime) 30%, var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    a {
+    .gradient-pink {
+      background: linear-gradient(135deg, var(--pink) 30%, var(--orange));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .section-text {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 600px;
+      line-height: 1.7;
+    }
+
+    /* Reveal animation */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ═══ QUE ES PAPOL ═══ */
+    .papol-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .papol-visual {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .floating-words {
+      position: relative;
+      width: 300px;
+      height: 300px;
+    }
+
+    .float-word {
+      position: absolute;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      padding: 0.5rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      white-space: nowrap;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .float-word:nth-child(1) {
+      top: 10%; left: 5%;
+      color: var(--green);
+      font-size: 1.5rem;
+      animation-delay: 0s;
+    }
+    .float-word:nth-child(2) {
+      top: 35%; right: 0;
+      color: var(--purple);
+      font-size: 1.1rem;
+      animation-delay: 1s;
+    }
+    .float-word:nth-child(3) {
+      bottom: 25%; left: 10%;
+      color: var(--pink);
+      font-size: 1.3rem;
+      animation-delay: 2s;
+    }
+    .float-word:nth-child(4) {
+      bottom: 5%; right: 10%;
+      color: var(--orange);
+      font-size: 0.9rem;
+      animation-delay: 0.5s;
+    }
+    .float-word:nth-child(5) {
+      top: 55%; left: 35%;
+      color: var(--lime);
+      font-size: 1.8rem;
+      animation-delay: 1.5s;
+      border-color: rgba(163, 230, 53, 0.3);
+      background: rgba(163, 230, 53, 0.05);
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25%      { transform: translateY(-12px) rotate(1deg); }
+      50%      { transform: translateY(-6px) rotate(-1deg); }
+      75%      { transform: translateY(-15px) rotate(0.5deg); }
+    }
+
+    /* ═══ EPEPE SECTION ═══ */
+    .epepe-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+
+    .epepe-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .epepe-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--purple), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .epepe-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(168, 85, 247, 0.3);
+      box-shadow: 0 8px 30px rgba(168, 85, 247, 0.08);
+    }
+
+    .epepe-card:hover::before { opacity: 1; }
+
+    .epepe-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .epepe-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+
+    .epepe-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ═══ SPOTIFY SECTION ═══ */
+    .spotify-section {
+      text-align: center;
+    }
+
+    .spotify-embed {
+      margin-top: 3rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .spotify-embed iframe {
+      border-radius: 16px;
+      max-width: 100%;
+    }
+
+    .spotify-vibes {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .vibe-tag {
+      padding: 0.4rem 1rem;
+      background: rgba(30, 215, 96, 0.08);
+      border: 1px solid rgba(30, 215, 96, 0.2);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: #1ed760;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ═══ GAME PANEL SECTION ═══ */
+    .game-section {
+      text-align: center;
+    }
+
+    .game-preview {
+      margin-top: 3rem;
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 2rem;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red { background: #ef4444; }
+    .terminal-dot.yellow { background: #eab308; }
+    .terminal-dot.green { background: #22c55e; }
+
+    .terminal-title {
+      margin-left: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .terminal-body {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      text-align: left;
+      line-height: 1.8;
+    }
+
+    .terminal-line {
+      opacity: 0;
+      animation: typeLine 0.5s forwards;
+    }
+
+    .terminal-line .prompt { color: var(--green); }
+    .terminal-line .cmd { color: var(--text); }
+    .terminal-line .output { color: var(--muted); }
+    .terminal-line .success { color: var(--green); }
+    .terminal-line .info { color: var(--blue); }
+
+    @keyframes typeLine {
+      from { opacity: 0; transform: translateX(-10px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ═══ CTA SECTION ═══ */
+    .cta-section {
+      text-align: center;
+      padding: 8rem 2rem;
+    }
+
+    .cta-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
       display: inline-flex;
       align-items: center;
-      gap: .5rem;
-      padding: .65rem 1.4rem;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 999px;
-      color: #94a3b8;
+      gap: 0.6rem;
+      padding: 0.85rem 2rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
       text-decoration: none;
-      font-size: .9rem;
-      transition: border-color .2s, color .2s;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      font-family: 'Space Grotesk', sans-serif;
+      border: none;
+      cursor: pointer;
     }
 
-    a:hover {
-      border-color: #4f6ef7;
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(168, 85, 247, 0.4);
+    }
+
+    .btn-spotify {
+      background: #1ed760;
+      color: #000;
+    }
+
+    .btn-spotify:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(30, 215, 96, 0.3);
+    }
+
+    /* ═══ MARQUEE ═══ */
+    .marquee-container {
+      overflow: hidden;
+      padding: 1rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+    }
+
+    .marquee {
+      display: flex;
+      gap: 3rem;
+      animation: marquee 25s linear infinite;
+      width: max-content;
+    }
+
+    .marquee span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+      opacity: 0.5;
+    }
+
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ═══ FOOTER ═══ */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #1e293b;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--text); }
+
+    /* ═══ HORIZONTAL RULE GLOW ═══ */
+    .glow-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--purple), var(--green), transparent);
+      border: none;
+      margin: 0;
+      opacity: 0.4;
+    }
+
+    /* ═══ RESPONSIVE ═══ */
+    @media (max-width: 768px) {
+      .papol-section {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .papol-visual { order: -1; }
+
+      .floating-words {
+        width: 250px;
+        height: 250px;
+      }
+
+      .epepe-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-links { display: none; }
+
+      section { padding: 4rem 1.5rem; }
+
+      .cta-buttons { flex-direction: column; align-items: center; }
+    }
+
+    @media (max-width: 480px) {
+      .floating-words {
+        width: 200px;
+        height: 200px;
+      }
+
+      .float-word { font-size: 0.9rem !important; padding: 0.3rem 0.7rem; }
+      .float-word:nth-child(5) { font-size: 1.2rem !important; }
+    }
+
+    /* ═══ SELECTION ═══ */
+    ::selection {
+      background: rgba(168, 85, 247, 0.3);
       color: #fff;
     }
 
-    footer {
+    /* ═══ NOISE OVERLAY ═══ */
+    body::after {
+      content: '';
       position: fixed;
-      bottom: 1.5rem;
-      color: #1e293b;
-      font-size: .8rem;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.015;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
   </style>
 </head>
 <body>
 
-  <div class="dot"></div>
+  <!-- Cursor Glow -->
+  <div class="cursor-glow" id="cursorGlow"></div>
 
-  <div style="text-align:center; display:flex; flex-direction:column; gap:.75rem; align-items:center;">
-    <h1>aypapol.com</h1>
-    <p>Servidor online · todo apuntando bien</p>
+  <!-- Particles -->
+  <canvas id="particles"></canvas>
+
+  <!-- Nav -->
+  <nav id="nav">
+    <a href="#" class="nav-logo">&gt; aypapol_</a>
+    <ul class="nav-links">
+      <li><a href="#papol">que es papol</a></li>
+      <li><a href="#epepe">epepe</a></li>
+      <li><a href="#musica">musica</a></li>
+      <li><a href="#juegos">juegos</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="glitch-wrap">
+      <h1 class="glitch">aypapol</h1>
+    </div>
+
+    <p class="hero-sub">
+      todos somos <span>papol</span>. esto no se explica, se vive.
+    </p>
+
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      sistema activo
+    </div>
+
+    <div class="scroll-indicator">
+      <span>scroll</span>
+      <div class="scroll-arrow"></div>
+    </div>
+  </section>
+
+  <!-- Marquee -->
+  <div class="marquee-container">
+    <div class="marquee">
+      <span>papol</span>
+      <span>*</span>
+      <span>epepe</span>
+      <span>*</span>
+      <span>aypapol</span>
+      <span>*</span>
+      <span>puro desmadre</span>
+      <span>*</span>
+      <span>todos somos papol</span>
+      <span>*</span>
+      <span>la banda</span>
+      <span>*</span>
+      <span>ia + pepe = epepe</span>
+      <span>*</span>
+      <span>game panel</span>
+      <span>*</span>
+      <span>papol</span>
+      <span>*</span>
+      <span>epepe</span>
+      <span>*</span>
+      <span>aypapol</span>
+      <span>*</span>
+      <span>puro desmadre</span>
+      <span>*</span>
+      <span>todos somos papol</span>
+      <span>*</span>
+      <span>la banda</span>
+      <span>*</span>
+      <span>ia + pepe = epepe</span>
+      <span>*</span>
+      <span>game panel</span>
+      <span>*</span>
+    </div>
   </div>
 
-  <a href="https://game.aypapol.com">
-    🎮 Game Panel
-  </a>
+  <!-- Que es papol -->
+  <section id="papol">
+    <div class="papol-section">
+      <div class="reveal">
+        <div class="section-label">// concepto</div>
+        <h2 class="section-title">
+          <span class="gradient-text">que es papol?</span>
+        </h2>
+        <p class="section-text">
+          papol es todo. es como decir "wey" pero elevado al infinito.
+          es tu compa, es el saludo, es el insulto carinyoso, es la identidad.
+          <br><br>
+          no hay una definicion real porque <strong style="color: var(--green);">todos somos papol</strong>.
+          si estas aqui, ya eres papol. no hay vuelta atras.
+        </p>
+      </div>
+      <div class="papol-visual reveal">
+        <div class="floating-words">
+          <div class="float-word">papol</div>
+          <div class="float-word">ay papol</div>
+          <div class="float-word">que onda</div>
+          <div class="float-word">eres papol</div>
+          <div class="float-word">PAPOL</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <footer>5.161.218.218</footer>
+  <hr class="glow-line" />
+
+  <!-- Epepe -->
+  <section id="epepe">
+    <div class="reveal" style="text-align: center; margin-bottom: 2rem;">
+      <div class="section-label">// creaciones</div>
+      <h2 class="section-title">
+        <span class="gradient-pink">epepe</span>
+      </h2>
+      <p class="section-text" style="margin: 0 auto;">
+        pepe + ia = epepe. tomamos al icono, lo pasamos por inteligencia artificial,
+        y salen obras de arte que no pediste pero necesitabas.
+      </p>
+    </div>
+    <div class="epepe-grid">
+      <div class="epepe-card reveal">
+        <span class="epepe-icon">🐸</span>
+        <h3>arte generativo</h3>
+        <p>pepes generados con ia en situaciones que nadie pidio pero todos disfrutamos.</p>
+      </div>
+      <div class="epepe-card reveal">
+        <span class="epepe-icon">🎭</span>
+        <h3>memes nivel dios</h3>
+        <p>bromas internas tan profundas que si no eres papol no las vas a entender. y esta bien.</p>
+      </div>
+      <div class="epepe-card reveal">
+        <span class="epepe-icon">🤖</span>
+        <h3>ia x creatividad</h3>
+        <p>herramientas de ia para crear contenido ridiculo a velocidades absurdas.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="glow-line" />
+
+  <!-- Musica -->
+  <section id="musica" class="spotify-section">
+    <div class="reveal">
+      <div class="section-label">// sonido</div>
+      <h2 class="section-title">
+        <span class="gradient-green">la banda suena</span>
+      </h2>
+      <p class="section-text" style="margin: 0 auto;">
+        aypapol no solo es un concepto, es un proyecto musical.
+        escuchanos en spotify y entenderas todo. o nada. pero vas a vibrar.
+      </p>
+    </div>
+    <div class="spotify-embed reveal">
+      <iframe
+        src="https://open.spotify.com/embed/artist/3qqovZFveEf7VCQexRmLQ2?utm_source=generator&theme=0"
+        width="100%"
+        height="352"
+        style="max-width: 660px;"
+        frameBorder="0"
+        allowfullscreen=""
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+      ></iframe>
+    </div>
+    <div class="spotify-vibes reveal">
+      <span class="vibe-tag"># experimental</span>
+      <span class="vibe-tag"># papol-core</span>
+      <span class="vibe-tag"># desmadre-sonoro</span>
+      <span class="vibe-tag"># aypapol</span>
+    </div>
+  </section>
+
+  <hr class="glow-line" />
+
+  <!-- Juegos -->
+  <section id="juegos" class="game-section">
+    <div class="reveal">
+      <div class="section-label">// infraestructura</div>
+      <h2 class="section-title">
+        <span class="gradient-text">game panel</span>
+      </h2>
+      <p class="section-text" style="margin: 0 auto;">
+        servidores de juegos para la banda. minecraft, valheim, terraria y lo que se nos ocurra.
+        todo controlado desde un panel custom hecho por papoles, para papoles.
+      </p>
+    </div>
+    <div class="game-preview reveal">
+      <div class="terminal-header">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">game-panel@aypapol ~</span>
+      </div>
+      <div class="terminal-body" id="terminal">
+        <!-- Lines injected by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="reveal">
+      <h2 class="section-title">
+        <span class="gradient-text">unete al desmadre</span>
+      </h2>
+      <p class="section-text" style="margin: 0 auto;">
+        si llegaste hasta aqui, ya eres papol. ahora elige tu camino.
+      </p>
+      <div class="cta-buttons">
+        <a href="https://game.aypapol.com" class="btn btn-primary">
+          🎮 Game Panel
+        </a>
+        <a href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2?si=BLyTzDz9Q8Clcty2IsTAXA" target="_blank" rel="noopener" class="btn btn-spotify">
+          🎵 Spotify
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marquee bottom -->
+  <div class="marquee-container">
+    <div class="marquee" style="animation-direction: reverse;">
+      <span>papol</span>
+      <span>*</span>
+      <span>esto no se explica</span>
+      <span>*</span>
+      <span>se vive</span>
+      <span>*</span>
+      <span>aypapol.com</span>
+      <span>*</span>
+      <span>todos somos papol</span>
+      <span>*</span>
+      <span>epepe</span>
+      <span>*</span>
+      <span>la banda</span>
+      <span>*</span>
+      <span>papol</span>
+      <span>*</span>
+      <span>esto no se explica</span>
+      <span>*</span>
+      <span>se vive</span>
+      <span>*</span>
+      <span>aypapol.com</span>
+      <span>*</span>
+      <span>todos somos papol</span>
+      <span>*</span>
+      <span>epepe</span>
+      <span>*</span>
+      <span>la banda</span>
+      <span>*</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://game.aypapol.com">game panel</a>
+      <a href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2" target="_blank" rel="noopener">spotify</a>
+    </div>
+    <p class="footer-text">aypapol.com &mdash; todos somos papol</p>
+  </footer>
+
+  <script>
+    // ═══ PARTICLES ═══
+    (() => {
+      const canvas = document.getElementById('particles');
+      const ctx = canvas.getContext('2d');
+      let particles = [];
+      let w, h;
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+
+      class Particle {
+        constructor() { this.reset(); }
+        reset() {
+          this.x = Math.random() * w;
+          this.y = Math.random() * h;
+          this.size = Math.random() * 2 + 0.5;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+          this.speedY = (Math.random() - 0.5) * 0.3;
+          this.opacity = Math.random() * 0.4 + 0.1;
+          const colors = ['168,85,247', '79,110,247', '34,197,94', '236,72,153'];
+          this.color = colors[Math.floor(Math.random() * colors.length)];
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+        }
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${this.color},${this.opacity})`;
+          ctx.fill();
+        }
+      }
+
+      function init() {
+        resize();
+        const count = Math.min(80, Math.floor((w * h) / 15000));
+        particles = Array.from({ length: count }, () => new Particle());
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, w, h);
+        particles.forEach(p => { p.update(); p.draw(); });
+
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 120) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(168,85,247,${0.06 * (1 - dist / 120)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      init();
+      animate();
+      window.addEventListener('resize', () => { resize(); init(); });
+    })();
+
+    // ═══ CURSOR GLOW ═══
+    (() => {
+      const glow = document.getElementById('cursorGlow');
+      let mouseX = -300, mouseY = -300;
+
+      document.addEventListener('mousemove', e => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+
+      function update() {
+        glow.style.left = mouseX + 'px';
+        glow.style.top = mouseY + 'px';
+        requestAnimationFrame(update);
+      }
+      update();
+    })();
+
+    // ═══ NAV HIDE ON SCROLL ═══
+    (() => {
+      const nav = document.getElementById('nav');
+      let lastY = 0;
+
+      window.addEventListener('scroll', () => {
+        const y = window.scrollY;
+        nav.classList.toggle('hidden', y > lastY && y > 100);
+        lastY = y;
+      });
+    })();
+
+    // ═══ SCROLL REVEAL ═══
+    (() => {
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting) e.target.classList.add('visible');
+          });
+        },
+        { threshold: 0.15, rootMargin: '0px 0px -50px 0px' }
+      );
+
+      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    })();
+
+    // ═══ TERMINAL ANIMATION ═══
+    (() => {
+      const lines = [
+        { prompt: '$ ', cmd: 'ssh papol@aypapol.com' },
+        { output: 'Connected to aypapol game infrastructure' },
+        { prompt: '$ ', cmd: 'panel status' },
+        { success: '  minecraft    ● running    4 players online' },
+        { info: '  valheim      ○ stopped' },
+        { info: '  terraria     ○ stopped' },
+        { prompt: '$ ', cmd: 'panel start valheim' },
+        { success: '  ✓ valheim server started — waiting for papoles...' },
+      ];
+
+      const terminal = document.getElementById('terminal');
+      let revealed = false;
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting && !revealed) {
+            revealed = true;
+            lines.forEach((line, i) => {
+              setTimeout(() => {
+                const div = document.createElement('div');
+                div.className = 'terminal-line';
+
+                if (line.prompt) {
+                  div.innerHTML = `<span class="prompt">${line.prompt}</span><span class="cmd">${line.cmd}</span>`;
+                } else if (line.output) {
+                  div.innerHTML = `<span class="output">${line.output}</span>`;
+                } else if (line.success) {
+                  div.innerHTML = `<span class="success">${line.success}</span>`;
+                } else if (line.info) {
+                  div.innerHTML = `<span class="info">${line.info}</span>`;
+                }
+
+                terminal.appendChild(div);
+              }, i * 400);
+            });
+          }
+        });
+      }, { threshold: 0.3 });
+
+      observer.observe(terminal);
+    })();
+
+    // ═══ SMOOTH SCROLL NAV ═══
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
 
 </body>
 </html>
