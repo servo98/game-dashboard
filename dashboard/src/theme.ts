@@ -64,23 +64,23 @@ export function generatePalette(hex: string): ThemeColors {
 /** Default themes per game type */
 export const DEFAULT_THEMES: Record<string, ThemeDef> = {
   _idle: {
-    banner: "/themes/pepebot banner.jpg",
+    banner: "/themes/ppmatrix.png",
     colors: generatePalette("#22c55e"),
   },
   minecraft: {
-    banner: "/themes/ppmc.png",
+    banner: "/themes/ppmatrix.png",
     colors: generatePalette("#4ade80"),
   },
   valheim: {
-    banner: "/themes/pepeviking.png",
+    banner: "/themes/ppmatrix.png",
     colors: generatePalette("#f59e0b"),
   },
   terraria: {
-    banner: "/themes/ppterra.png",
+    banner: "/themes/ppmatrix.png",
     colors: generatePalette("#a855f7"),
   },
   _default: {
-    banner: "/themes/pepebot banner.jpg",
+    banner: "/themes/ppmatrix.png",
     colors: generatePalette("#4f6ef7"),
   },
 };

@@ -4,3 +4,7 @@ node_modules/
 dist/
 .turbo/
 coverage/
+
+# Theme images — only ppmatrix.png is tracked
+dashboard/public/themes/*
+!dashboard/public/themes/ppmatrix.png
