@@ -10,6 +10,7 @@ export type GameServer = {
   status: ServerStatus;
   banner_path?: string | null;
   accent_color?: string | null;
+  icon?: string | null;
 };
 
 export type User = {
@@ -135,6 +136,7 @@ export type CreateServerRequest = {
   port?: number;
   env_vars?: Record<string, string>;
   volumes?: Record<string, string>;
+  icon?: string;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

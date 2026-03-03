@@ -41,6 +41,7 @@ servers.post("/", requireAuth, async (c) => {
     port?: number;
     env_vars?: Record<string, string>;
     volumes?: Record<string, string>;
+    icon?: string;
   }>();
 
   let id: string;
@@ -50,6 +51,7 @@ servers.post("/", requireAuth, async (c) => {
   let port: number;
   let env_vars: Record<string, string>;
   let volumes: Record<string, string>;
+  let icon: string | null;
 
   if (body.template_id) {
     const template = findTemplate(body.template_id);
@@ -62,6 +64,7 @@ servers.post("/", requireAuth, async (c) => {
     port = body.port ?? template.default_port;
     env_vars = { ...template.default_env, ...(body.env_vars ?? {}) };
     volumes = { ...template.default_volumes, ...(body.volumes ?? {}) };
+    icon = body.icon ?? template.icon;
   } else {
     if (!body.id || !body.name || !body.docker_image || !body.port) {
       return c.json({ error: "Missing required fields: id, name, docker_image, port" }, 400);
@@ -73,6 +76,7 @@ servers.post("/", requireAuth, async (c) => {
     port = body.port;
     env_vars = body.env_vars ?? {};
     volumes = body.volumes ?? {};
+    icon = body.icon ?? null;
   }
 
   // Validate id format
@@ -111,6 +115,7 @@ servers.post("/", requireAuth, async (c) => {
       port,
       JSON.stringify(env_vars),
       JSON.stringify(volumes),
+      icon,
     );
     return c.json({ ok: true });
   } catch (_err) {
@@ -163,6 +168,7 @@ servers.get("/", async (c) => {
       status: await getContainerStatus(row.id),
       banner_path: row.banner_path ?? null,
       accent_color: row.accent_color ?? null,
+      icon: row.icon ?? null,
     })),
   );
   return c.json(result);

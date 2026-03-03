@@ -229,6 +229,22 @@ export const GAME_CATALOG: GameTemplate[] = [
     default_volumes: { "/data/barotrauma": "/data" },
   },
 
+  // --- Tabletop ---
+  {
+    id: "foundryvtt",
+    name: "Foundry VTT",
+    category: "tabletop",
+    icon: "https://foundryvtt.com/static/assets/icons/fvtt.png",
+    docker_image: "felddy/foundryvtt:release",
+    default_port: 30000,
+    default_env: {
+      FOUNDRY_USERNAME: "",
+      FOUNDRY_PASSWORD: "",
+      FOUNDRY_ADMIN_KEY: "",
+    },
+    default_volumes: { "/data/foundryvtt": "/data" },
+  },
+
   // --- Sandbox ---
   {
     id: "terrariaserver",

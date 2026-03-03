@@ -77,6 +77,11 @@ try {
 } catch (_) {
   /* column already exists */
 }
+try {
+  db.exec(`ALTER TABLE servers ADD COLUMN icon TEXT`);
+} catch (_) {
+  /* column already exists */
+}
 
 export type Server = {
   id: string;
@@ -89,6 +94,7 @@ export type Server = {
   created_at: number;
   banner_path: string | null;
   accent_color: string | null;
+  icon: string | null;
 };
 
 export type Session = {
@@ -110,8 +116,8 @@ export type ServerSession = {
 export const serverQueries = {
   getAll: db.query<Server, []>("SELECT * FROM servers ORDER BY created_at ASC"),
   getById: db.query<Server, [string]>("SELECT * FROM servers WHERE id = ?"),
-  insert: db.query<void, [string, string, string, string, number, string, string]>(
-    "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  insert: db.query<void, [string, string, string, string, number, string, string, string | null]>(
+    "INSERT INTO servers (id, name, game_type, docker_image, port, env_vars, volumes, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   ),
   deleteById: db.query<void, [string]>("DELETE FROM servers WHERE id = ?"),
   update: db.query<void, [string, number, string, string, string, string]>(

@@ -12,6 +12,7 @@ export function makeServer(overrides: Partial<Server> = {}): Server {
     created_at: 1700000000,
     banner_path: null,
     accent_color: null,
+    icon: null,
     ...overrides,
   };
 }

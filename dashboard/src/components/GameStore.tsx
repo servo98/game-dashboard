@@ -32,6 +32,8 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
   const [formImage, setFormImage] = useState("");
   const [formPort, setFormPort] = useState("");
   const [formEnv, setFormEnv] = useState<Array<{ key: string; value: string }>>([]);
+  const [formIcon, setFormIcon] = useState("");
+  const [formVolumes, setFormVolumes] = useState<Array<{ host: string; container: string }>>([]);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +62,8 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
     setFormImage("");
     setFormPort("");
     setFormEnv([]);
+    setFormIcon("");
+    setFormVolumes([]);
     setError(null);
   }
 
@@ -67,6 +71,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
     setSelected(null);
     setCustomMode(true);
     resetForm();
+    setFormVolumes([{ host: "", container: "/data" }]);
   }
 
   function handleBack() {
@@ -95,12 +100,20 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
           env_vars: envVars,
         });
       } else {
+        const volumes: Record<string, string> = {};
+        for (const { host, container } of formVolumes) {
+          const h = host.trim() || `/data/${formId}`;
+          const cnt = container.trim() || "/data";
+          if (h) volumes[h] = cnt;
+        }
         await api.createServer({
           id: formId,
           name: formName,
           docker_image: formImage,
           port: Number(formPort),
           env_vars: envVars,
+          volumes,
+          icon: formIcon || undefined,
         });
       }
       onCreated();
@@ -278,17 +291,30 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
             </label>
 
             {customMode && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-400">Docker Image</span>
-                <input
-                  type="text"
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                  required
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                  placeholder="gameservermanagers/gameserver:cs2"
-                />
-              </label>
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Docker Image</span>
+                  <input
+                    type="text"
+                    value={formImage}
+                    onChange={(e) => setFormImage(e.target.value)}
+                    required
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                    placeholder="gameservermanagers/gameserver:cs2"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Icon URL (optional)</span>
+                  <input
+                    type="text"
+                    value={formIcon}
+                    onChange={(e) => setFormIcon(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                    placeholder="https://example.com/icon.png"
+                  />
+                </label>
+              </>
             )}
 
             <label className="flex flex-col gap-1">
@@ -302,6 +328,59 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                 placeholder="27015"
               />
             </label>
+
+            {/* Volumes (custom only) */}
+            {customMode && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Volumes</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormVolumes([...formVolumes, { host: "", container: "" }])}
+                    className="text-xs text-brand-400 hover:text-brand-300"
+                  >
+                    + Add
+                  </button>
+                </div>
+                {formVolumes.map((vol, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={vol.host}
+                      onChange={(e) => {
+                        const next = [...formVolumes];
+                        next[i] = { ...next[i], host: e.target.value };
+                        setFormVolumes(next);
+                      }}
+                      placeholder={`/data/${formId || "my-server"}`}
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                    />
+                    <span className="text-gray-600 text-xs">:</span>
+                    <input
+                      type="text"
+                      value={vol.container}
+                      onChange={(e) => {
+                        const next = [...formVolumes];
+                        next[i] = { ...next[i], container: e.target.value };
+                        setFormVolumes(next);
+                      }}
+                      placeholder="/data"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormVolumes(formVolumes.filter((_, j) => j !== i))}
+                      className="text-gray-500 hover:text-red-400 text-sm px-1"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-600">
+                  Maps host path to container path for persistent data.
+                </p>
+              </div>
+            )}
 
             {/* Env vars */}
             <div className="flex flex-col gap-1">

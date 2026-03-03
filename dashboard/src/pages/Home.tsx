@@ -348,7 +348,7 @@ export default function Home() {
                     loading={loadingId === server.id}
                     hostMemTotalMB={hostMemTotalMB}
                     hostDomain={hostDomain}
-                    iconUrl={gameIcons[server.id]}
+                    iconUrl={server.icon || gameIcons[server.id]}
                     onStart={handleStart}
                     onStop={handleStop}
                     onDelete={handleDelete}
