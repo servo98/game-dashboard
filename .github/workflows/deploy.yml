@@ -79,6 +79,7 @@ jobs:
               - 'bot/src/register.ts'
             nginx:
               - 'nginx/nginx.conf'
+              - 'docker-compose.yml'
             static:
               - 'static-site/**'
             games:
@@ -461,7 +462,7 @@ jobs:
       needs.sync-code.result == 'success' &&
       needs.detect-changes.outputs.nginx == 'true'
     steps:
-      - name: Recargar nginx
+      - name: Recrear nginx
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -470,9 +471,9 @@ jobs:
           script: |
             set -e
             cd /root/game-panel
-            # Restart (not just reload) because git reset --hard creates new inodes
-            # and Docker bind mounts keep pointing to the old inode after file replacement
-            docker compose restart nginx
+            # Force-recreate to pick up compose config changes (network_mode, volumes, etc.)
+            # and to handle inode changes from git reset --hard on bind-mounted files
+            docker compose up -d --force-recreate --no-deps nginx
 
   deploy-static:
     runs-on: ubuntu-latest
