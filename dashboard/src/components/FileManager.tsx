@@ -102,7 +102,12 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
         const list = await api.listFiles(serverId, path);
         setEntries(list);
       } catch (err) {
-        setError((err as Error).message);
+        const msg = (err as Error).message;
+        setError(
+          msg === "No volumes configured"
+            ? "Este servidor no tiene volúmenes de datos configurados. Agrega un volume en la config para poder navegar archivos."
+            : msg,
+        );
         setEntries([]);
       } finally {
         setLoading(false);
