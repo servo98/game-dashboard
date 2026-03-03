@@ -6,6 +6,7 @@ import {
   BoxIcon,
   ClockIcon,
   DownloadIcon,
+  FolderIcon,
   GamepadIcon,
   LogsIcon,
   RestoreIcon,
@@ -21,6 +22,7 @@ type Props = {
   onStop: (id: string) => void;
   onViewLogs: (id: string) => void;
   onEditConfig: (id: string) => void;
+  onOpenFiles: (id: string) => void;
   onDelete: (id: string) => void;
   loading: boolean;
   hostMemTotalMB?: number;
@@ -47,6 +49,7 @@ export default memo(function ServerCard({
   onStop,
   onViewLogs,
   onEditConfig,
+  onOpenFiles,
   onDelete,
   loading,
   hostMemTotalMB,
@@ -240,6 +243,13 @@ export default memo(function ServerCard({
           className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
         >
           <SettingsIcon />
+        </button>
+        <button
+          onClick={() => onOpenFiles(server.id)}
+          title="Browse files"
+          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
+        >
+          <FolderIcon />
         </button>
         {!isRunning && (
           <button

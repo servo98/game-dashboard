@@ -12,6 +12,7 @@ import {
 import BackupsTab from "../components/BackupsTab";
 import BotSettings from "../components/BotSettings";
 import ConfigEditor from "../components/ConfigEditor";
+import FileManager from "../components/FileManager";
 import GameStore from "../components/GameStore";
 import HostStatsBar from "../components/HostStatsBar";
 import LogViewer from "../components/LogViewer";
@@ -43,6 +44,7 @@ export default function Home() {
   const [serviceStats, setServiceStats] = useState<Record<string, ServiceStats>>({});
   const serviceStatsRef = useRef<EventSource | null>(null);
   const [showGameStore, setShowGameStore] = useState(false);
+  const [fileManagerId, setFileManagerId] = useState<string | null>(null);
   const [hostDomain, setHostDomain] = useState("aypapol.com");
   const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
 
@@ -186,6 +188,10 @@ export default function Home() {
 
   const handleEditConfig = useCallback((id: string) => {
     setEditConfigId(id);
+  }, []);
+
+  const handleOpenFiles = useCallback((id: string) => {
+    setFileManagerId(id);
   }, []);
 
   const sortedServers = useMemo(
@@ -348,6 +354,7 @@ export default function Home() {
                     onDelete={handleDelete}
                     onViewLogs={handleViewLogs}
                     onEditConfig={handleEditConfig}
+                    onOpenFiles={handleOpenFiles}
                   />
                 ))}
               </div>
@@ -440,6 +447,15 @@ export default function Home() {
           isRunning={editConfigServer.status === "running"}
           onClose={() => setEditConfigId(null)}
           onSaved={fetchServers}
+        />
+      )}
+
+      {/* File manager modal */}
+      {fileManagerId && (
+        <FileManager
+          serverId={fileManagerId}
+          serverName={servers.find((s) => s.id === fileManagerId)?.name ?? fileManagerId}
+          onClose={() => setFileManagerId(null)}
         />
       )}
 

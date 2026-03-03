@@ -8,6 +8,7 @@ import { startQuestPoller } from "./quest-poller";
 import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
+import fileRoutes from "./routes/files";
 import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
@@ -107,6 +108,7 @@ app.get("/api/health/status", async (c) => {
 });
 
 app.route("/api/auth", authRoutes);
+app.route("/api/servers", fileRoutes);
 app.route("/api/servers", serverRoutes);
 app.route("/api/services", serviceRoutes);
 app.route("/api/bot", botSettingsRoutes);

@@ -116,6 +116,13 @@ export type CurseForgeModpack = {
   thumbnailUrl: string | null;
 };
 
+export type FileEntry = {
+  name: string;
+  isDirectory: boolean;
+  size: number;
+  modifiedAt: number;
+};
+
 export type CreateServerRequest = {
   template_id?: string;
   id?: string;
@@ -239,6 +246,39 @@ export const api = {
   deleteBanner: (serverId: string) =>
     request<{ ok: boolean }>(`/servers/${serverId}/banner`, { method: "DELETE" }),
   getBannerUrl: (serverId: string) => `${BASE}/servers/${serverId}/banner`,
+
+  /** File manager */
+  listFiles: (serverId: string, path: string) =>
+    request<FileEntry[]>(`/servers/${serverId}/files?path=${encodeURIComponent(path)}`),
+  downloadFileUrl: (serverId: string, path: string) =>
+    `${BASE}/servers/${serverId}/files/download?path=${encodeURIComponent(path)}`,
+  uploadFiles: async (
+    serverId: string,
+    path: string,
+    files: File[],
+  ): Promise<{ ok: boolean; uploaded: string[] }> => {
+    const form = new FormData();
+    for (const file of files) {
+      form.append("file", file);
+    }
+    const res = await fetch(
+      `${BASE}/servers/${serverId}/files/upload?path=${encodeURIComponent(path)}`,
+      { method: "POST", credentials: "include", body: form },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error: string }).error ?? res.statusText);
+    }
+    return res.json() as Promise<{ ok: boolean; uploaded: string[] }>;
+  },
+  deleteFile: (serverId: string, path: string) =>
+    request<{ ok: boolean }>(`/servers/${serverId}/files?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
+  createDirectory: (serverId: string, path: string) =>
+    request<{ ok: boolean }>(`/servers/${serverId}/files/mkdir?path=${encodeURIComponent(path)}`, {
+      method: "POST",
+    }),
 
   /** CurseForge */
   searchCurseForge: (q: string) =>
