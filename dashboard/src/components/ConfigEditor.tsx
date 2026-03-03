@@ -62,7 +62,6 @@ export default function ConfigEditor({
   const [dockerImage, setDockerImage] = useState("");
   const [envPairs, setEnvPairs] = useState<Array<{ key: string; value: string }>>([]);
   const [envRecord, setEnvRecord] = useState<Record<string, string>>({});
-  const [volumePairs, setVolumePairs] = useState<Array<{ host: string; container: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,9 +98,6 @@ export default function ConfigEditor({
         setDockerImage(cfg.docker_image);
         setEnvPairs(Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value })));
         setEnvRecord(cfg.env_vars);
-        setVolumePairs(
-          Object.entries(cfg.volumes ?? {}).map(([host, container]) => ({ host, container })),
-        );
         setBannerPath(cfg.banner_path);
         setAccentColor(cfg.accent_color);
       })
@@ -120,17 +116,11 @@ export default function ConfigEditor({
         : Object.fromEntries(
             envPairs.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value]),
           );
-      const volumes = Object.fromEntries(
-        volumePairs
-          .filter((v) => v.host.trim() && v.container.trim())
-          .map((v) => [v.host.trim(), v.container.trim()]),
-      );
       await api.updateServerConfig(serverId, {
         name,
         port,
         docker_image: dockerImage,
         env_vars,
-        volumes,
         accent_color: accentColor,
       } as ServerConfig);
       if (isRunning) {
@@ -343,61 +333,6 @@ export default function ConfigEditor({
                   </div>
                 </>
               )}
-
-              {/* Volumes */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-gray-500">Volumes</label>
-                  <button
-                    onClick={() => setVolumePairs((prev) => [...prev, { host: "", container: "" }])}
-                    className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
-                  >
-                    + Add
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
-                  {volumePairs.map((pair, i) => (
-                    <div key={i} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        placeholder="/data/server"
-                        value={pair.host}
-                        onChange={(e) =>
-                          setVolumePairs((prev) =>
-                            prev.map((p, idx) => (idx === i ? { ...p, host: e.target.value } : p)),
-                          )
-                        }
-                        className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
-                      />
-                      <span className="text-gray-600">:</span>
-                      <input
-                        type="text"
-                        placeholder="/data"
-                        value={pair.container}
-                        onChange={(e) =>
-                          setVolumePairs((prev) =>
-                            prev.map((p, idx) =>
-                              idx === i ? { ...p, container: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
-                      />
-                      <button
-                        onClick={() => setVolumePairs((prev) => prev.filter((_, idx) => idx !== i))}
-                        className="text-gray-600 hover:text-red-400 transition-colors shrink-0 px-1"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {volumePairs.length === 0 && (
-                    <p className="text-xs text-gray-600">
-                      No volumes configured — data will not persist.
-                    </p>
-                  )}
-                </div>
-              </div>
 
               {/* Theme Section */}
               <div className="border-t border-gray-800 pt-4">

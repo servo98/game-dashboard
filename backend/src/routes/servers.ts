@@ -178,7 +178,20 @@ servers.post("/:id/start", async (c) => {
   if (!server) return c.json({ error: "Server not found" }, 404);
 
   const envVars = JSON.parse(server.env_vars) as Record<string, string>;
-  const volumes = JSON.parse(server.volumes) as Record<string, string>;
+  let volumes = JSON.parse(server.volumes) as Record<string, string>;
+
+  // Ensure server always has a volume — auto-fix legacy servers without one
+  if (Object.keys(volumes).length === 0) {
+    volumes = { [`/data/${id}`]: "/data" };
+    serverQueries.update.run(
+      server.name,
+      server.port,
+      server.docker_image,
+      server.env_vars,
+      JSON.stringify(volumes),
+      id,
+    );
+  }
 
   // Inject CF_API_KEY from backend env when using CurseForge modpacks
   if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
