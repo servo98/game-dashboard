@@ -63,7 +63,20 @@ servers.post("/", requireAuth, async (c) => {
     docker_image = body.docker_image ?? template.docker_image;
     port = body.port ?? template.default_port;
     env_vars = { ...template.default_env, ...(body.env_vars ?? {}) };
-    volumes = { ...template.default_volumes, ...(body.volumes ?? {}) };
+    // When using a different ID than the template, remap volume host paths
+    // so each server gets its own data directory (e.g. /data/minecraft-2 instead of /data/minecraft)
+    if (body.volumes) {
+      volumes = body.volumes;
+    } else if (id !== template.id) {
+      volumes = Object.fromEntries(
+        Object.entries(template.default_volumes).map(([host, container]) => [
+          host.replace(new RegExp(`/${template.id}(/|$)`), `/${id}$1`),
+          container,
+        ]),
+      );
+    } else {
+      volumes = { ...template.default_volumes };
+    }
     icon = body.icon ?? template.icon;
   } else {
     if (!body.id || !body.name || !body.docker_image || !body.port) {

@@ -25,7 +25,7 @@ export const GAME_CATALOG: GameTemplate[] = [
     default_port: 25565,
     default_env: {
       EULA: "TRUE",
-      MEMORY: "4G",
+      MEMORY: "12G",
       TYPE: "VANILLA",
     },
     default_volumes: { "/data/minecraft": "/data" },
