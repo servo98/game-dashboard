@@ -36,6 +36,7 @@ export type ServerSessionRecord = {
 export type ServerConfig = {
   docker_image: string;
   env_vars: Record<string, string>;
+  volumes: Record<string, string>;
   banner_path: string | null;
   accent_color: string | null;
 };

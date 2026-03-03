@@ -406,6 +406,7 @@ servers.get("/:id/config", requireAuth, async (c) => {
   return c.json({
     docker_image: server.docker_image,
     env_vars: JSON.parse(server.env_vars) as Record<string, string>,
+    volumes: JSON.parse(server.volumes) as Record<string, string>,
     banner_path: server.banner_path ?? null,
     accent_color: server.accent_color ?? null,
   });
@@ -420,10 +421,17 @@ servers.put("/:id/config", requireAuth, async (c) => {
   const body = await c.req.json<{
     docker_image: string;
     env_vars: Record<string, string>;
+    volumes?: Record<string, string>;
     accent_color?: string | null;
   }>();
 
-  serverQueries.update.run(body.docker_image, JSON.stringify(body.env_vars), id);
+  const volumes = body.volumes ?? (JSON.parse(server.volumes) as Record<string, string>);
+  serverQueries.update.run(
+    body.docker_image,
+    JSON.stringify(body.env_vars),
+    JSON.stringify(volumes),
+    id,
+  );
 
   // Update theme accent color if provided
   if (body.accent_color !== undefined) {
