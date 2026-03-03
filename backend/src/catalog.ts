@@ -337,3 +337,9 @@ export const GAME_CATALOG: GameTemplate[] = [
 export function findTemplate(id: string): GameTemplate | undefined {
   return GAME_CATALOG.find((t) => t.id === id);
 }
+
+/** Find a catalog template by Docker image (ignoring tag) */
+export function findTemplateByImage(image: string): GameTemplate | undefined {
+  const imageName = image.split(":")[0];
+  return GAME_CATALOG.find((t) => t.docker_image.split(":")[0] === imageName);
+}

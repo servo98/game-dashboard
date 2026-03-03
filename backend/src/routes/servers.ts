@@ -1,7 +1,7 @@
 import { existsSync, rmSync } from "fs";
 import { Hono } from "hono";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
-import { findTemplate, GAME_CATALOG } from "../catalog";
+import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
 import { backupQueries, botSettingsQueries, serverQueries, serverSessionQueries } from "../db";
 import {
@@ -87,9 +87,19 @@ servers.post("/", requireAuth, async (c) => {
   const existing = serverQueries.getById.get(id);
   if (existing) return c.json({ error: "A server with this ID already exists" }, 409);
 
-  // Default volume if none provided
+  // Default volume if none provided — use catalog template if image matches
   if (Object.keys(volumes).length === 0) {
-    volumes = { [`/data/${id}`]: "/data" };
+    const tpl = findTemplateByImage(docker_image);
+    if (tpl) {
+      volumes = Object.fromEntries(
+        Object.entries(tpl.default_volumes).map(([host, container]) => [
+          host.replace(new RegExp(`/${tpl.id}(/|$)`), `/${id}$1`),
+          container,
+        ]),
+      );
+    } else {
+      volumes = { [`/data/${id}`]: "/data" };
+    }
   }
 
   try {
@@ -182,7 +192,19 @@ servers.post("/:id/start", async (c) => {
 
   // Ensure server always has a volume — auto-fix legacy servers without one
   if (Object.keys(volumes).length === 0) {
-    volumes = { [`/data/${id}`]: "/data" };
+    // Try to match the Docker image to a catalog template for correct volumes
+    const template = findTemplateByImage(server.docker_image);
+    if (template) {
+      // Use catalog volumes but substitute the server ID in host paths
+      volumes = Object.fromEntries(
+        Object.entries(template.default_volumes).map(([host, container]) => [
+          host.replace(new RegExp(`/${template.id}(/|$)`), `/${id}$1`),
+          container,
+        ]),
+      );
+    } else {
+      volumes = { [`/data/${id}`]: "/data" };
+    }
     serverQueries.update.run(
       server.name,
       server.port,

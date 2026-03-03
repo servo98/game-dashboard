@@ -66,6 +66,7 @@ vi.mock("../docker", () => ({
 vi.mock("../catalog", () => ({
   GAME_CATALOG: [],
   findTemplate: vi.fn(),
+  findTemplateByImage: vi.fn().mockReturnValue(undefined),
 }));
 
 vi.mock("../backup", () => ({
