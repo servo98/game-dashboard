@@ -150,10 +150,10 @@ export default function Home() {
   );
 
   const handleDelete = useCallback(
-    async (id: string) => {
+    async (id: string, deleteFiles: boolean) => {
       setError(null);
       try {
-        await api.deleteServer(id);
+        await api.deleteServer(id, deleteFiles);
         await fetchServers();
       } catch (err) {
         setError((err as Error).message);

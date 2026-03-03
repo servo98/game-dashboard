@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, rmSync } from "fs";
 import { Hono } from "hono";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, GAME_CATALOG } from "../catalog";
@@ -94,6 +94,11 @@ servers.post("/", requireAuth, async (c) => {
     return c.json({ error: `Port ${port} is already used by ${portConflict.name}` }, 409);
   }
 
+  // Default volume if none provided
+  if (Object.keys(volumes).length === 0) {
+    volumes = { [`/data/${id}`]: "/data" };
+  }
+
   try {
     serverQueries.insert.run(
       id,
@@ -121,8 +126,24 @@ servers.delete("/:id", requireAuth, async (c) => {
     return c.json({ error: "Cannot delete a running server. Stop it first." }, 400);
   }
 
+  const deleteFiles = c.req.query("deleteFiles") === "true";
+
   serverSessionQueries.deleteByServerId.run(id);
   serverQueries.deleteById.run(id);
+
+  // Optionally remove volume data from disk
+  if (deleteFiles) {
+    const volumes = JSON.parse(server.volumes) as Record<string, string>;
+    for (const hostPath of Object.keys(volumes)) {
+      if (!hostPath.startsWith("/data/")) continue;
+      const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
+      try {
+        rmSync(accessPath, { recursive: true });
+      } catch {
+        // best-effort — directory may not exist
+      }
+    }
+  }
 
   return c.json({ ok: true });
 });

@@ -201,7 +201,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  deleteServer: (id: string) => request<{ ok: boolean }>(`/servers/${id}`, { method: "DELETE" }),
+  deleteServer: (id: string, deleteFiles = false) =>
+    request<{ ok: boolean }>(`/servers/${id}${deleteFiles ? "?deleteFiles=true" : ""}`, {
+      method: "DELETE",
+    }),
 
   /** Backups */
   listAllBackups: () => request<BackupRecord[]>("/servers/backups/all"),

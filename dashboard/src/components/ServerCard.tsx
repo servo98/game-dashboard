@@ -23,7 +23,7 @@ type Props = {
   onViewLogs: (id: string) => void;
   onEditConfig: (id: string) => void;
   onOpenFiles: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, deleteFiles: boolean) => void;
   loading: boolean;
   hostMemTotalMB?: number;
   hostDomain?: string;
@@ -95,13 +95,13 @@ export default memo(function ServerCard({
     }
   }
 
-  function handleDeleteClick() {
+  function handleDeleteClick(deleteFiles: boolean) {
     if (confirmDelete) {
-      onDelete(server.id);
+      onDelete(server.id, deleteFiles);
       setConfirmDelete(false);
     } else {
       setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 3000);
+      setTimeout(() => setConfirmDelete(false), 4000);
     }
   }
 
@@ -251,18 +251,32 @@ export default memo(function ServerCard({
         >
           <FolderIcon />
         </button>
-        {!isRunning && (
+        {!isRunning && !confirmDelete && (
           <button
-            onClick={handleDeleteClick}
-            title={confirmDelete ? "Click again to confirm" : "Delete server"}
-            className={`px-3 py-2 rounded-xl transition-colors ${
-              confirmDelete
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
-            }`}
+            onClick={() => handleDeleteClick(false)}
+            title="Delete server"
+            className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"
           >
-            {confirmDelete ? "Confirm?" : <TrashIcon />}
+            <TrashIcon />
           </button>
+        )}
+        {!isRunning && confirmDelete && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleDeleteClick(false)}
+              title="Delete server only"
+              className="px-2.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => handleDeleteClick(true)}
+              title="Delete server and all files"
+              className="px-2.5 py-2 rounded-xl bg-red-800 hover:bg-red-900 text-white text-xs font-medium transition-colors"
+            >
+              + Files
+            </button>
+          </div>
         )}
         <button
           onClick={toggleBackups}
