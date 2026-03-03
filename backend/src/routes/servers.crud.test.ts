@@ -142,15 +142,15 @@ describe("POST /", () => {
     expect((await res.json()).error).toMatch(/Missing required fields/);
   });
 
-  it("detects port conflicts", async () => {
+  it("allows same port on different servers (only one runs at a time)", async () => {
     mockServerGetAll.mockReturnValue([server]); // minecraft uses port 25565
     const res = await servers.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
       body: JSON.stringify({ id: "test", name: "Test", docker_image: "img", port: 25565 }),
     });
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toMatch(/Port 25565/);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 
   it("creates server successfully", async () => {

@@ -1,3 +1,7 @@
+import type { QuestDetails, QuestReward, QuestTaskDetailed } from "./minecraft/quests";
+import type { ModInfo, StructuredRecipe } from "./minecraft/recipes";
+import type { FormattedStats, LeaderboardCategory, LeaderboardEntry } from "./minecraft/stats";
+
 export type Chapter = {
   id: string;
   title: string;
@@ -30,8 +34,13 @@ export type PlayerInfo = {
   uuid: string;
 };
 
+export type PlayerInfoExtended = PlayerInfo & {
+  total_play_time: string;
+};
+
 export interface GameAdapter {
   readonly gameType: string;
+  readonly serverId: string;
   /** Which optional systems were detected */
   readonly detectedSystems: string[];
 
@@ -39,14 +48,22 @@ export interface GameAdapter {
   getChapters?(): Promise<Chapter[]>;
   getQuestProgress?(playerName: string): Promise<QuestProgress | null>;
   getAllQuestProgress?(): Promise<QuestProgress[]>;
+  getQuestDetails?(questId: string): Promise<QuestDetails | null>;
 
   // Stats
   getPlayerStats?(playerName: string): Promise<Record<string, unknown>>;
+  getFormattedStats?(playerName: string): Promise<FormattedStats | null>;
+  getLeaderboard?(category?: LeaderboardCategory, limit?: number): Promise<LeaderboardEntry[]>;
   listPlayers?(): Promise<PlayerInfo[]>;
+  listPlayersExtended?(): Promise<PlayerInfoExtended[]>;
 
   // Recipes/knowledge
   getRecipeScripts?(): Promise<{ path: string; content: string }[]>;
+  searchRecipes?(
+    itemName: string,
+  ): Promise<{ structured: StructuredRecipe[]; rawMatches: { path: string; lines: string[] }[] }>;
   getModList?(): Promise<string[]>;
+  getModListDetailed?(): Promise<ModInfo[]>;
 
   // Commands
   runCommand?(command: string): Promise<string>;
@@ -66,3 +83,15 @@ export function getAdapter(gameType: string): GameAdapter | null {
   const factory = adapters.get(gameType);
   return factory ? factory() : null;
 }
+
+// Re-export types used by the adapter
+export type {
+  QuestDetails,
+  QuestReward,
+  QuestTaskDetailed,
+  FormattedStats,
+  LeaderboardCategory,
+  LeaderboardEntry,
+  ModInfo,
+  StructuredRecipe,
+};

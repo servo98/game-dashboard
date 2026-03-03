@@ -87,13 +87,6 @@ servers.post("/", requireAuth, async (c) => {
   const existing = serverQueries.getById.get(id);
   if (existing) return c.json({ error: "A server with this ID already exists" }, 409);
 
-  // Check port conflict
-  const allServers = serverQueries.getAll.all();
-  const portConflict = allServers.find((s) => s.port === port);
-  if (portConflict) {
-    return c.json({ error: `Port ${port} is already used by ${portConflict.name}` }, 409);
-  }
-
   // Default volume if none provided
   if (Object.keys(volumes).length === 0) {
     volumes = { [`/data/${id}`]: "/data" };
@@ -190,6 +183,12 @@ servers.post("/:id/start", async (c) => {
   // Inject CF_API_KEY from backend env when using CurseForge modpacks
   if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
     envVars.CF_API_KEY = process.env.CF_API_KEY;
+  }
+
+  // Auto-inject SERVER_PORT for Minecraft servers when using a non-default port
+  // This ensures itzg/minecraft-server binds to the correct port with host networking
+  if (server.game_type === "minecraft" && server.port !== 25565 && !envVars.SERVER_PORT) {
+    envVars.SERVER_PORT = String(server.port);
   }
 
   try {

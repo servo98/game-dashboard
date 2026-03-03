@@ -2,22 +2,52 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { GameAdapter } from "../adapters/adapter";
 import { createMinecraftAdapter } from "../adapters/minecraft/index";
+import { sanitize } from "../adapters/minecraft/sanitize";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
-import { getActiveContainer } from "../docker";
+import { getActiveContainer, getContainerStatus } from "../docker";
 
 const mcpRoute = new Hono();
 
-/** Helper to create a text content response (satisfies MCP SDK literal types) */
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function textResult(text: string) {
   return { content: [{ type: "text" as const, text }] };
 }
 
-function noServer() {
-  return textResult("No game server is currently running.");
+function jsonResult(data: unknown) {
+  return textResult(JSON.stringify(data, null, 2));
 }
 
-/** Resolve the MCP token from Bearer auth and return the McpToken record */
+function successResult(data: unknown) {
+  return jsonResult({
+    success: true,
+    data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+function errorResult(error: string) {
+  return jsonResult({
+    success: false,
+    error,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+function noServer() {
+  return errorResult("No game server is currently running.");
+}
+
+function noServerData(serverId: string) {
+  return errorResult(
+    `Could not resolve data path for server "${serverId}". Check that the server is configured with a /data volume.`,
+  );
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
 function getMcpToken(req: Request): McpToken | null {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) return null;
@@ -29,7 +59,6 @@ function getMcpToken(req: Request): McpToken | null {
   return record ?? null;
 }
 
-/** Check if the requesting user is a dashboard admin (has a valid session) */
 function isAdmin(req: Request): boolean {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) return false;
@@ -38,74 +67,130 @@ function isAdmin(req: Request): boolean {
   return session !== null && session !== undefined;
 }
 
-async function getActiveMinecraftAdapter() {
+// ─── Adapter resolution ───────────────────────────────────────────────────────
+
+/**
+ * Resolve adapter for a given server_id, or the active server if not specified.
+ * Returns [adapter, serverId, isRunning] or null if no server found.
+ */
+async function resolveAdapter(
+  serverId?: string,
+): Promise<{ adapter: GameAdapter; serverId: string; isRunning: boolean } | null> {
+  if (serverId) {
+    // Specific server requested — works even if stopped
+    const adapter = await createMinecraftAdapter(serverId);
+    if (!adapter) return null;
+    const status = await getContainerStatus(serverId);
+    return { adapter, serverId, isRunning: status === "running" };
+  }
+
+  // Default: active (running) server
   const active = await getActiveContainer();
   if (!active) return null;
-  return createMinecraftAdapter(active.name);
+  const adapter = await createMinecraftAdapter(active.name);
+  if (!adapter) return null;
+  return { adapter, serverId: active.name, isRunning: true };
 }
+
+// ─── MCP Server factory ───────────────────────────────────────────────────────
 
 function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
   const server = new McpServer({
     name: "Game Panel",
-    version: "1.0.0",
+    version: "2.0.0",
   });
 
   const playerName = mcpToken?.player_name ?? "unknown";
 
+  // Common schema for server_id parameter
+  const serverIdParam = {
+    server_id: z
+      .string()
+      .optional()
+      .describe("Server ID to query (e.g. 'minecraft'). Defaults to the currently running server."),
+  };
+
   // ─── Tools ──────────────────────────────────────────────────────────────
+
+  server.tool(
+    "list_servers",
+    "List all configured game servers and their current status",
+    {},
+    async () => {
+      const servers = serverQueries.getAll.all();
+      const active = await getActiveContainer();
+
+      const result = await Promise.all(
+        servers
+          .filter((s) => s.game_type === "minecraft")
+          .map(async (s) => {
+            const status = await getContainerStatus(s.id);
+            const adapter = await createMinecraftAdapter(s.id);
+            return {
+              id: s.id,
+              name: s.name,
+              game_type: s.game_type,
+              status,
+              is_active: active?.name === s.id,
+              detected_systems: adapter?.detectedSystems ?? [],
+              port: s.port,
+            };
+          }),
+      );
+
+      return successResult(result);
+    },
+  );
 
   server.tool(
     "server_status",
     "Get the current game server status, players online, and uptime",
-    {},
-    async () => {
-      const active = await getActiveContainer();
-      if (!active) return noServer();
+    { ...serverIdParam },
+    async ({ server_id }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
-      const serverRecord = serverQueries.getById.get(active.name);
-      const adapter = await createMinecraftAdapter(active.name);
+      const { adapter, serverId: sid, isRunning } = resolved;
+      const serverRecord = serverQueries.getById.get(sid);
       let playerList: string[] = [];
 
-      if (adapter) {
+      if (isRunning) {
         try {
-          const result = await adapter.runCommand("list");
+          const result = await adapter.runCommand!("list");
           playerList = result
             .replace(/^.*:\s*/, "")
             .split(",")
-            .map((p) => p.trim())
+            .map((p) => sanitize(p))
             .filter(Boolean);
         } catch {
           // RCON may not be ready
         }
       }
 
-      return textResult(
-        JSON.stringify(
-          {
-            serverId: active.name,
-            serverName: serverRecord?.name ?? active.name,
-            gameType: serverRecord?.game_type ?? "unknown",
-            status: "running",
-            playersOnline: playerList,
-            detectedSystems: adapter?.detectedSystems ?? [],
-          },
-          null,
-          2,
-        ),
-      );
+      return successResult({
+        serverId: sid,
+        serverName: serverRecord?.name ?? sid,
+        gameType: serverRecord?.game_type ?? "unknown",
+        status: isRunning ? "running" : "stopped",
+        playersOnline: playerList,
+        detectedSystems: adapter.detectedSystems,
+      });
     },
   );
 
   server.tool(
     "list_quests",
     "List all quest chapters and their quests from the modpack",
-    { chapter: z.string().optional().describe("Filter by chapter title (partial match)") },
-    async ({ chapter }) => {
-      const adapter = await getActiveMinecraftAdapter();
-      if (!adapter) return noServer();
+    {
+      ...serverIdParam,
+      chapter: z.string().optional().describe("Filter by chapter title (partial match)"),
+    },
+    async ({ server_id, chapter }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
-      const chapters = await adapter.getChapters();
-      if (chapters.length === 0) return textResult("No quest system detected in this modpack.");
+      const chapters = await resolved.adapter.getChapters!();
+      if (chapters.length === 0) return errorResult("No quest system detected in this modpack.");
 
       let filtered = chapters;
       if (chapter) {
@@ -116,86 +201,147 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       const result = filtered.map((ch) => ({
         chapter: ch.title,
         icon: ch.icon,
+        quest_count: ch.quests.length,
         quests: ch.quests.map((q) => ({
           id: q.id,
           title: q.title,
+          description: q.description || undefined,
           tasks: q.tasks.length,
           dependencies: q.dependencies.length,
         })),
       }));
 
-      return textResult(JSON.stringify(result, null, 2));
+      return successResult(result);
+    },
+  );
+
+  server.tool(
+    "get_quest_details",
+    "Get detailed information about a specific quest by its ID",
+    {
+      ...serverIdParam,
+      quest_id: z.string().describe("The quest ID (hex string, e.g. '5151CDD8FCDE7A07')"),
+    },
+    async ({ server_id, quest_id }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
+
+      const details = await resolved.adapter.getQuestDetails!(quest_id);
+      if (!details) return errorResult(`Quest "${quest_id}" not found.`);
+
+      return successResult(details);
     },
   );
 
   server.tool(
     "get_quest_progress",
     "Get quest completion progress for a player",
-    { player_name: z.string().optional().describe("Player name (defaults to your linked player)") },
-    async ({ player_name }) => {
-      const adapter = await getActiveMinecraftAdapter();
-      if (!adapter) return noServer();
+    {
+      ...serverIdParam,
+      player_name: z.string().optional().describe("Player name (defaults to your linked player)"),
+    },
+    async ({ server_id, player_name }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
-      const progress = await adapter.getQuestProgress(name);
+      const progress = await resolved.adapter.getQuestProgress!(name);
 
-      if (!progress) return textResult(`No quest progress found for player "${name}".`);
+      if (!progress) return errorResult(`No quest progress found for player "${name}".`);
 
-      return textResult(
-        JSON.stringify(
-          {
-            player: progress.playerName,
-            completedCount: progress.completed.length,
-            startedCount: progress.started.length,
-            completed: progress.completed,
-            started: progress.started,
-          },
-          null,
-          2,
-        ),
-      );
+      // Enrich with quest titles
+      const chapters = await resolved.adapter.getChapters!();
+      const titleMap = new Map<string, { title: string; chapter: string }>();
+      for (const ch of chapters) {
+        for (const q of ch.quests) {
+          titleMap.set(q.id, { title: q.title, chapter: ch.title });
+        }
+      }
+
+      return successResult({
+        player: progress.playerName,
+        completedCount: progress.completed.length,
+        startedCount: progress.started.length,
+        completed: progress.completed.map((id) => ({
+          id,
+          ...(titleMap.get(id) ?? { title: "Unknown", chapter: "Unknown" }),
+        })),
+        started: progress.started.map((id) => ({
+          id,
+          ...(titleMap.get(id) ?? { title: "Unknown", chapter: "Unknown" }),
+        })),
+      });
     },
   );
 
   server.tool(
     "suggest_next",
     "Suggest quests whose dependencies are already completed",
-    { player_name: z.string().optional().describe("Player name (defaults to your linked player)") },
-    async ({ player_name }) => {
-      const adapter = await getActiveMinecraftAdapter();
-      if (!adapter) return noServer();
+    {
+      ...serverIdParam,
+      player_name: z.string().optional().describe("Player name (defaults to your linked player)"),
+      chapter: z.string().optional().describe("Filter suggestions by chapter (partial match)"),
+      limit: z.number().optional().describe("Max suggestions to return (default 10)"),
+    },
+    async ({ server_id, player_name, chapter, limit }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
+      const maxResults = limit ?? 10;
+
       const [chapters, progress] = await Promise.all([
-        adapter.getChapters(),
-        adapter.getQuestProgress(name),
+        resolved.adapter.getChapters!(),
+        resolved.adapter.getQuestProgress!(name),
       ]);
 
-      if (!progress) return textResult(`No quest progress found for "${name}".`);
+      if (!progress) return errorResult(`No quest progress found for "${name}".`);
 
       const completedSet = new Set(progress.completed);
-      const suggestions: { chapter: string; quest: string; id: string }[] = [];
+      const suggestions: {
+        chapter: string;
+        quest_id: string;
+        title: string;
+        description: string;
+        tasks: number;
+        dependencies_met: number;
+        total_dependencies: number;
+      }[] = [];
 
-      for (const chapter of chapters) {
-        for (const quest of chapter.quests) {
+      for (const ch of chapters) {
+        if (chapter && !ch.title.toLowerCase().includes(chapter.toLowerCase())) continue;
+
+        for (const quest of ch.quests) {
           if (completedSet.has(quest.id)) continue;
           if (quest.dependencies.every((d) => completedSet.has(d))) {
             suggestions.push({
-              chapter: chapter.title,
-              quest: quest.title,
-              id: quest.id,
+              chapter: ch.title,
+              quest_id: quest.id,
+              title: quest.title,
+              description: quest.description || "",
+              tasks: quest.tasks.length,
+              dependencies_met: quest.dependencies.length,
+              total_dependencies: quest.dependencies.length,
             });
           }
         }
       }
 
       if (suggestions.length === 0) {
-        return textResult(
-          "No available quests found. All dependencies may not be met or all quests are completed.",
-        );
+        return successResult({
+          player: name,
+          message:
+            "No available quests found. All dependencies may not be met or all quests are completed.",
+          suggestions: [],
+        });
       }
 
-      return textResult(JSON.stringify(suggestions, null, 2));
+      return successResult({
+        player: name,
+        total_available: suggestions.length,
+        showing: Math.min(maxResults, suggestions.length),
+        suggestions: suggestions.slice(0, maxResults),
+      });
     },
   );
 
@@ -203,79 +349,189 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     "search_recipes",
     "Search KubeJS/CraftTweaker scripts for a specific item or recipe",
     {
+      ...serverIdParam,
       item_name: z
         .string()
         .describe("Item name or ID to search for (e.g. 'diamond', 'minecraft:iron_ingot')"),
     },
-    async ({ item_name }) => {
-      const adapter = await getActiveMinecraftAdapter();
-      if (!adapter) return noServer();
+    async ({ server_id, item_name }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
-      const scripts = await adapter.getRecipeScripts();
-      if (scripts.length === 0)
-        return textResult("No recipe scripts found (KubeJS/CraftTweaker not detected).");
+      const result = await resolved.adapter.searchRecipes!(item_name);
 
-      const lower = item_name.toLowerCase();
-      const matches = scripts
-        .filter((s) => s.content.toLowerCase().includes(lower))
-        .map((s) => ({
-          path: s.path,
-          relevantLines: s.content
-            .split("\n")
-            .filter((line) => line.toLowerCase().includes(lower))
-            .slice(0, 20),
-        }));
+      if (result.structured.length === 0 && result.rawMatches.length === 0) {
+        return errorResult(
+          `No recipe scripts mention "${item_name}". The item may use vanilla crafting or a mod's built-in recipes.`,
+        );
+      }
 
-      if (matches.length === 0) return textResult(`No recipe scripts mention "${item_name}".`);
-
-      return textResult(JSON.stringify(matches, null, 2));
+      return successResult({
+        item: item_name,
+        structured_recipes: result.structured,
+        raw_matches:
+          result.rawMatches.length > 0
+            ? result.rawMatches.map((m) => ({
+                path: m.path,
+                relevant_lines: m.lines,
+              }))
+            : undefined,
+        total_found: result.structured.length + result.rawMatches.length,
+      });
     },
   );
 
   server.tool(
     "player_stats",
-    "Get Minecraft statistics for a player (mobs killed, blocks mined, etc.)",
-    { player_name: z.string().optional().describe("Player name (defaults to your linked player)") },
-    async ({ player_name }) => {
-      const adapter = await getActiveMinecraftAdapter();
-      if (!adapter) return noServer();
+    "Get Minecraft statistics for a player (mobs killed, blocks mined, etc.) in readable format",
+    {
+      ...serverIdParam,
+      player_name: z.string().optional().describe("Player name (defaults to your linked player)"),
+    },
+    async ({ server_id, player_name }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
-      const stats = await adapter.getPlayerStats(name);
+      const formatted = await resolved.adapter.getFormattedStats!(name);
 
-      if (!stats || Object.keys(stats).length === 0) {
-        return textResult(`No statistics found for player "${name}".`);
+      if (!formatted) {
+        return errorResult(`No statistics found for player "${name}".`);
       }
 
-      return textResult(JSON.stringify(stats, null, 2));
+      return successResult({
+        player: name,
+        movement: formatted.movement,
+        time: formatted.time,
+        combat: formatted.combat,
+        mining: formatted.mining,
+        crafting: formatted.crafting,
+        interactions: formatted.interactions,
+        raw: formatted.raw,
+      });
     },
   );
 
-  server.tool("list_mods", "List all mods installed in the current modpack", {}, async () => {
-    const adapter = await getActiveMinecraftAdapter();
-    if (!adapter) return noServer();
+  server.tool(
+    "list_players",
+    "List all players who have joined the server with play time and UUID",
+    {
+      ...serverIdParam,
+    },
+    async ({ server_id }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
-    const mods = await adapter.getModList();
-    if (mods.length === 0) return textResult("No mods directory found.");
+      const players = await resolved.adapter.listPlayersExtended!();
 
-    return textResult(`${mods.length} mods installed:\n\n${mods.join("\n")}`);
-  });
+      // If server is running, check who's online
+      let onlinePlayers = new Set<string>();
+      if (resolved.isRunning) {
+        try {
+          const result = await resolved.adapter.runCommand!("list");
+          onlinePlayers = new Set(
+            result
+              .replace(/^.*:\s*/, "")
+              .split(",")
+              .map((p) => sanitize(p).toLowerCase())
+              .filter(Boolean),
+          );
+        } catch {
+          // RCON may not be ready
+        }
+      }
+
+      return successResult({
+        server_id: resolved.serverId,
+        server_running: resolved.isRunning,
+        total_players: players.length,
+        players: players.map((p) => ({
+          ...p,
+          online: onlinePlayers.has(p.name.toLowerCase()),
+        })),
+      });
+    },
+  );
+
+  server.tool(
+    "leaderboard",
+    "Get player rankings comparing stats across all players",
+    {
+      ...serverIdParam,
+      category: z
+        .enum(["general", "combat", "mining", "exploration", "farming"])
+        .optional()
+        .describe("Stat category (default: general)"),
+      limit: z.number().optional().describe("Max players to show (default 10)"),
+    },
+    async ({ server_id, category, limit }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
+
+      const cat = category ?? "general";
+      const max = limit ?? 10;
+      const rankings = await resolved.adapter.getLeaderboard!(cat, max);
+
+      if (rankings.length === 0) {
+        return errorResult("No player statistics available for leaderboard.");
+      }
+
+      return successResult({
+        server_id: resolved.serverId,
+        category: cat,
+        rankings,
+      });
+    },
+  );
+
+  server.tool(
+    "list_mods",
+    "List all mods installed in the current modpack with name and version",
+    { ...serverIdParam },
+    async ({ server_id }) => {
+      const resolved = await resolveAdapter(server_id);
+      if (!resolved) return server_id ? noServerData(server_id) : noServer();
+
+      const mods = await resolved.adapter.getModListDetailed!();
+      if (mods.length === 0) return errorResult("No mods directory found.");
+
+      return successResult({
+        server_id: resolved.serverId,
+        total_mods: mods.length,
+        mods: mods.map((m) => ({
+          name: m.name,
+          mod_id: m.modId,
+          version: m.version,
+          filename: m.filename,
+        })),
+      });
+    },
+  );
 
   // Admin-only: run RCON command
   if (adminMode) {
     server.tool(
       "run_command",
-      "Execute a server command via RCON (admin only)",
-      { command: z.string().describe("The command to run (e.g. 'list', 'time set day')") },
-      async ({ command }) => {
-        const adapter = await getActiveMinecraftAdapter();
-        if (!adapter) return noServer();
+      "Execute a server command via RCON (admin only). Server must be running.",
+      {
+        ...serverIdParam,
+        command: z.string().describe("The command to run (e.g. 'list', 'time set day')"),
+      },
+      async ({ server_id, command }) => {
+        const resolved = await resolveAdapter(server_id);
+        if (!resolved) return server_id ? noServerData(server_id) : noServer();
+
+        if (!resolved.isRunning) {
+          return errorResult(
+            `Server "${resolved.serverId}" is not running. RCON commands require a running server.`,
+          );
+        }
 
         try {
-          const result = await adapter.runCommand(command);
-          return textResult(result || "(no output)");
+          const result = await resolved.adapter.runCommand!(command);
+          return successResult({ command, output: sanitize(result) || "(no output)" });
         } catch (err) {
-          return textResult(`Command failed: ${(err as Error).message}`);
+          return errorResult(`Command failed: ${(err as Error).message}`);
         }
       },
     );
@@ -284,26 +540,30 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
   // ─── Resources ──────────────────────────────────────────────────────────
 
   server.resource("modpack-scripts", "modpack://scripts", async (uri) => {
-    const adapter = await getActiveMinecraftAdapter();
-    if (!adapter) {
+    const resolved = await resolveAdapter();
+    if (!resolved) {
       return {
         contents: [{ uri: uri.href, mimeType: "text/plain" as const, text: "No server running." }],
       };
     }
 
-    const scripts = await adapter.getRecipeScripts();
+    const scripts = await resolved.adapter.getRecipeScripts!();
     const text = scripts.map((s) => `=== ${s.path} ===\n${s.content}`).join("\n\n");
 
     return {
       contents: [
-        { uri: uri.href, mimeType: "text/plain" as const, text: text || "No scripts found." },
+        {
+          uri: uri.href,
+          mimeType: "text/plain" as const,
+          text: text || "No scripts found.",
+        },
       ],
     };
   });
 
   server.resource("modpack-info", "modpack://info", async (uri) => {
-    const adapter = await getActiveMinecraftAdapter();
-    if (!adapter) {
+    const resolved = await resolveAdapter();
+    if (!resolved) {
       return {
         contents: [
           {
@@ -315,7 +575,10 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       };
     }
 
-    const [mods, info] = await Promise.all([adapter.getModList(), adapter.getServerInfo()]);
+    const [mods, info] = await Promise.all([
+      resolved.adapter.getModList!(),
+      resolved.adapter.getServerInfo!(),
+    ]);
 
     return {
       contents: [
@@ -333,16 +596,18 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
   server.prompt(
     "quest-guide",
     "Get a personalized quest guide with your progress and available quests",
-    { player_name: z.string().optional().describe("Player name (defaults to your linked player)") },
+    {
+      player_name: z.string().optional().describe("Player name (defaults to your linked player)"),
+    },
     async ({ player_name }) => {
       const name = player_name ?? playerName;
-      const adapter = await getActiveMinecraftAdapter();
+      const resolved = await resolveAdapter();
 
       let questInfo = "No quest system detected.";
-      if (adapter) {
+      if (resolved) {
         const [chapters, progress] = await Promise.all([
-          adapter.getChapters(),
-          adapter.getQuestProgress(name),
+          resolved.adapter.getChapters!(),
+          resolved.adapter.getQuestProgress!(name),
         ]);
 
         if (chapters.length > 0) {
@@ -387,16 +652,26 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     "Get help finding or understanding recipes from the modpack's scripts",
     { item: z.string().describe("The item you need help crafting") },
     async ({ item }) => {
-      const adapter = await getActiveMinecraftAdapter();
+      const resolved = await resolveAdapter();
       let scriptContext = "No recipe scripts available.";
 
-      if (adapter) {
-        const scripts = await adapter.getRecipeScripts();
-        const lower = item.toLowerCase();
-        const relevant = scripts.filter((s) => s.content.toLowerCase().includes(lower));
+      if (resolved) {
+        const result = await resolved.adapter.searchRecipes!(item);
 
-        if (relevant.length > 0) {
-          scriptContext = relevant.map((s) => `=== ${s.path} ===\n${s.content}`).join("\n\n");
+        if (result.structured.length > 0 || result.rawMatches.length > 0) {
+          const parts: string[] = [];
+          if (result.structured.length > 0) {
+            parts.push(`Structured recipes found:\n${JSON.stringify(result.structured, null, 2)}`);
+          }
+          if (result.rawMatches.length > 0) {
+            parts.push(
+              "Raw script matches:\n" +
+                result.rawMatches
+                  .map((m) => `=== ${m.path} ===\n${m.lines.join("\n")}`)
+                  .join("\n\n"),
+            );
+          }
+          scriptContext = parts.join("\n\n");
         } else {
           scriptContext = `No scripts mention "${item}". The item may use vanilla crafting or a mod's built-in recipes.`;
         }
@@ -421,7 +696,6 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
 
 // ─── HTTP Handler ──────────────────────────────────────────────────────────
 
-/** Allowed origins for MCP requests (DNS rebinding protection per MCP spec) */
 const ALLOWED_ORIGINS = new Set([
   "https://game.aypapol.com",
   "https://claude.ai",
@@ -429,7 +703,6 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 mcpRoute.post("/mcp", async (c) => {
-  // Origin validation per MCP spec security requirements
   const origin = c.req.header("origin");
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return c.json({ error: "Forbidden origin" }, 403);
@@ -454,7 +727,9 @@ mcpRoute.post("/mcp", async (c) => {
   }
 
   const server = createMcpServer(mcpToken, admin);
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
 
   await server.connect(transport);
 
@@ -463,7 +738,9 @@ mcpRoute.post("/mcp", async (c) => {
 
 mcpRoute.get("/mcp", async (c) => {
   return c.json(
-    { error: "SSE transport not supported. Use POST /api/mcp for Streamable HTTP." },
+    {
+      error: "SSE transport not supported. Use POST /api/mcp for Streamable HTTP.",
+    },
     405,
   );
 });

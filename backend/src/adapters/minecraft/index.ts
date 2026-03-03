@@ -2,15 +2,39 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { serverQueries } from "../../db";
 import { getActiveContainer } from "../../docker";
-import type { Chapter, GameAdapter, PlayerInfo, QuestProgress } from "../adapter";
+import type {
+  Chapter,
+  FormattedStats,
+  GameAdapter,
+  LeaderboardCategory,
+  LeaderboardEntry,
+  ModInfo,
+  PlayerInfo,
+  PlayerInfoExtended,
+  QuestDetails,
+  QuestProgress,
+  StructuredRecipe,
+} from "../adapter";
 import { registerAdapter } from "../adapter";
-import { getAllQuestProgress, getChapters, getQuestProgress } from "./quests";
+import { getAllQuestProgress, getChapters, getQuestDetails, getQuestProgress } from "./quests";
 import { execRconCommand } from "./rcon";
-import { getCraftTweakerScripts, getKubeJSScripts, getModList } from "./recipes";
-import { getPlayerStats, listPlayers } from "./stats";
+import {
+  getAllScriptsCached,
+  getModList,
+  getModListDetailed,
+  searchRecipesStructured,
+} from "./recipes";
+import {
+  formatPlayerStats,
+  getLeaderboard,
+  getPlayerStats,
+  getRawPlayerStats,
+  listPlayers,
+  listPlayersExtended,
+} from "./stats";
 
 /**
- * Resolve the data directory for the active Minecraft server.
+ * Resolve the data directory for a Minecraft server.
  * The backend container has /data (host) mounted at /host-data,
  * so we translate the host path accordingly.
  */
@@ -22,8 +46,6 @@ export function getServerDataPath(serverId: string): string | null {
   // Find the volume that maps to /data (itzg/minecraft-server convention)
   for (const [hostPath, containerPath] of Object.entries(volumes)) {
     if (containerPath === "/data") {
-      // The backend container mounts /data (host) at /host-data.
-      // Translate: /data/minecraft → /host-data/minecraft
       if (hostPath.startsWith("/data/")) {
         return `/host-data/${hostPath.slice(6)}`;
       }
@@ -41,7 +63,6 @@ export function getServerDataPath(serverId: string): string | null {
 function detectSystems(serverRoot: string): string[] {
   const systems: string[] = [];
 
-  // FTB Quests
   if (
     existsSync(join(serverRoot, "world", "ftbquests")) ||
     existsSync(join(serverRoot, "config", "ftbquests"))
@@ -49,22 +70,18 @@ function detectSystems(serverRoot: string): string[] {
     systems.push("ftbquests");
   }
 
-  // Better Questing
   if (existsSync(join(serverRoot, "world", "betterquesting"))) {
     systems.push("betterquesting");
   }
 
-  // KubeJS
   if (existsSync(join(serverRoot, "kubejs", "server_scripts"))) {
     systems.push("kubejs");
   }
 
-  // CraftTweaker
   if (existsSync(join(serverRoot, "scripts"))) {
     systems.push("crafttweaker");
   }
 
-  // Mods
   if (existsSync(join(serverRoot, "mods"))) {
     systems.push("mods");
   }
@@ -75,8 +92,8 @@ function detectSystems(serverRoot: string): string[] {
 class MinecraftAdapter implements GameAdapter {
   readonly gameType = "minecraft";
   readonly detectedSystems: string[];
+  readonly serverId: string;
   private serverRoot: string;
-  private serverId: string;
 
   constructor(serverId: string, serverRoot: string) {
     this.serverId = serverId;
@@ -99,33 +116,54 @@ class MinecraftAdapter implements GameAdapter {
     return getAllQuestProgress(this.serverRoot);
   }
 
+  async getQuestDetails(questId: string): Promise<QuestDetails | null> {
+    if (!this.detectedSystems.includes("ftbquests")) return null;
+    return getQuestDetails(this.serverRoot, questId);
+  }
+
   async getPlayerStats(playerName: string): Promise<Record<string, unknown>> {
     const stats = await getPlayerStats(this.serverRoot, playerName);
     return stats ?? {};
+  }
+
+  async getFormattedStats(playerName: string): Promise<FormattedStats | null> {
+    const raw = await getRawPlayerStats(this.serverRoot, playerName);
+    if (!raw) return null;
+    return formatPlayerStats(raw);
+  }
+
+  async getLeaderboard(
+    category: LeaderboardCategory = "general",
+    limit = 10,
+  ): Promise<LeaderboardEntry[]> {
+    return getLeaderboard(this.serverRoot, category, limit);
   }
 
   async listPlayers(): Promise<PlayerInfo[]> {
     return listPlayers(this.serverRoot);
   }
 
+  async listPlayersExtended(): Promise<PlayerInfoExtended[]> {
+    return listPlayersExtended(this.serverRoot);
+  }
+
   async getRecipeScripts(): Promise<{ path: string; content: string }[]> {
-    const scripts: { path: string; content: string }[] = [];
+    return getAllScriptsCached(this.serverRoot);
+  }
 
-    if (this.detectedSystems.includes("kubejs")) {
-      const kubeScripts = await getKubeJSScripts(this.serverRoot);
-      scripts.push(...kubeScripts.map((s) => ({ ...s, path: `kubejs/${s.path}` })));
-    }
-
-    if (this.detectedSystems.includes("crafttweaker")) {
-      const ctScripts = await getCraftTweakerScripts(this.serverRoot);
-      scripts.push(...ctScripts.map((s) => ({ ...s, path: `scripts/${s.path}` })));
-    }
-
-    return scripts;
+  async searchRecipes(
+    itemName: string,
+  ): Promise<{ structured: StructuredRecipe[]; rawMatches: { path: string; lines: string[] }[] }> {
+    const scripts = await getAllScriptsCached(this.serverRoot);
+    return searchRecipesStructured(scripts, itemName);
   }
 
   async getModList(): Promise<string[]> {
     return getModList(this.serverRoot);
+  }
+
+  async getModListDetailed(): Promise<ModInfo[]> {
+    return getModListDetailed(this.serverRoot);
   }
 
   async runCommand(command: string): Promise<string> {
@@ -143,28 +181,28 @@ class MinecraftAdapter implements GameAdapter {
 }
 
 /**
- * Create a MinecraftAdapter for the currently active server, or for a specific server ID.
- * Returns null if no MC server is running or data path can't be resolved.
+ * Create a MinecraftAdapter for any server by ID.
+ * Works even if the server is not running (for file-based operations).
+ * Returns null if data path can't be resolved.
  */
-export async function createMinecraftAdapter(serverId?: string): Promise<MinecraftAdapter | null> {
-  let id = serverId;
-
-  if (!id) {
-    const active = await getActiveContainer();
-    if (!active) return null;
-    id = active.name;
-  }
-
-  const dataPath = getServerDataPath(id);
+export async function createMinecraftAdapter(serverId: string): Promise<MinecraftAdapter | null> {
+  const dataPath = getServerDataPath(serverId);
   if (!dataPath) return null;
+  return new MinecraftAdapter(serverId, dataPath);
+}
 
-  return new MinecraftAdapter(id, dataPath);
+/**
+ * Create a MinecraftAdapter for the currently active (running) server.
+ * Returns null if no server is running.
+ */
+export async function createActiveMinecraftAdapter(): Promise<MinecraftAdapter | null> {
+  const active = await getActiveContainer();
+  if (!active) return null;
+  return createMinecraftAdapter(active.name);
 }
 
 // Register for auto-discovery
 registerAdapter("minecraft", () => {
-  // This is a synchronous factory — callers should use createMinecraftAdapter() directly
-  // for proper async resolution. This exists for the registry pattern.
   throw new Error("Use createMinecraftAdapter() for async adapter creation");
 });
 
