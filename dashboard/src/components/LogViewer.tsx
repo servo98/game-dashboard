@@ -13,7 +13,7 @@ type Props = {
   streamFactory: () => EventSource;
   onClose: () => void;
   serverId?: string;
-  gameType?: string;
+  dockerImage?: string;
 };
 
 type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG";
@@ -41,7 +41,7 @@ const LEVEL_COLORS: Record<string, string> = {
   DEBUG: "text-gray-500",
 };
 
-export default function LogViewer({ title, streamFactory, onClose, serverId, gameType }: Props) {
+export default function LogViewer({ title, streamFactory, onClose, serverId, dockerImage }: Props) {
   const [lines, setLines] = useState<LogLine[]>([]);
   const [connected, setConnected] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +61,7 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, gam
   });
 
   // Command input state (MC only)
-  const isMC = gameType === "minecraft" && !!serverId;
+  const isMC = !!serverId && !!dockerImage?.includes("itzg/minecraft-server");
   const [command, setCommand] = useState("");
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);

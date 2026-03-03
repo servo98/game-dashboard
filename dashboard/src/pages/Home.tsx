@@ -36,7 +36,7 @@ export default function Home() {
     title: string;
     factory: () => EventSource;
     serverId?: string;
-    gameType?: string;
+    dockerImage?: string;
   } | null>(null);
   const [editConfigId, setEditConfigId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,7 +191,7 @@ export default function Home() {
       title: server?.name ?? id,
       factory: () => createLogStream(id),
       serverId: id,
-      gameType: server?.game_type,
+      dockerImage: server?.docker_image,
     });
   }, []);
 
@@ -444,7 +444,7 @@ export default function Home() {
           streamFactory={logTarget.factory}
           onClose={() => setLogTarget(null)}
           serverId={logTarget.serverId}
-          gameType={logTarget.gameType}
+          dockerImage={logTarget.dockerImage}
         />
       )}
 

@@ -104,6 +104,15 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
   const currentPathRef = useRef(currentPath);
   currentPathRef.current = currentPath;
 
+  // Close on Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   const fetchEntries = useCallback(
     async (path: string) => {
       setLoading(true);
@@ -359,7 +368,7 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
           </button>
           {pathParts.map((part, i) => (
             <span key={i} className="flex items-center gap-1 shrink-0">
-              <span className="text-gray-600">/</span>
+              {i > 0 && <span className="text-gray-600">/</span>}
               <button
                 onClick={() => navigateToBreadcrumb(i)}
                 className={`hover:text-brand-300 transition-colors ${

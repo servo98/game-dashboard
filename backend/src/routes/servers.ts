@@ -178,6 +178,7 @@ servers.get("/", async (c) => {
       id: row.id,
       name: row.name,
       game_type: row.game_type,
+      docker_image: row.docker_image,
       port: row.port,
       status: await getContainerStatus(row.id),
       banner_path: row.banner_path ?? null,
@@ -631,7 +632,7 @@ servers.get("/:id/players", requireAuth, async (c) => {
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
 
-  if (server.game_type !== "minecraft") {
+  if (!server.docker_image.includes("itzg/minecraft-server")) {
     return c.json({ error: "Player list is only available for Minecraft servers" }, 400);
   }
 
@@ -670,7 +671,7 @@ servers.post("/:id/command", requireAuth, async (c) => {
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
 
-  if (server.game_type !== "minecraft") {
+  if (!server.docker_image.includes("itzg/minecraft-server")) {
     return c.json({ error: "Commands are only available for Minecraft servers" }, 400);
   }
 

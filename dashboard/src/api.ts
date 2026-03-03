@@ -6,6 +6,7 @@ export type GameServer = {
   id: string;
   name: string;
   game_type: string;
+  docker_image: string;
   port: number;
   status: ServerStatus;
   banner_path?: string | null;
