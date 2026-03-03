@@ -1,4 +1,5 @@
 import Dockerode from "dockerode";
+import { chmodSync, mkdirSync } from "fs";
 import { createConnection } from "net";
 import { getPanelSetting } from "./db";
 
@@ -126,6 +127,18 @@ export async function startGameContainer(
 
   // Build volume bindings: host_path -> container_path
   const binds = Object.entries(volumes).map(([host, container]) => `${host}:${container}`);
+
+  // Ensure volume directories exist with open permissions (some images run as non-root)
+  for (const hostPath of Object.keys(volumes)) {
+    if (!hostPath.startsWith("/data/")) continue;
+    const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
+    try {
+      mkdirSync(accessPath, { recursive: true });
+      chmodSync(accessPath, 0o777);
+    } catch {
+      // best-effort
+    }
+  }
 
   // Pull image if not present locally
   await new Promise<void>((resolve, reject) => {
