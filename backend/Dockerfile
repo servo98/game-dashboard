@@ -1,5 +1,8 @@
 FROM oven/bun:1.1-slim
 
+# zstd for fast backup compression, util-linux for ionice (low-priority I/O)
+RUN apt-get update && apt-get install -y --no-install-recommends zstd util-linux && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy package files

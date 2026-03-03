@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
+import { execRconCommand } from "./adapters/minecraft/rcon";
 import { backupQueries, getPanelSetting, serverQueries } from "./db";
-import { docker, gameContainerName, getActiveContainer, getContainerStatus } from "./docker";
+import { getActiveContainer, getContainerStatus } from "./docker";
 
 const BACKUP_DIR = "/data/backups";
 const HOST_DATA_DIR = "/host-data";
@@ -38,39 +39,63 @@ export async function createBackup(serverId: string): Promise<{
   const dir = backupDir(serverId);
   mkdirSync(dir, { recursive: true });
 
-  const filename = `${serverId}_${timestamp()}.tar.gz`;
+  const filename = `${serverId}_${timestamp()}.tar.zst`;
   const outputPath = join(dir, filename);
 
-  // Pause container if running (freeze without killing)
-  let paused = false;
+  // For Minecraft: flush world to disk and disable auto-save for consistency
+  // Server stays online — players keep playing without interruption
+  const isMinecraft = server.game_type === "minecraft";
   const status = await getContainerStatus(serverId);
-  if (status === "running") {
+  const isRunning = status === "running";
+  let savesDisabled = false;
+
+  if (isMinecraft && isRunning) {
     try {
-      const container = docker.getContainer(gameContainerName(serverId));
-      await container.pause();
-      paused = true;
-    } catch {
-      // If pause fails, continue anyway
+      await execRconCommand(serverId, "save-all flush");
+      // Give the server a moment to finish flushing chunks to disk
+      await new Promise((r) => setTimeout(r, 3000));
+      await execRconCommand(serverId, "save-off");
+      savesDisabled = true;
+      console.log(`[backup] Minecraft save-off for ${serverId}`);
+    } catch (err) {
+      console.warn(`[backup] Could not run save-off for ${serverId}, continuing anyway:`, err);
     }
   }
 
   try {
-    const proc = Bun.spawn(["tar", "-czf", outputPath, "-C", HOST_DATA_DIR, ...relativeDirs], {
-      stdout: "ignore",
-      stderr: "pipe",
-    });
+    // ionice -c3 = idle I/O priority (only uses disk when server doesn't need it)
+    // nice -n 19 = lowest CPU priority
+    // --zstd = zstandard compression (3-5x faster than gzip, similar ratio)
+    const proc = Bun.spawn(
+      [
+        "ionice",
+        "-c3",
+        "nice",
+        "-n",
+        "19",
+        "tar",
+        "--zstd",
+        "-cf",
+        outputPath,
+        "-C",
+        HOST_DATA_DIR,
+        ...relativeDirs,
+      ],
+      { stdout: "ignore", stderr: "pipe" },
+    );
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text();
       throw new Error(`tar failed (exit ${exitCode}): ${stderr}`);
     }
   } finally {
-    if (paused) {
+    // Always re-enable saves, even if tar fails
+    if (savesDisabled) {
       try {
-        const container = docker.getContainer(gameContainerName(serverId));
-        await container.unpause();
-      } catch {
-        // ignore
+        await execRconCommand(serverId, "save-on");
+        console.log(`[backup] Minecraft save-on for ${serverId}`);
+      } catch (err) {
+        console.error(`[backup] CRITICAL: Could not re-enable saves for ${serverId}:`, err);
       }
     }
   }
@@ -109,7 +134,9 @@ export async function restoreBackup(serverId: string, backupId: number): Promise
     throw new Error("Backup file not found on disk");
   }
 
-  const proc = Bun.spawn(["tar", "-xzf", backupPath, "-C", HOST_DATA_DIR], {
+  // Support both old .tar.gz and new .tar.zst backups
+  const tarFlags = backup.filename.endsWith(".tar.zst") ? ["--zstd", "-xf"] : ["-xzf"];
+  const proc = Bun.spawn(["tar", ...tarFlags, backupPath, "-C", HOST_DATA_DIR], {
     stdout: "ignore",
     stderr: "pipe",
   });
