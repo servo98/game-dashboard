@@ -32,9 +32,12 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [servers, setServers] = useState<GameServer[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [logTarget, setLogTarget] = useState<{ title: string; factory: () => EventSource } | null>(
-    null,
-  );
+  const [logTarget, setLogTarget] = useState<{
+    title: string;
+    factory: () => EventSource;
+    serverId?: string;
+    gameType?: string;
+  } | null>(null);
   const [editConfigId, setEditConfigId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("servers");
@@ -183,7 +186,13 @@ export default function Home() {
   };
 
   const handleViewLogs = useCallback((id: string) => {
-    setLogTarget({ title: id, factory: () => createLogStream(id) });
+    const server = serversRef.current.find((s) => s.id === id);
+    setLogTarget({
+      title: server?.name ?? id,
+      factory: () => createLogStream(id),
+      serverId: id,
+      gameType: server?.game_type,
+    });
   }, []);
 
   const handleEditConfig = useCallback((id: string) => {
@@ -434,6 +443,8 @@ export default function Home() {
           title={logTarget.title}
           streamFactory={logTarget.factory}
           onClose={() => setLogTarget(null)}
+          serverId={logTarget.serverId}
+          gameType={logTarget.gameType}
         />
       )}
 

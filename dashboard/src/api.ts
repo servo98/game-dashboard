@@ -111,6 +111,16 @@ export type McpTokenRecord = {
   last_used_at: number | null;
 };
 
+export type PlayersResponse = {
+  online: string[];
+  count: number;
+  max: number;
+};
+
+export type CommandResponse = {
+  output: string;
+};
+
 export type CurseForgeModpack = {
   id: number;
   name: string;
@@ -178,6 +188,16 @@ export const api = {
 
   /** Session history */
   getServerHistory: (id: string) => request<ServerSessionRecord[]>(`/servers/${id}/history`),
+
+  /** Minecraft: online players */
+  getPlayers: (id: string) => request<PlayersResponse>(`/servers/${id}/players`),
+
+  /** Minecraft: execute RCON command */
+  sendCommand: (id: string, command: string) =>
+    request<CommandResponse>(`/servers/${id}/command`, {
+      method: "POST",
+      body: JSON.stringify({ command }),
+    }),
 
   /** Infrastructure */
   restartService: (name: "backend" | "bot") =>
@@ -309,6 +329,50 @@ export const api = {
   deleteMcpToken: (id: number) =>
     request<{ ok: boolean }>(`/mcp-tokens/${id}`, { method: "DELETE" }),
 };
+
+/** Upload a single file with progress tracking via XHR */
+export function uploadFileWithProgress(
+  serverId: string,
+  path: string,
+  file: File,
+  onProgress: (loaded: number, total: number) => void,
+): { promise: Promise<{ ok: boolean; uploaded: string[] }>; abort: () => void } {
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise<{ ok: boolean; uploaded: string[] }>((resolve, reject) => {
+    xhr.open("POST", `${BASE}/servers/${serverId}/files/upload?path=${encodeURIComponent(path)}`);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          resolve({ ok: true, uploaded: [file.name] });
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.error ?? `Upload failed (${xhr.status})`));
+        } catch {
+          reject(new Error(`Upload failed (${xhr.status})`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.onabort = () => reject(new Error("Upload cancelled"));
+
+    const form = new FormData();
+    form.append("file", file);
+    xhr.send(form);
+  });
+
+  return { promise, abort: () => xhr.abort() };
+}
 
 /** Create an EventSource for live game server logs */
 export function createLogStream(serverId: string): EventSource {

@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from "fs";
 import { Hono } from "hono";
+import { execRconCommand } from "../adapters/minecraft/rcon";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
@@ -622,6 +623,74 @@ servers.get("/:id/history", requireAuth, async (c) => {
   }));
 
   return c.json(formatted);
+});
+
+// Online players (Minecraft only, via RCON "list")
+servers.get("/:id/players", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  if (server.game_type !== "minecraft") {
+    return c.json({ error: "Player list is only available for Minecraft servers" }, 400);
+  }
+
+  const status = await getContainerStatus(id);
+  if (status !== "running") {
+    return c.json({ error: "Server is not running" }, 400);
+  }
+
+  try {
+    const raw = await execRconCommand(id, "list");
+    // MC format: "There are X of a max of Y players online: player1, player2"
+    const match = raw.match(/There are (\d+) of a max of (\d+) players online:\s*(.*)/);
+    if (match) {
+      const count = parseInt(match[1], 10);
+      const max = parseInt(match[2], 10);
+      const online =
+        count > 0
+          ? match[3]
+              .split(",")
+              .map((p) => p.trim())
+              .filter(Boolean)
+          : [];
+      return c.json({ online, count, max });
+    }
+    // Fallback: couldn't parse, return raw
+    return c.json({ online: [], count: 0, max: 0, raw });
+  } catch (err) {
+    console.error("Players error:", err);
+    return c.json({ error: "Failed to get player list" }, 500);
+  }
+});
+
+// Execute RCON command (Minecraft only)
+servers.post("/:id/command", requireAuth, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  if (server.game_type !== "minecraft") {
+    return c.json({ error: "Commands are only available for Minecraft servers" }, 400);
+  }
+
+  const status = await getContainerStatus(id);
+  if (status !== "running") {
+    return c.json({ error: "Server is not running" }, 400);
+  }
+
+  const body = await c.req.json<{ command: string }>();
+  if (!body.command?.trim()) {
+    return c.json({ error: "Command is required" }, 400);
+  }
+
+  try {
+    const output = await execRconCommand(id, body.command.trim());
+    return c.json({ output });
+  } catch (err) {
+    console.error("Command error:", err);
+    return c.json({ error: "Failed to execute command" }, 500);
+  }
 });
 
 // --- Backup routes ---
