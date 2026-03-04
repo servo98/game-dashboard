@@ -123,7 +123,7 @@ describe("POST /:id/start", () => {
     expect(body.ok).toBe(true);
     expect(mockStartGameContainer).toHaveBeenCalledWith(
       "minecraft",
-      "itzg/minecraft-server",
+      "itzg/minecraft-server:java21",
       25565,
       { EULA: "TRUE" },
       { "/data/minecraft": "/data" },

@@ -6,7 +6,7 @@ describe("findTemplate", () => {
     const mc = findTemplate("minecraft");
     expect(mc).toBeDefined();
     expect(mc!.name).toBe("Minecraft");
-    expect(mc!.docker_image).toBe("itzg/minecraft-server:latest");
+    expect(mc!.docker_image).toBe("itzg/minecraft-server:java21");
   });
 
   it("returns undefined for an unknown id", () => {
