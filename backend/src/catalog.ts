@@ -21,7 +21,7 @@ export const GAME_CATALOG: GameTemplate[] = [
     name: "Minecraft",
     category: "sandbox",
     icon: MINECRAFT_ICON,
-    docker_image: "itzg/minecraft-server:latest",
+    docker_image: "itzg/minecraft-server:java21",
     default_port: 25565,
     default_env: {
       EULA: "TRUE",

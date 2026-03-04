@@ -23,6 +23,24 @@ export type MinecraftField = {
   modpackCompatible: boolean;
 };
 
+// Maps MC version ranges to the required Java image tag
+export const JAVA_TAG_OPTIONS = [
+  { value: "java21", label: "Java 21", description: "MC 1.20.5+" },
+  { value: "java17", label: "Java 17", description: "MC 1.18 – 1.20.4" },
+  { value: "java8", label: "Java 8", description: "MC 1.16.5 and older" },
+] as const;
+
+/** Given a MC version string, return the best java image tag */
+export function javaTagForVersion(version: string): string {
+  if (version === "LATEST" || version === "SNAPSHOT") return "java21";
+  const parts = version.split(".").map(Number);
+  const minor = parts[1] ?? 0;
+  const patch = parts[2] ?? 0;
+  if (minor >= 21 || (minor === 20 && patch >= 5)) return "java21";
+  if (minor >= 18) return "java17";
+  return "java8";
+}
+
 export const MINECRAFT_FIELDS: MinecraftField[] = [
   // ── Server Type ──
   {

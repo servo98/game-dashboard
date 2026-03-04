@@ -253,6 +253,26 @@ servers.post("/:id/start", async (c) => {
     envVars.SERVER_PORT = String(server.port);
   }
 
+  // Auto-select Java image tag for itzg/minecraft-server based on MC version
+  let dockerImage = server.docker_image;
+  if (dockerImage.startsWith("itzg/minecraft-server")) {
+    const version = envVars.VERSION ?? "LATEST";
+    const parts = version.split(".").map(Number);
+    const minor = parts[1] ?? 0;
+    const patch = parts[2] ?? 0;
+    let javaTag = "java21"; // default for latest/modern
+    if (version !== "LATEST" && version !== "SNAPSHOT") {
+      if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
+      else if (minor >= 18) javaTag = "java17";
+      else javaTag = "java8";
+    }
+    // For modpacks without VERSION, default to java17 (most modpacks target 1.20.1 or similar)
+    if (MODPACK_TYPES.has(envVars.TYPE) && !envVars.VERSION) {
+      javaTag = "java17";
+    }
+    dockerImage = `itzg/minecraft-server:${javaTag}`;
+  }
+
   try {
     // Mark any currently running server's session as replaced
     const active = await getActiveContainer();
@@ -261,7 +281,7 @@ servers.post("/:id/start", async (c) => {
       serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
     }
 
-    await startGameContainer(server.id, server.docker_image, server.port, envVars, volumes);
+    await startGameContainer(server.id, dockerImage, server.port, envVars, volumes);
 
     // Record new session
     serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
