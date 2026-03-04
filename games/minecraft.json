@@ -6,9 +6,8 @@
   "port": 25565,
   "env_vars": {
     "EULA": "TRUE",
-    "MEMORY": "2G",
+    "MEMORY": "4G",
     "TYPE": "VANILLA",
-    "VERSION": "LATEST",
     "ONLINE_MODE": "TRUE",
     "MAX_PLAYERS": "10",
     "DIFFICULTY": "normal",

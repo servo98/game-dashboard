@@ -236,6 +236,12 @@ servers.post("/:id/start", async (c) => {
     );
   }
 
+  // Modpack types: auto-detect version from modpack manifest, don't override
+  const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
+  if (MODPACK_TYPES.has(envVars.TYPE)) {
+    delete envVars.VERSION;
+  }
+
   // Inject CF_API_KEY from backend env when using CurseForge modpacks
   if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
     envVars.CF_API_KEY = process.env.CF_API_KEY;

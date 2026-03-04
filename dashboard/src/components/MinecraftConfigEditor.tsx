@@ -92,6 +92,8 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       // Switching to modpack — set TYPE to selected platform's type
       const platform = MODPACK_PLATFORMS.find((p) => p.id === selectedPlatform);
       if (platform) next.TYPE = platform.typeValue;
+      // Remove VERSION so the image auto-detects it from the modpack
+      delete next.VERSION;
     }
 
     onChange(next);
