@@ -109,7 +109,7 @@ export async function startGameContainer(
   // Remove existing stopped container if present
   try {
     const existing = docker.getContainer(containerName);
-    await existing.remove({ force: true });
+    await existing.remove({ force: true, v: true });
   } catch {
     // Container doesn't exist, that's fine
   }

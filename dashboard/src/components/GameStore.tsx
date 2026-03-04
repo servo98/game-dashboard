@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type GameTemplate } from "../api";
+import MinecraftConfigEditor from "./MinecraftConfigEditor";
 
 type Props = {
   open: boolean;
@@ -32,8 +33,11 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
   const [formImage, setFormImage] = useState("");
   const [formPort, setFormPort] = useState("");
   const [formEnv, setFormEnv] = useState<Array<{ key: string; value: string }>>([]);
+  const [mcEnvRecord, setMcEnvRecord] = useState<Record<string, string>>({});
   const [formIcon, setFormIcon] = useState("");
   const [formVolumes, setFormVolumes] = useState<Array<{ host: string; container: string }>>([]);
+
+  const isMcTemplate = selected?.docker_image?.includes("itzg/minecraft-server") ?? false;
 
   useEffect(() => {
     if (open) {
@@ -51,6 +55,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
       setFormImage(selected.docker_image);
       setFormPort(String(selected.default_port));
       setFormEnv(Object.entries(selected.default_env).map(([key, value]) => ({ key, value })));
+      setMcEnvRecord({ ...selected.default_env });
       setCustomMode(false);
       setError(null);
     }
@@ -85,10 +90,9 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
     setError(null);
     setLoading(true);
 
-    const envVars: Record<string, string> = {};
-    for (const { key, value } of formEnv) {
-      if (key.trim()) envVars[key.trim()] = value;
-    }
+    const envVars: Record<string, string> = isMcTemplate
+      ? Object.fromEntries(Object.entries(mcEnvRecord).filter(([k]) => k.trim()))
+      : Object.fromEntries(formEnv.filter((p) => p.key.trim()).map((p) => [p.key.trim(), p.value]));
 
     try {
       if (selected) {
@@ -149,7 +153,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        className={`bg-gray-900 border border-gray-700 rounded-2xl w-full max-h-[85vh] flex flex-col overflow-hidden ${showForm && isMcTemplate ? "max-w-3xl" : "max-w-2xl"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -383,51 +387,57 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
             )}
 
             {/* Env vars */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Environment Variables</span>
-                <button
-                  type="button"
-                  onClick={() => setFormEnv([...formEnv, { key: "", value: "" }])}
-                  className="text-xs text-brand-400 hover:text-brand-300"
-                >
-                  + Add
-                </button>
+            {isMcTemplate ? (
+              <div className="max-h-[40vh] overflow-y-auto pr-1">
+                <MinecraftConfigEditor envVars={mcEnvRecord} onChange={setMcEnvRecord} />
               </div>
-              {formEnv.map((env, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={env.key}
-                    onChange={(e) => {
-                      const next = [...formEnv];
-                      next[i] = { ...next[i], key: e.target.value };
-                      setFormEnv(next);
-                    }}
-                    placeholder="KEY"
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                  />
-                  <input
-                    type="text"
-                    value={env.value}
-                    onChange={(e) => {
-                      const next = [...formEnv];
-                      next[i] = { ...next[i], value: e.target.value };
-                      setFormEnv(next);
-                    }}
-                    placeholder="value"
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                  />
+            ) : (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Environment Variables</span>
                   <button
                     type="button"
-                    onClick={() => setFormEnv(formEnv.filter((_, j) => j !== i))}
-                    className="text-gray-500 hover:text-red-400 text-sm px-1"
+                    onClick={() => setFormEnv([...formEnv, { key: "", value: "" }])}
+                    className="text-xs text-brand-400 hover:text-brand-300"
                   >
-                    &times;
+                    + Add
                   </button>
                 </div>
-              ))}
-            </div>
+                {formEnv.map((env, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={env.key}
+                      onChange={(e) => {
+                        const next = [...formEnv];
+                        next[i] = { ...next[i], key: e.target.value };
+                        setFormEnv(next);
+                      }}
+                      placeholder="KEY"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                    />
+                    <input
+                      type="text"
+                      value={env.value}
+                      onChange={(e) => {
+                        const next = [...formEnv];
+                        next[i] = { ...next[i], value: e.target.value };
+                        setFormEnv(next);
+                      }}
+                      placeholder="value"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormEnv(formEnv.filter((_, j) => j !== i))}
+                      className="text-gray-500 hover:text-red-400 text-sm px-1"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <button
               type="submit"
