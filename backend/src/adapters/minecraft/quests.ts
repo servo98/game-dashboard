@@ -404,8 +404,10 @@ export async function getAllQuestProgress(serverRoot: string): Promise<QuestProg
 }
 
 function extractStringArray(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((v) => String(v));
+  if (Array.isArray(raw)) return raw.map((v) => String(v));
+  // FTB Quests stores completed/started as maps { questId: timestampL }
+  if (raw && typeof raw === "object") return Object.keys(raw);
+  return [];
 }
 
 /**

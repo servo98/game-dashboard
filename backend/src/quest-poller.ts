@@ -90,8 +90,10 @@ async function pollQuests(): Promise<void> {
 
     if (newCompletions.length === 0) return;
 
-    // 6. Resolve quest titles
+    // 6. Resolve quest titles and filter to known quests only (progress maps also contain task IDs)
     const titleMap = await getQuestTitleMap(dataPath);
+    const questCompletions = newCompletions.filter((c) => titleMap.has(c.questId));
+    if (questCompletions.length === 0) return;
 
     // 7. Send Discord notifications (rate limited)
     const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
@@ -109,7 +111,7 @@ async function pollQuests(): Promise<void> {
       return;
     }
 
-    const toSend = newCompletions.slice(0, MAX_NOTIFICATIONS_PER_CYCLE);
+    const toSend = questCompletions.slice(0, MAX_NOTIFICATIONS_PER_CYCLE);
 
     for (const completion of toSend) {
       const info = titleMap.get(completion.questId);
@@ -149,9 +151,9 @@ async function pollQuests(): Promise<void> {
       }
     }
 
-    if (newCompletions.length > MAX_NOTIFICATIONS_PER_CYCLE) {
+    if (questCompletions.length > MAX_NOTIFICATIONS_PER_CYCLE) {
       console.log(
-        `[QuestPoller] ${newCompletions.length - MAX_NOTIFICATIONS_PER_CYCLE} notifications queued for next cycle`,
+        `[QuestPoller] ${questCompletions.length - MAX_NOTIFICATIONS_PER_CYCLE} notifications queued for next cycle`,
       );
     }
   } catch (err) {

@@ -258,18 +258,20 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
         }
       }
 
+      // Filter to only known quest IDs (progress maps also contain task/chapter IDs)
+      const completedQuests = progress.completed
+        .filter((id) => titleMap.has(id))
+        .map((id) => ({ id, ...titleMap.get(id)! }));
+      const startedQuests = progress.started
+        .filter((id) => titleMap.has(id))
+        .map((id) => ({ id, ...titleMap.get(id)! }));
+
       return successResult({
         player: progress.playerName,
-        completedCount: progress.completed.length,
-        startedCount: progress.started.length,
-        completed: progress.completed.map((id) => ({
-          id,
-          ...(titleMap.get(id) ?? { title: "Unknown", chapter: "Unknown" }),
-        })),
-        started: progress.started.map((id) => ({
-          id,
-          ...(titleMap.get(id) ?? { title: "Unknown", chapter: "Unknown" }),
-        })),
+        completedCount: completedQuests.length,
+        startedCount: startedQuests.length,
+        completed: completedQuests,
+        started: startedQuests,
       });
     },
   );
