@@ -16,6 +16,7 @@ import oauthRoutes, { oauthCodeQueries, registerWellKnown } from "./routes/oauth
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
+import userRoutes from "./routes/users";
 import { getCachedStats, startStatsCache } from "./stats-cache";
 
 const app = new Hono();
@@ -117,6 +118,7 @@ app.route("/api/notifications", notificationRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
+app.route("/api/users", userRoutes);
 app.route("/oauth", oauthRoutes);
 registerWellKnown(app);
 

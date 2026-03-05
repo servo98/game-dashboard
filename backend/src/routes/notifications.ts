@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { botSettingsQueries } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 const notifications = new Hono();
 
-notifications.post("/error", requireAuth, async (c) => {
+notifications.post("/error", requireAuth, requireApproved, async (c) => {
   const body = await c.req.json<{
     message: string;
     stack?: string;

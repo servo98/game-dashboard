@@ -21,9 +21,10 @@ import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
 import ServiceStatsBar from "../components/ServiceStatsBar";
 import ThemeBanner from "../components/ThemeBanner";
+import UsersTab from "../components/UsersTab";
 import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
-type Tab = "servers" | "bot" | "mcp" | "backups" | "settings";
+type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
@@ -55,7 +56,17 @@ export default function Home() {
   useEffect(() => {
     api
       .me()
-      .then(setUser)
+      .then((u) => {
+        if (u.status === "pending") {
+          navigate("/pending", { replace: true });
+          return;
+        }
+        if (u.status === "rejected") {
+          navigate("/login?error=rejected", { replace: true });
+          return;
+        }
+        setUser(u);
+      })
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
@@ -298,7 +309,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(["servers", "bot", "mcp", "backups", "settings"] as const).map((t) => (
+          {(["servers", "bot", "mcp", "backups", "users", "settings"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -316,7 +327,9 @@ export default function Home() {
                     ? "MCP"
                     : t === "backups"
                       ? "Backups"
-                      : "Settings"}
+                      : t === "users"
+                        ? "Users"
+                        : "Settings"}
             </button>
           ))}
         </div>
@@ -429,6 +442,12 @@ export default function Home() {
         )}
 
         {tab === "backups" && <BackupsTab servers={servers} />}
+
+        {tab === "users" && (
+          <div className="max-w-lg">
+            <UsersTab />
+          </div>
+        )}
 
         {tab === "settings" && (
           <div className="max-w-lg">

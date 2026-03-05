@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
-import { sessionQueries } from "../db";
+import { panelUserQueries, sessionQueries } from "../db";
 import { requireAuth } from "../middleware/auth";
 
 const auth = new Hono<{ Variables: { session: Session } }>();
@@ -59,28 +59,46 @@ auth.get("/callback", async (c) => {
     avatar: string | null;
   };
 
-  // Whitelist check
+  const publicUrl = process.env.PUBLIC_URL ?? "http://localhost:5173";
+  const displayName = user.global_name ?? user.username;
+
+  // Determine panel_users status
   const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (allowedIds.length > 0 && !allowedIds.includes(user.id)) {
-    return c.redirect(
-      `${process.env.PUBLIC_URL ?? "http://localhost:5173"}/login?error=unauthorized`,
-    );
+
+  let panelUser = panelUserQueries.get.get(user.id);
+  let redirectPath = "/";
+
+  if (!panelUser) {
+    if (allowedIds.includes(user.id)) {
+      // Whitelisted user, auto-approve
+      panelUserQueries.insert.run(user.id, displayName, user.avatar, "approved");
+    } else {
+      // New user, pending approval
+      panelUserQueries.insert.run(user.id, displayName, user.avatar, "pending");
+      redirectPath = "/pending";
+    }
+    panelUser = panelUserQueries.get.get(user.id);
+  } else {
+    // Existing user — update profile
+    panelUserQueries.updateProfile.run(displayName, user.avatar, user.id);
+
+    if (panelUser.status === "rejected") {
+      return c.redirect(`${publicUrl}/login?error=rejected`);
+    }
+    if (panelUser.status === "pending") {
+      redirectPath = "/pending";
+    }
+    // approved → redirectPath stays "/"
   }
 
   // Create session
   const token = crypto.randomUUID() + crypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_DURATION;
 
-  sessionQueries.insert.run(
-    token,
-    user.id,
-    user.global_name ?? user.username,
-    user.avatar,
-    expiresAt,
-  );
+  sessionQueries.insert.run(token, user.id, displayName, user.avatar, expiresAt);
 
   // Check for pending OAuth authorization flow
   const oauthReturn = getCookie(c.req.raw, "oauth_return");
@@ -101,12 +119,11 @@ auth.get("/callback", async (c) => {
     }
   }
 
-  // Default: redirect to dashboard
-  const publicUrl = process.env.PUBLIC_URL ?? "http://localhost:5173";
+  // Default: redirect based on status
   return new Response(null, {
     status: 302,
     headers: {
-      Location: `${publicUrl}/`,
+      Location: `${publicUrl}${redirectPath}`,
       "Set-Cookie": `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}`,
     },
   });
@@ -114,12 +131,14 @@ auth.get("/callback", async (c) => {
 
 auth.get("/me", requireAuth, (c) => {
   const session = c.get("session");
+  const panelUser = panelUserQueries.get.get(session.discord_id);
   return c.json({
     discord_id: session.discord_id,
     username: session.username,
     avatar: session.avatar
       ? `https://cdn.discordapp.com/avatars/${session.discord_id}/${session.avatar}.png`
       : null,
+    status: panelUser?.status ?? "pending",
   });
 });
 

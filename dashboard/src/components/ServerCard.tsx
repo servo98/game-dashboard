@@ -13,6 +13,7 @@ import {
   SettingsIcon,
   TrashIcon,
 } from "./Icons";
+import OnlinePlayers from "./OnlinePlayers";
 import StatsBar from "./StatsBar";
 
 type Props = {
@@ -208,6 +209,9 @@ export default memo(function ServerCard({
 
       {/* CPU/RAM stats — only when running */}
       {isRunning && <StatsBar serverId={server.id} hostMemTotalMB={hostMemTotalMB} />}
+
+      {/* Online players — only when running */}
+      {isRunning && <OnlinePlayers serverId={server.id} dockerImage={server.docker_image} />}
 
       {/* Actions */}
       <div className="flex gap-2">

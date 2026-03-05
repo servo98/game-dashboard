@@ -15,7 +15,7 @@ import {
   streamContainerStats,
   watchContainer,
 } from "../docker";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
 
@@ -32,7 +32,7 @@ servers.get("/catalog", (c) => {
 });
 
 // Create a new server from catalog template or custom config
-servers.post("/", requireAuth, async (c) => {
+servers.post("/", requireAuth, requireApproved, async (c) => {
   const body = await c.req.json<{
     template_id?: string;
     id?: string;
@@ -138,7 +138,7 @@ servers.post("/", requireAuth, async (c) => {
 });
 
 // Delete a server — only when stopped
-servers.delete("/:id", requireAuth, async (c) => {
+servers.delete("/:id", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -382,7 +382,7 @@ servers.post("/:id/stop", async (c) => {
 });
 
 // Live logs via Server-Sent Events
-servers.get("/:id/logs", requireAuth, async (c) => {
+servers.get("/:id/logs", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -430,7 +430,7 @@ servers.get("/:id/logs", requireAuth, async (c) => {
 });
 
 // Real-time CPU/RAM stats via Server-Sent Events
-servers.get("/:id/stats", requireAuth, async (c) => {
+servers.get("/:id/stats", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -480,7 +480,7 @@ servers.get("/:id/stats", requireAuth, async (c) => {
 });
 
 // Get editable config for a server
-servers.get("/:id/config", requireAuth, async (c) => {
+servers.get("/:id/config", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -497,7 +497,7 @@ servers.get("/:id/config", requireAuth, async (c) => {
 });
 
 // Update editable config for a server
-servers.put("/:id/config", requireAuth, async (c) => {
+servers.put("/:id/config", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -532,7 +532,7 @@ servers.put("/:id/config", requireAuth, async (c) => {
 });
 
 // Upload custom banner image
-servers.post("/:id/banner", requireAuth, async (c) => {
+servers.post("/:id/banner", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -610,7 +610,7 @@ servers.get("/:id/banner", async (c) => {
 });
 
 // Delete custom banner (reset to default)
-servers.delete("/:id/banner", requireAuth, async (c) => {
+servers.delete("/:id/banner", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -635,7 +635,7 @@ servers.delete("/:id/banner", requireAuth, async (c) => {
 });
 
 // Session history for a server
-servers.get("/:id/history", requireAuth, async (c) => {
+servers.get("/:id/history", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -653,7 +653,7 @@ servers.get("/:id/history", requireAuth, async (c) => {
 });
 
 // Online players (Minecraft only, via RCON "list")
-servers.get("/:id/players", requireAuth, async (c) => {
+servers.get("/:id/players", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -692,7 +692,7 @@ servers.get("/:id/players", requireAuth, async (c) => {
 });
 
 // Execute RCON command (Minecraft only)
-servers.post("/:id/command", requireAuth, async (c) => {
+servers.post("/:id/command", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -723,13 +723,13 @@ servers.post("/:id/command", requireAuth, async (c) => {
 // --- Backup routes ---
 
 // List ALL backups across all servers
-servers.get("/backups/all", requireAuth, (c) => {
+servers.get("/backups/all", requireAuth, requireApproved, (c) => {
   const backups = backupQueries.listAll.all();
   return c.json(backups);
 });
 
 // List backups for a server
-servers.get("/:id/backups", requireAuth, (c) => {
+servers.get("/:id/backups", requireAuth, requireApproved, (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -739,7 +739,7 @@ servers.get("/:id/backups", requireAuth, (c) => {
 });
 
 // Create a backup
-servers.post("/:id/backups", requireAuth, async (c) => {
+servers.post("/:id/backups", requireAuth, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -754,7 +754,7 @@ servers.post("/:id/backups", requireAuth, async (c) => {
 });
 
 // Download a backup
-servers.get("/:id/backups/:bid/download", requireAuth, (c) => {
+servers.get("/:id/backups/:bid/download", requireAuth, requireApproved, (c) => {
   const { id, bid } = c.req.param();
   const backup = backupQueries.getById.get(Number(bid));
   if (!backup || backup.server_id !== id) {
@@ -777,7 +777,7 @@ servers.get("/:id/backups/:bid/download", requireAuth, (c) => {
 });
 
 // Restore a backup
-servers.post("/:id/backups/:bid/restore", requireAuth, async (c) => {
+servers.post("/:id/backups/:bid/restore", requireAuth, requireApproved, async (c) => {
   const { id, bid } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -792,7 +792,7 @@ servers.post("/:id/backups/:bid/restore", requireAuth, async (c) => {
 });
 
 // Delete a backup
-servers.delete("/:id/backups/:bid", requireAuth, (c) => {
+servers.delete("/:id/backups/:bid", requireAuth, requireApproved, (c) => {
   const { id, bid } = c.req.param();
   const backup = backupQueries.getById.get(Number(bid));
   if (!backup || backup.server_id !== id) {

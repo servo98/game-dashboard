@@ -52,6 +52,19 @@ db.exec(`
   );
 `);
 
+// Panel users table (access management)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS panel_users (
+    discord_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    avatar TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    approved_at INTEGER,
+    approved_by TEXT
+  );
+`);
+
 // MCP tokens table
 db.exec(`
   CREATE TABLE IF NOT EXISTS mcp_tokens (
@@ -230,6 +243,34 @@ export type McpToken = {
   label: string;
   created_at: number;
   last_used_at: number | null;
+};
+
+export type PanelUser = {
+  discord_id: string;
+  username: string;
+  avatar: string | null;
+  status: string; // pending | approved | rejected
+  requested_at: number;
+  approved_at: number | null;
+  approved_by: string | null;
+};
+
+export const panelUserQueries = {
+  get: db.query<PanelUser, [string]>("SELECT * FROM panel_users WHERE discord_id = ?"),
+  getAll: db.query<PanelUser, []>("SELECT * FROM panel_users ORDER BY requested_at DESC"),
+  getByStatus: db.query<PanelUser, [string]>(
+    "SELECT * FROM panel_users WHERE status = ? ORDER BY requested_at DESC",
+  ),
+  insert: db.query<void, [string, string, string | null, string]>(
+    "INSERT OR IGNORE INTO panel_users (discord_id, username, avatar, status) VALUES (?, ?, ?, ?)",
+  ),
+  updateStatus: db.query<void, [string, number | null, string | null, string]>(
+    "UPDATE panel_users SET status = ?, approved_at = ?, approved_by = ? WHERE discord_id = ?",
+  ),
+  updateProfile: db.query<void, [string, string | null, string]>(
+    "UPDATE panel_users SET username = ?, avatar = ? WHERE discord_id = ?",
+  ),
+  delete: db.query<void, [string]>("DELETE FROM panel_users WHERE discord_id = ?"),
 };
 
 export const mcpTokenQueries = {

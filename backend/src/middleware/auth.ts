@@ -1,5 +1,5 @@
 import type { Context, Next } from "hono";
-import { sessionQueries } from "../db";
+import { panelUserQueries, sessionQueries } from "../db";
 
 export async function requireAuth(c: Context, next: Next) {
   const token =
@@ -15,6 +15,33 @@ export async function requireAuth(c: Context, next: Next) {
   }
 
   c.set("session", session);
+  await next();
+}
+
+export async function requireApproved(c: Context, next: Next) {
+  const session = c.get("session") as { discord_id: string } | undefined;
+  if (!session) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let user = panelUserQueries.get.get(session.discord_id);
+
+  // Fallback: if not in panel_users but IS in ALLOWED_DISCORD_IDS, auto-insert as approved
+  if (!user) {
+    const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (allowedIds.includes(session.discord_id)) {
+      panelUserQueries.insert.run(session.discord_id, session.discord_id, null, "approved");
+      user = panelUserQueries.get.get(session.discord_id);
+    }
+  }
+
+  if (!user || user.status !== "approved") {
+    return c.json({ error: "Access pending approval" }, 403);
+  }
+
   await next();
 }
 

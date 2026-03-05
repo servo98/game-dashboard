@@ -5,6 +5,7 @@ import { api } from "./api";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Pending from "./pages/Pending";
 import Status from "./pages/Status";
 import "./index.css";
 
@@ -47,6 +48,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/pending" element={<Pending />} />
           <Route path="/status" element={<Status />} />
           <Route path="/" element={<Home />} />
           <Route path="*" element={<Navigate to="/" replace />} />

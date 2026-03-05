@@ -1,7 +1,7 @@
 import type { Context, Next } from "hono";
 import { Hono } from "hono";
 import { botSettingsQueries } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 /** Allow either dashboard session OR bot API key */
 async function requireAuthOrBotKey(c: Context, next: Next) {
@@ -41,7 +41,7 @@ botSettings.get("/settings", requireAuthOrBotKey, async (c) => {
   });
 });
 
-botSettings.put("/settings", requireAuth, async (c) => {
+botSettings.put("/settings", requireAuth, requireApproved, async (c) => {
   const body = await c.req.json<Record<string, string | null>>();
 
   for (const key of CHANNEL_KEYS) {
@@ -58,7 +58,7 @@ botSettings.put("/settings", requireAuth, async (c) => {
 });
 
 // List text channels from Discord guild
-botSettings.get("/channels", requireAuth, async (c) => {
+botSettings.get("/channels", requireAuth, requireApproved, async (c) => {
   const token = process.env.DISCORD_BOT_TOKEN;
   const guildId = process.env.DISCORD_GUILD_ID;
 

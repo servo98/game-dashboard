@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { mcpTokenQueries, type Session } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 const mcpTokens = new Hono();
 
@@ -10,7 +10,7 @@ function getSession(c: { get(key: string): unknown }): Session {
 }
 
 /** List tokens belonging to the current user */
-mcpTokens.get("/", requireAuth, (c) => {
+mcpTokens.get("/", requireAuth, requireApproved, (c) => {
   const session = getSession(c);
   const tokens = mcpTokenQueries.listByDiscordId.all(session.discord_id);
 
@@ -28,7 +28,7 @@ mcpTokens.get("/", requireAuth, (c) => {
 });
 
 /** Generate a new MCP token */
-mcpTokens.post("/", requireAuth, async (c) => {
+mcpTokens.post("/", requireAuth, requireApproved, async (c) => {
   const session = getSession(c);
   const body = await c.req.json<{
     player_name: string;
@@ -54,7 +54,7 @@ mcpTokens.post("/", requireAuth, async (c) => {
 });
 
 /** Revoke a token */
-mcpTokens.delete("/:id", requireAuth, (c) => {
+mcpTokens.delete("/:id", requireAuth, requireApproved, (c) => {
   const session = getSession(c);
   const id = Number(c.req.param("id"));
 

@@ -5,7 +5,9 @@ import { api } from "../api";
 export default function Login() {
   const navigate = useNavigate();
   const params = new URLSearchParams(window.location.search);
-  const isUnauthorized = params.get("error") === "unauthorized";
+  const errorType = params.get("error");
+  const isUnauthorized = errorType === "unauthorized";
+  const isRejected = errorType === "rejected";
 
   // If already logged in, redirect to home
   useEffect(() => {
@@ -63,6 +65,12 @@ export default function Login() {
         {isUnauthorized && (
           <p className="text-red-400 text-xs text-center bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
             Tu cuenta Discord no tiene acceso a este panel.
+          </p>
+        )}
+
+        {isRejected && (
+          <p className="text-red-400 text-xs text-center bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+            Tu solicitud de acceso fue rechazada. Contacta a un administrador.
           </p>
         )}
 

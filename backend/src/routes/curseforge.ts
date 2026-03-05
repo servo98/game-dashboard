@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 const curseforge = new Hono<{ Variables: { session: Session } }>();
 
-curseforge.get("/search", requireAuth, async (c) => {
+curseforge.get("/search", requireAuth, requireApproved, async (c) => {
   const apiKey = process.env.CF_API_KEY;
   if (!apiKey) {
     return c.json({ error: "CurseForge API key not configured" }, 501);

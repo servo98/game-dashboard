@@ -2,7 +2,7 @@ import type { Context, Next } from "hono";
 import { Hono } from "hono";
 import type { Session } from "../db";
 import { getAllPanelSettings, panelSettingsQueries } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth } from "../middleware/auth";
 
 async function requireAuthOrBotKey(c: Context, next: Next) {
   const botKey = c.req.header("X-Bot-Api-Key");
@@ -18,7 +18,7 @@ settings.get("/", requireAuthOrBotKey, (c) => {
   return c.json(getAllPanelSettings());
 });
 
-settings.put("/", requireAuth, async (c) => {
+settings.put("/", requireAuth, requireApproved, async (c) => {
   const body = await c.req.json<Record<string, string | number>>();
 
   const allowedKeys = [

@@ -18,6 +18,17 @@ export type User = {
   discord_id: string;
   username: string;
   avatar: string | null;
+  status: "pending" | "approved" | "rejected";
+};
+
+export type PanelUser = {
+  discord_id: string;
+  username: string;
+  avatar: string | null;
+  status: "pending" | "approved" | "rejected";
+  requested_at: number;
+  approved_at: number | null;
+  approved_by: string | null;
 };
 
 export type ContainerStats = {
@@ -319,6 +330,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  /** User management */
+  listUsers: () => request<PanelUser[]>("/users"),
+  approveUser: (id: string) => request<{ ok: boolean }>(`/users/${id}/approve`, { method: "PUT" }),
+  rejectUser: (id: string) => request<{ ok: boolean }>(`/users/${id}/reject`, { method: "PUT" }),
+  deleteUser: (id: string) => request<{ ok: boolean }>(`/users/${id}`, { method: "DELETE" }),
 
   /** MCP tokens */
   listMcpTokens: () => request<McpTokenRecord[]>("/mcp-tokens"),
