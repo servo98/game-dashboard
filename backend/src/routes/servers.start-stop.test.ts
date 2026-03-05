@@ -45,6 +45,33 @@ vi.mock("../db", () => ({
     set: { run: vi.fn() },
     getAll: { all: vi.fn(() => []) },
   },
+  panelUserQueries: {
+    get: {
+      get: vi.fn(() => ({
+        discord_id: "123456",
+        username: "testuser",
+        avatar: null,
+        status: "approved",
+        requested_at: 0,
+        approved_at: 0,
+        approved_by: null,
+      })),
+    },
+    getAll: { all: vi.fn(() => []) },
+    getByStatus: { all: vi.fn(() => []) },
+    insert: { run: vi.fn() },
+    updateStatus: { run: vi.fn() },
+    updateProfile: { run: vi.fn() },
+    delete: { run: vi.fn() },
+  },
+  mcpTokenQueries: {
+    getByToken: { get: vi.fn() },
+    listByDiscordId: { all: vi.fn(() => []) },
+    listAll: { all: vi.fn(() => []) },
+    insert: { run: vi.fn() },
+    deleteById: { run: vi.fn() },
+    updateLastUsed: { run: vi.fn() },
+  },
   getPanelSetting: vi.fn(() => "6"),
   getAllPanelSettings: vi.fn(() => ({})),
 }));

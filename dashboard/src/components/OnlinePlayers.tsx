@@ -9,7 +9,7 @@ type Props = {
 export default function OnlinePlayers({ serverId, dockerImage }: Props) {
   const [data, setData] = useState<PlayersResponse | null>(null);
 
-  const isMinecraft = dockerImage.includes("itzg/minecraft-server");
+  const isMinecraft = dockerImage?.includes("itzg/minecraft-server") ?? false;
 
   useEffect(() => {
     if (!isMinecraft) return;

@@ -7,6 +7,11 @@ vi.mock("./StatsBar", () => ({
   default: () => <div data-testid="stats-bar" />,
 }));
 
+// Mock OnlinePlayers since it polls the API
+vi.mock("./OnlinePlayers", () => ({
+  default: () => <div data-testid="online-players" />,
+}));
+
 // Mock api for backup/history calls
 vi.mock("../api", () => ({
   api: {
@@ -25,6 +30,7 @@ const stoppedServer: GameServer = {
   id: "minecraft",
   name: "Minecraft",
   game_type: "sandbox",
+  docker_image: "itzg/minecraft-server:java21",
   port: 25565,
   status: "stopped",
 };
@@ -33,6 +39,7 @@ const runningServer: GameServer = {
   id: "minecraft",
   name: "Minecraft",
   game_type: "sandbox",
+  docker_image: "itzg/minecraft-server:java21",
   port: 25565,
   status: "running",
 };
