@@ -50,6 +50,7 @@ const defaultProps = {
   onStop: vi.fn(),
   onViewLogs: vi.fn(),
   onEditConfig: vi.fn(),
+  onOpenFiles: vi.fn(),
   onDelete: vi.fn(),
   loading: false,
   hostDomain: "example.com",
@@ -116,6 +117,24 @@ describe("ServerCard", () => {
     expect(configBtn).toBeInTheDocument();
     fireEvent.click(configBtn);
     expect(defaultProps.onEditConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows 'Starting...' status when joinable is 'starting'", () => {
+    const startingServer: GameServer = { ...runningServer, joinable: "starting" };
+    render(<ServerCard server={startingServer} {...defaultProps} isActive />);
+    expect(screen.getByText("Starting...")).toBeInTheDocument();
+  });
+
+  it("shows 'Ready' status when joinable is 'joinable'", () => {
+    const readyServer: GameServer = { ...runningServer, joinable: "joinable" };
+    render(<ServerCard server={readyServer} {...defaultProps} isActive />);
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+  });
+
+  it("shows 'Running' status when joinable is null (non-MC server)", () => {
+    const noJoinableServer: GameServer = { ...runningServer, joinable: null };
+    render(<ServerCard server={noJoinableServer} {...defaultProps} isActive />);
+    expect(screen.getByText("Running")).toBeInTheDocument();
   });
 
   it("delete requires double-click confirmation", () => {

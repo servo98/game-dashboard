@@ -9,6 +9,7 @@ export type GameServer = {
   docker_image: string;
   port: number;
   status: ServerStatus;
+  joinable?: "starting" | "joinable" | null;
   banner_path?: string | null;
   accent_color?: string | null;
   icon?: string | null;

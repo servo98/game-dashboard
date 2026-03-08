@@ -4,15 +4,17 @@ import { api, type PlayersResponse } from "../api";
 type Props = {
   serverId: string;
   dockerImage: string;
+  joinable?: "starting" | "joinable" | null;
 };
 
-export default function OnlinePlayers({ serverId, dockerImage }: Props) {
+export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props) {
   const [data, setData] = useState<PlayersResponse | null>(null);
 
   const isMinecraft = dockerImage?.includes("itzg/minecraft-server") ?? false;
+  const isReady = joinable === "joinable";
 
   useEffect(() => {
-    if (!isMinecraft) return;
+    if (!isMinecraft || !isReady) return;
 
     let mounted = true;
 
@@ -31,9 +33,9 @@ export default function OnlinePlayers({ serverId, dockerImage }: Props) {
       mounted = false;
       clearInterval(interval);
     };
-  }, [serverId, isMinecraft]);
+  }, [serverId, isMinecraft, isReady]);
 
-  if (!isMinecraft || !data) return null;
+  if (!isMinecraft || !isReady || !data) return null;
 
   return (
     <div className="flex items-center gap-2 text-xs text-gray-400">

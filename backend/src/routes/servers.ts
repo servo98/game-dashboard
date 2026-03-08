@@ -15,6 +15,7 @@ import {
   streamContainerStats,
   watchContainer,
 } from "../docker";
+import { beginLogWatching, getJoinableStatus, stopJoinableWatcher } from "../joinable-status";
 import { requireApproved, requireAuth } from "../middleware/auth";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
@@ -174,17 +175,21 @@ servers.delete("/:id", requireAuth, requireApproved, async (c) => {
 servers.get("/", async (c) => {
   const rows = serverQueries.getAll.all();
   const result = await Promise.all(
-    rows.map(async (row) => ({
-      id: row.id,
-      name: row.name,
-      game_type: row.game_type,
-      docker_image: row.docker_image,
-      port: row.port,
-      status: await getContainerStatus(row.id),
-      banner_path: row.banner_path ?? null,
-      accent_color: row.accent_color ?? null,
-      icon: row.icon ?? null,
-    })),
+    rows.map(async (row) => {
+      const status = await getContainerStatus(row.id);
+      return {
+        id: row.id,
+        name: row.name,
+        game_type: row.game_type,
+        docker_image: row.docker_image,
+        port: row.port,
+        status,
+        joinable: status === "running" ? getJoinableStatus(row.id) : null,
+        banner_path: row.banner_path ?? null,
+        accent_color: row.accent_color ?? null,
+        icon: row.icon ?? null,
+      };
+    }),
   );
   return c.json(result);
 });
@@ -282,6 +287,7 @@ servers.post("/:id/start", async (c) => {
     // Mark any currently running server's session as replaced
     const active = await getActiveContainer();
     if (active) {
+      stopJoinableWatcher(active.name);
       markIntentionalStop(active.name);
       serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
     }
@@ -290,6 +296,9 @@ servers.post("/:id/start", async (c) => {
 
     // Record new session
     serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
+
+    // Watch logs for "Done" line to detect when server is joinable
+    beginLogWatching(server.id);
 
     // Watch for unexpected stops (crashes)
     const serverName = server.name;
@@ -366,6 +375,7 @@ servers.post("/:id/stop", async (c) => {
   if (id === "active") {
     const active = await getActiveContainer();
     if (!active) return c.json({ ok: true, message: "No server running" });
+    stopJoinableWatcher(active.name);
     markIntentionalStop(active.name);
     await stopGameContainer(active.name);
     serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", active.name);
@@ -376,6 +386,7 @@ servers.post("/:id/stop", async (c) => {
   if (!server) return c.json({ error: "Server not found" }, 404);
 
   try {
+    stopJoinableWatcher(id);
     markIntentionalStop(id);
     await stopGameContainer(id);
     serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", id);

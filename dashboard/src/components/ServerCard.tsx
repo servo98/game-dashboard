@@ -33,8 +33,18 @@ type Props = {
 
 const STATUS_COLOR: Record<string, string> = {
   running: "bg-green-500",
+  starting: "bg-yellow-500 animate-pulse",
+  joinable: "bg-green-500",
   stopped: "bg-gray-500",
   missing: "bg-gray-500",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  running: "Running",
+  starting: "Starting...",
+  joinable: "Ready",
+  stopped: "Stopped",
+  missing: "Stopped",
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -69,6 +79,8 @@ export default memo(function ServerCard({
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
 
   const isRunning = server.status === "running";
+  // Derive effective status: if running, use joinable sub-state when available
+  const effectiveStatus = isRunning && server.joinable ? server.joinable : server.status;
   const address = connectAddress(server.game_type, server.port, hostDomain);
 
   function handleCopy() {
@@ -183,10 +195,10 @@ export default memo(function ServerCard({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_COLOR[server.status]}`}
+            className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_COLOR[effectiveStatus] ?? STATUS_COLOR.stopped}`}
           />
-          <span className="text-xs text-gray-400 capitalize">
-            {server.status === "missing" ? "Stopped" : server.status}
+          <span className="text-xs text-gray-400">
+            {STATUS_LABEL[effectiveStatus] ?? "Stopped"}
           </span>
         </div>
       </div>
@@ -210,8 +222,14 @@ export default memo(function ServerCard({
       {/* CPU/RAM stats — only when running */}
       {isRunning && <StatsBar serverId={server.id} hostMemTotalMB={hostMemTotalMB} />}
 
-      {/* Online players — only when running */}
-      {isRunning && <OnlinePlayers serverId={server.id} dockerImage={server.docker_image} />}
+      {/* Online players — only when running and joinable */}
+      {isRunning && (
+        <OnlinePlayers
+          serverId={server.id}
+          dockerImage={server.docker_image}
+          joinable={server.joinable}
+        />
+      )}
 
       {/* Actions */}
       <div className="flex gap-2">
