@@ -1,16 +1,6 @@
-import type { Context, Next } from "hono";
 import { Hono } from "hono";
 import { botSettingsQueries } from "../db";
-import { requireApproved, requireAuth } from "../middleware/auth";
-
-/** Allow either dashboard session OR bot API key */
-async function requireAuthOrBotKey(c: Context, next: Next) {
-  const botKey = c.req.header("X-Bot-Api-Key");
-  if (botKey && botKey === process.env.BOT_API_KEY) {
-    return next();
-  }
-  return requireAuth(c, next);
-}
+import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
 
 const botSettings = new Hono();
 

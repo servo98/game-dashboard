@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
 import { panelUserQueries, sessionQueries } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { getCookie, requireAuth } from "../middleware/auth";
 
 const auth = new Hono<{ Variables: { session: Session } }>();
 
@@ -156,11 +156,5 @@ auth.post("/logout", requireAuth, (c) => {
     },
   });
 });
-
-function getCookie(req: Request, name: string): string | undefined {
-  const cookie = req.headers.get("cookie") ?? "";
-  const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match?.[1];
-}
 
 export default auth;

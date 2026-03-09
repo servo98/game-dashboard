@@ -51,6 +51,7 @@ export default function Home() {
   const [fileManagerId, setFileManagerId] = useState<string | null>(null);
   const [hostDomain, setHostDomain] = useState("aypapol.com");
   const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
+  const [sseConnected, setSseConnected] = useState(true);
 
   // Auth guard
   useEffect(() => {
@@ -122,9 +123,14 @@ export default function Home() {
         if (data.service) {
           setServiceStats((prev) => ({ ...prev, [data.service]: data }));
         }
+        setSseConnected(true);
       } catch {
         // ignore
       }
+    };
+
+    es.onerror = () => {
+      setSseConnected(false);
     };
 
     return () => es.close();
@@ -299,6 +305,14 @@ export default function Home() {
           loading={!!activeServer && loadingId === activeServer.id}
           onStop={handleStop}
         />
+
+        {/* SSE disconnected indicator */}
+        {!sseConnected && (
+          <div className="mb-4 bg-yellow-950/40 border border-yellow-800 rounded-xl px-4 py-2 text-xs text-yellow-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+            Live stats disconnected — reconnecting...
+          </div>
+        )}
 
         {/* Error */}
         {error && (

@@ -1,16 +1,7 @@
-import type { Context, Next } from "hono";
 import { Hono } from "hono";
 import type { Session } from "../db";
 import { getAllPanelSettings, panelSettingsQueries } from "../db";
-import { requireApproved, requireAuth } from "../middleware/auth";
-
-async function requireAuthOrBotKey(c: Context, next: Next) {
-  const botKey = c.req.header("X-Bot-Api-Key");
-  if (botKey && botKey === process.env.BOT_API_KEY) {
-    return next();
-  }
-  return requireAuth(c, next);
-}
+import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
 
 const settings = new Hono<{ Variables: { session: Session } }>();
 

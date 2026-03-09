@@ -89,18 +89,85 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// ─── Rate limiting ──────────────────────────────────────────────────────────
+
+const registerRateLimit = {
+  count: 0,
+  windowStart: Date.now(),
+  maxPerMinute: 5,
+};
+
+function checkRegisterRateLimit(): boolean {
+  const now = Date.now();
+  if (now - registerRateLimit.windowStart > 60_000) {
+    registerRateLimit.count = 0;
+    registerRateLimit.windowStart = now;
+  }
+  registerRateLimit.count++;
+  return registerRateLimit.count <= registerRateLimit.maxPerMinute;
+}
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 const oauth = new Hono();
 
 // Dynamic Client Registration (RFC 7591) — required by MCP spec
 oauth.post("/register", async (c) => {
-  const body = (await c.req.json()) as {
-    redirect_uris?: string[];
-    client_name?: string;
-  };
-  const redirectUris: string[] = body.redirect_uris ?? [];
+  if (!checkRegisterRateLimit()) {
+    return c.json(
+      {
+        error: "rate_limit_exceeded",
+        error_description: "Too many registrations. Try again later.",
+      },
+      429,
+    );
+  }
+
+  let body: { redirect_uris?: string[]; client_name?: string };
+  try {
+    body = (await c.req.json()) as { redirect_uris?: string[]; client_name?: string };
+  } catch {
+    return c.json({ error: "invalid_request", error_description: "Invalid JSON body" }, 400);
+  }
+
   const clientName = body.client_name ?? "";
+  const redirectUris: string[] = body.redirect_uris ?? [];
+
+  // Input validation
+  if (clientName.length > 200) {
+    return c.json(
+      {
+        error: "invalid_client_metadata",
+        error_description: "client_name must be at most 200 characters",
+      },
+      400,
+    );
+  }
+  if (redirectUris.length > 5) {
+    return c.json(
+      { error: "invalid_client_metadata", error_description: "At most 5 redirect_uris allowed" },
+      400,
+    );
+  }
+  for (const uri of redirectUris) {
+    if (uri.length > 2000) {
+      return c.json(
+        {
+          error: "invalid_client_metadata",
+          error_description: "Each redirect_uri must be at most 2000 characters",
+        },
+        400,
+      );
+    }
+    try {
+      new URL(uri);
+    } catch {
+      return c.json(
+        { error: "invalid_redirect_uri", error_description: `Invalid URL: ${uri}` },
+        400,
+      );
+    }
+  }
 
   const clientId = crypto.randomUUID();
   const clientSecret = crypto.randomUUID();

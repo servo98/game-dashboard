@@ -16,7 +16,7 @@ import {
   watchContainer,
 } from "../docker";
 import { beginLogWatching, getJoinableStatus, stopJoinableWatcher } from "../joinable-status";
-import { requireApproved, requireAuth } from "../middleware/auth";
+import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
 
@@ -195,20 +195,7 @@ servers.get("/", async (c) => {
 });
 
 // Start a game server — auth required (dashboard) OR bot key
-servers.post("/:id/start", async (c) => {
-  const botKey = c.req.header("X-Bot-Api-Key");
-  const isBotRequest = botKey && botKey === process.env.BOT_API_KEY;
-
-  if (!isBotRequest) {
-    const token =
-      c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
-    if (!token) return c.json({ error: "Unauthorized" }, 401);
-
-    const { sessionQueries: sq } = await import("../db");
-    const session = sq.get.get(token);
-    if (!session) return c.json({ error: "Unauthorized" }, 401);
-  }
-
+servers.post("/:id/start", requireAuthOrBotKey, requireApproved, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -356,19 +343,7 @@ servers.post("/:id/start", async (c) => {
 });
 
 // Stop active game server
-servers.post("/:id/stop", async (c) => {
-  const botKey = c.req.header("X-Bot-Api-Key");
-  const isBotRequest = botKey && botKey === process.env.BOT_API_KEY;
-
-  if (!isBotRequest) {
-    const token =
-      c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
-    if (!token) return c.json({ error: "Unauthorized" }, 401);
-    const { sessionQueries: sq } = await import("../db");
-    const session = sq.get.get(token);
-    if (!session) return c.json({ error: "Unauthorized" }, 401);
-  }
-
+servers.post("/:id/stop", requireAuthOrBotKey, requireApproved, async (c) => {
   const { id } = c.req.param();
 
   // Special "active" pseudo-id
@@ -822,11 +797,5 @@ servers.delete("/:id/backups/:bid", requireAuth, requireApproved, (c) => {
     return c.json({ error: (err as Error).message }, 500);
   }
 });
-
-function getCookie(req: Request, name: string): string | undefined {
-  const cookie = req.headers.get("cookie") ?? "";
-  const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match?.[1];
-}
 
 export default servers;

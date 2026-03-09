@@ -75,7 +75,7 @@ export function watchContainer(serverId: string, onCrash: () => void): void {
         activeWatchers.delete(serverId);
       }
     }
-  }, 30_000);
+  }, 10_000);
 
   activeWatchers.set(serverId, interval);
 }
@@ -114,11 +114,22 @@ export async function startGameContainer(
     // Container doesn't exist, that's fine
   }
 
-  // Resolve ${VAR} placeholders from process.env
+  // Resolve ${VAR} placeholders from process.env — only allowlisted vars
+  // to prevent exfiltration of secrets like DISCORD_BOT_TOKEN, BOT_API_KEY, etc.
+  const ENV_EXPANSION_ALLOWLIST = new Set([
+    "CF_API_KEY",
+    "VALHEIM_SERVER_PASS",
+    "MINECRAFT_SERVER_PASS",
+    "RCON_PASSWORD",
+    "SERVER_PASS",
+  ]);
+
   const resolvedEnv = Object.fromEntries(
     Object.entries(envVars).map(([k, v]) => [
       k,
-      v.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? ""),
+      v.replace(/\$\{(\w+)\}/g, (_, name) =>
+        ENV_EXPANSION_ALLOWLIST.has(name) ? (process.env[name] ?? "") : "",
+      ),
     ]),
   );
 
@@ -134,7 +145,7 @@ export async function startGameContainer(
     const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
     try {
       mkdirSync(accessPath, { recursive: true });
-      chmodSync(accessPath, 0o777);
+      chmodSync(accessPath, 0o775);
     } catch {
       // best-effort
     }

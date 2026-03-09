@@ -10,6 +10,15 @@ import * as start from "./commands/start";
 import * as status from "./commands/status";
 import * as stop from "./commands/stop";
 
+// --- Startup env validation ---
+const REQUIRED_ENV = ["DISCORD_BOT_TOKEN", "BACKEND_URL", "BOT_API_KEY"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`Missing required env var: ${key}`);
+    process.exit(1);
+  }
+}
+
 type Command = {
   data: { name: string };
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
@@ -98,4 +107,7 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-client.login(process.env.DISCORD_BOT_TOKEN);
+client.login(process.env.DISCORD_BOT_TOKEN).catch((err) => {
+  console.error("Failed to login to Discord:", err);
+  process.exit(1);
+});

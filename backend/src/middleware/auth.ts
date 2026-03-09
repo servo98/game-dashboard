@@ -19,6 +19,11 @@ export async function requireAuth(c: Context, next: Next) {
 }
 
 export async function requireApproved(c: Context, next: Next) {
+  // Bot key requests are trusted — skip approval check
+  if (c.get("isBotRequest")) {
+    return next();
+  }
+
   const session = c.get("session") as { discord_id: string } | undefined;
   if (!session) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -51,6 +56,17 @@ export async function requireBotKey(c: Context, next: Next) {
     return c.json({ error: "Forbidden" }, 403);
   }
   await next();
+}
+
+/** Allow either dashboard session OR bot API key.
+ *  Bot key bypasses session check entirely (trusted service). */
+export async function requireAuthOrBotKey(c: Context, next: Next) {
+  const botKey = c.req.header("X-Bot-Api-Key");
+  if (botKey && botKey === process.env.BOT_API_KEY) {
+    c.set("isBotRequest", true);
+    return next();
+  }
+  return requireAuth(c, next);
 }
 
 export function getCookie(req: Request, name: string): string | undefined {
