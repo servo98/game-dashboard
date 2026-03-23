@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { mcpTokenQueries, type Session } from "../db";
-import { requireApproved, requireAuth } from "../middleware/auth";
+import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
 
 const mcpTokens = new Hono();
 
@@ -9,8 +9,8 @@ function getSession(c: { get(key: string): unknown }): Session {
   return c.get("session") as Session;
 }
 
-/** List tokens belonging to the current user */
-mcpTokens.get("/", requireAuth, requireApproved, (c) => {
+/** List tokens belonging to the current user (admin only) */
+mcpTokens.get("/", requireAuth, requireApproved, requireAdmin, (c) => {
   const session = getSession(c);
   const tokens = mcpTokenQueries.listByDiscordId.all(session.discord_id);
 
@@ -27,8 +27,8 @@ mcpTokens.get("/", requireAuth, requireApproved, (c) => {
   );
 });
 
-/** Generate a new MCP token */
-mcpTokens.post("/", requireAuth, requireApproved, async (c) => {
+/** Generate a new MCP token (admin only) */
+mcpTokens.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   const session = getSession(c);
   const body = await c.req.json<{
     player_name: string;
@@ -53,8 +53,8 @@ mcpTokens.post("/", requireAuth, requireApproved, async (c) => {
   return c.json({ token, player_name: body.player_name.trim() });
 });
 
-/** Revoke a token */
-mcpTokens.delete("/:id", requireAuth, requireApproved, (c) => {
+/** Revoke a token (admin only) */
+mcpTokens.delete("/:id", requireAuth, requireApproved, requireAdmin, (c) => {
   const session = getSession(c);
   const id = Number(c.req.param("id"));
 

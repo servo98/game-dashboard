@@ -26,6 +26,9 @@ import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
 type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users";
 
+const ADMIN_TABS: Tab[] = ["servers", "bot", "mcp", "backups", "users", "settings"];
+const USER_TABS: Tab[] = ["servers"];
+
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
 export default function Home() {
@@ -71,13 +74,13 @@ export default function Home() {
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
-  // Fetch host domain from settings
+  // Fetch host domain from settings (settings GET is public via bot key route)
   useEffect(() => {
     api
       .getSettings()
       .then((s) => setHostDomain(s.host_domain))
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   // Fetch game catalog for icons
   useEffect(() => {
@@ -112,8 +115,10 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchServers]);
 
-  // Multiplexed service stats SSE
+  // Multiplexed service stats SSE (admin only)
   useEffect(() => {
+    if (user?.role !== "admin") return;
+
     const es = createAllServiceStatsStream();
     serviceStatsRef.current = es;
 
@@ -134,7 +139,7 @@ export default function Home() {
     };
 
     return () => es.close();
-  }, []);
+  }, [user?.role]);
 
   const handleStart = useCallback(
     async (id: string) => {
@@ -234,6 +239,7 @@ export default function Home() {
     () => servers.find((s) => s.status === "running") ?? null,
     [servers],
   );
+  const isAdmin = user?.role === "admin";
   const editConfigServer = editConfigId ? servers.find((s) => s.id === editConfigId) : null;
 
   // Dynamic theme based on active game
@@ -295,8 +301,8 @@ export default function Home() {
 
       {/* Main */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
-        {/* Host stats */}
-        <HostStatsBar onMemTotal={setHostMemTotalMB} />
+        {/* Host stats (admin only) */}
+        {isAdmin && <HostStatsBar onMemTotal={setHostMemTotalMB} />}
 
         {/* Hero banner */}
         <ThemeBanner
@@ -323,7 +329,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(["servers", "bot", "mcp", "backups", "users", "settings"] as const).map((t) => (
+          {(isAdmin ? ADMIN_TABS : USER_TABS).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -355,12 +361,14 @@ export default function Home() {
               <span className="text-sm text-gray-400">
                 {servers.length} server{servers.length !== 1 ? "s" : ""}
               </span>
-              <button
-                onClick={() => setShowGameStore(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                + Add Game
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowGameStore(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  + Add Game
+                </button>
+              )}
             </div>
 
             {/* Server grid */}
@@ -385,6 +393,7 @@ export default function Home() {
                     hostMemTotalMB={hostMemTotalMB}
                     hostDomain={hostDomain}
                     iconUrl={server.icon || gameIcons[server.id]}
+                    isAdmin={isAdmin}
                     onStart={handleStart}
                     onStop={handleStop}
                     onDelete={handleDelete}
@@ -396,50 +405,52 @@ export default function Home() {
               </div>
             )}
 
-            {/* Infrastructure */}
-            <div className="mt-10">
-              <h2 className="text-lg font-semibold text-gray-200 mb-4">Infrastructure</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {INFRA_SERVICES.map((svc) => (
-                  <div
-                    key={svc}
-                    className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-200 capitalize">{svc}</span>
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() =>
-                            setLogTarget({
-                              title: svc,
-                              factory: () => createServiceLogStream(svc),
-                            })
-                          }
-                          className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
-                        >
-                          Logs
-                        </button>
-                        {(svc === "backend" || svc === "bot") && (
+            {/* Infrastructure (admin only) */}
+            {isAdmin && (
+              <div className="mt-10">
+                <h2 className="text-lg font-semibold text-gray-200 mb-4">Infrastructure</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {INFRA_SERVICES.map((svc) => (
+                    <div
+                      key={svc}
+                      className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-200 capitalize">{svc}</span>
+                        <div className="flex gap-1.5">
                           <button
-                            onClick={() => handleRestartService(svc)}
-                            disabled={restartingService === svc}
-                            className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() =>
+                              setLogTarget({
+                                title: svc,
+                                factory: () => createServiceLogStream(svc),
+                              })
+                            }
+                            className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
                           >
-                            {restartingService === svc ? (
-                              <span className="inline-block animate-spin">⟳</span>
-                            ) : (
-                              "⟳ Restart"
-                            )}
+                            Logs
                           </button>
-                        )}
+                          {(svc === "backend" || svc === "bot") && (
+                            <button
+                              onClick={() => handleRestartService(svc)}
+                              disabled={restartingService === svc}
+                              className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {restartingService === svc ? (
+                                <span className="inline-block animate-spin">⟳</span>
+                              ) : (
+                                "⟳ Restart"
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      <ServiceStatsBar stats={serviceStats[svc] ?? null} />
                     </div>
-                    <ServiceStatsBar stats={serviceStats[svc] ?? null} />
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {restartMsg && <p className="mt-2 text-xs text-green-400">{restartMsg}</p>}
               </div>
-              {restartMsg && <p className="mt-2 text-xs text-green-400">{restartMsg}</p>}
-            </div>
+            )}
           </>
         )}
 
@@ -457,11 +468,7 @@ export default function Home() {
 
         {tab === "backups" && <BackupsTab servers={servers} />}
 
-        {tab === "users" && (
-          <div className="max-w-lg">
-            <UsersTab />
-          </div>
-        )}
+        {tab === "users" && <UsersTab />}
 
         {tab === "settings" && (
           <div className="max-w-lg">

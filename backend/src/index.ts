@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
 import fileRoutes from "./routes/files";
+import inviteRoutes from "./routes/invites";
 import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
@@ -119,6 +120,7 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
 app.route("/api/users", userRoutes);
+app.route("/api/invites", inviteRoutes);
 app.route("/oauth", oauthRoutes);
 registerWellKnown(app);
 

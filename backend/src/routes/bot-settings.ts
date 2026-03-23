@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { botSettingsQueries } from "../db";
-import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
+import {
+  requireAdmin,
+  requireApproved,
+  requireAuth,
+  requireAuthOrBotKey,
+} from "../middleware/auth";
 
 const botSettings = new Hono();
 
@@ -31,7 +36,7 @@ botSettings.get("/settings", requireAuthOrBotKey, async (c) => {
   });
 });
 
-botSettings.put("/settings", requireAuth, requireApproved, async (c) => {
+botSettings.put("/settings", requireAuth, requireApproved, requireAdmin, async (c) => {
   const body = await c.req.json<Record<string, string | null>>();
 
   for (const key of CHANNEL_KEYS) {
@@ -47,8 +52,8 @@ botSettings.put("/settings", requireAuth, requireApproved, async (c) => {
   return c.json({ ok: true });
 });
 
-// List text channels from Discord guild
-botSettings.get("/channels", requireAuth, requireApproved, async (c) => {
+// List text channels from Discord guild (admin only)
+botSettings.get("/channels", requireAuth, requireApproved, requireAdmin, async (c) => {
   const token = process.env.DISCORD_BOT_TOKEN;
   const guildId = process.env.DISCORD_GUILD_ID;
 

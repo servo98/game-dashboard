@@ -4,7 +4,13 @@ import { execRconCommand } from "../adapters/minecraft/rcon";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
-import { backupQueries, botSettingsQueries, serverQueries, serverSessionQueries } from "../db";
+import {
+  backupQueries,
+  botSettingsQueries,
+  serverQueries,
+  serverSessionQueries,
+  userServerAccessQueries,
+} from "../db";
 import {
   getActiveContainer,
   getContainerStatus,
@@ -16,7 +22,13 @@ import {
   watchContainer,
 } from "../docker";
 import { beginLogWatching, getJoinableStatus, stopJoinableWatcher } from "../joinable-status";
-import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
+import {
+  requireAdmin,
+  requireApproved,
+  requireAuth,
+  requireAuthOrBotKey,
+  requireServerAccess,
+} from "../middleware/auth";
 
 const servers = new Hono<{ Variables: { session: Session } }>();
 
@@ -32,8 +44,8 @@ servers.get("/catalog", (c) => {
   return c.json(GAME_CATALOG);
 });
 
-// Create a new server from catalog template or custom config
-servers.post("/", requireAuth, requireApproved, async (c) => {
+// Create a new server from catalog template or custom config (admin only)
+servers.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   const body = await c.req.json<{
     template_id?: string;
     id?: string;
@@ -138,8 +150,8 @@ servers.post("/", requireAuth, requireApproved, async (c) => {
   }
 });
 
-// Delete a server — only when stopped
-servers.delete("/:id", requireAuth, requireApproved, async (c) => {
+// Delete a server — only when stopped (admin only)
+servers.delete("/:id", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -171,9 +183,20 @@ servers.delete("/:id", requireAuth, requireApproved, async (c) => {
   return c.json({ ok: true });
 });
 
-// Both dashboard users and bot can list servers
-servers.get("/", async (c) => {
-  const rows = serverQueries.getAll.all();
+// Both dashboard users and bot can list servers (filtered by access for regular users)
+servers.get("/", requireAuthOrBotKey, requireApproved, async (c) => {
+  let rows = serverQueries.getAll.all();
+
+  // Filter for non-admin users: only show servers they have access to
+  const isBotRequest = !!c.get("isBotRequest");
+  const role = c.get("role") as string | undefined;
+  if (!isBotRequest && role !== "admin") {
+    const discordId = c.get("discordId") as string;
+    const access = userServerAccessQueries.listByUser.all(discordId);
+    const accessSet = new Set(access.map((a) => a.server_id));
+    rows = rows.filter((r) => accessSet.has(r.id));
+  }
+
   const result = await Promise.all(
     rows.map(async (row) => {
       const status = await getContainerStatus(row.id);
@@ -195,185 +218,197 @@ servers.get("/", async (c) => {
 });
 
 // Start a game server — auth required (dashboard) OR bot key
-servers.post("/:id/start", requireAuthOrBotKey, requireApproved, async (c) => {
-  const { id } = c.req.param();
-  const server = serverQueries.getById.get(id);
-  if (!server) return c.json({ error: "Server not found" }, 404);
+servers.post(
+  "/:id/start",
+  requireAuthOrBotKey,
+  requireApproved,
+  requireServerAccess(),
+  async (c) => {
+    const { id } = c.req.param();
+    const server = serverQueries.getById.get(id);
+    if (!server) return c.json({ error: "Server not found" }, 404);
 
-  const envVars = JSON.parse(server.env_vars) as Record<string, string>;
-  let volumes = JSON.parse(server.volumes) as Record<string, string>;
+    const envVars = JSON.parse(server.env_vars) as Record<string, string>;
+    let volumes = JSON.parse(server.volumes) as Record<string, string>;
 
-  // Ensure server always has a volume — auto-fix legacy servers without one
-  if (Object.keys(volumes).length === 0) {
-    // Try to match the Docker image to a catalog template for correct volumes
-    const template = findTemplateByImage(server.docker_image);
-    if (template) {
-      // Use catalog volumes but substitute the server ID in host paths
-      volumes = Object.fromEntries(
-        Object.entries(template.default_volumes).map(([host, container]) => [
-          host.replace(new RegExp(`/${template.id}(/|$)`), `/${id}$1`),
-          container,
-        ]),
+    // Ensure server always has a volume — auto-fix legacy servers without one
+    if (Object.keys(volumes).length === 0) {
+      // Try to match the Docker image to a catalog template for correct volumes
+      const template = findTemplateByImage(server.docker_image);
+      if (template) {
+        // Use catalog volumes but substitute the server ID in host paths
+        volumes = Object.fromEntries(
+          Object.entries(template.default_volumes).map(([host, container]) => [
+            host.replace(new RegExp(`/${template.id}(/|$)`), `/${id}$1`),
+            container,
+          ]),
+        );
+      } else {
+        volumes = { [`/data/${id}`]: "/data" };
+      }
+      serverQueries.update.run(
+        server.name,
+        server.port,
+        server.docker_image,
+        server.env_vars,
+        JSON.stringify(volumes),
+        id,
       );
-    } else {
-      volumes = { [`/data/${id}`]: "/data" };
-    }
-    serverQueries.update.run(
-      server.name,
-      server.port,
-      server.docker_image,
-      server.env_vars,
-      JSON.stringify(volumes),
-      id,
-    );
-  }
-
-  // Modpack types: auto-detect version from modpack manifest, don't override
-  const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
-  if (MODPACK_TYPES.has(envVars.TYPE)) {
-    delete envVars.VERSION;
-  }
-
-  // Inject CF_API_KEY from backend env when using CurseForge modpacks
-  if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
-    envVars.CF_API_KEY = process.env.CF_API_KEY;
-  }
-
-  // Auto-inject SERVER_PORT for Minecraft servers when using a non-default port
-  // This ensures itzg/minecraft-server binds to the correct port with host networking
-  if (server.game_type === "minecraft" && server.port !== 25565 && !envVars.SERVER_PORT) {
-    envVars.SERVER_PORT = String(server.port);
-  }
-
-  // Auto-select Java image tag for itzg/minecraft-server based on MC version
-  let dockerImage = server.docker_image;
-  if (dockerImage.startsWith("itzg/minecraft-server")) {
-    // If the DB already has an explicit tag (e.g. java21), respect it
-    const existingTag = dockerImage.includes(":") ? dockerImage.split(":")[1] : null;
-    const hasExplicitJavaTag = existingTag && /^java\d+$/.test(existingTag);
-
-    if (hasExplicitJavaTag) {
-      // User chose a specific Java version in the config — don't override it
-      dockerImage = `itzg/minecraft-server:${existingTag}`;
-    } else {
-      const version = envVars.VERSION ?? "LATEST";
-      const parts = version.split(".").map(Number);
-      const minor = parts[1] ?? 0;
-      const patch = parts[2] ?? 0;
-      let javaTag = "java21"; // default for latest/modern
-      if (version !== "LATEST" && version !== "SNAPSHOT") {
-        if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
-        else if (minor >= 18) javaTag = "java17";
-        else javaTag = "java8";
-      }
-      dockerImage = `itzg/minecraft-server:${javaTag}`;
-    }
-  }
-
-  try {
-    // Mark any currently running server's session as replaced
-    const active = await getActiveContainer();
-    if (active) {
-      stopJoinableWatcher(active.name);
-      markIntentionalStop(active.name);
-      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
     }
 
-    await startGameContainer(server.id, dockerImage, server.port, envVars, volumes);
+    // Modpack types: auto-detect version from modpack manifest, don't override
+    const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
+    if (MODPACK_TYPES.has(envVars.TYPE)) {
+      delete envVars.VERSION;
+    }
 
-    // Record new session
-    serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
+    // Inject CF_API_KEY from backend env when using CurseForge modpacks
+    if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
+      envVars.CF_API_KEY = process.env.CF_API_KEY;
+    }
 
-    // Watch logs for "Done" line to detect when server is joinable
-    beginLogWatching(server.id);
+    // Auto-inject SERVER_PORT for Minecraft servers when using a non-default port
+    // This ensures itzg/minecraft-server binds to the correct port with host networking
+    if (server.game_type === "minecraft" && server.port !== 25565 && !envVars.SERVER_PORT) {
+      envVars.SERVER_PORT = String(server.port);
+    }
 
-    // Watch for unexpected stops (crashes)
-    const serverName = server.name;
-    const serverId = server.id;
-    watchContainer(serverId, async () => {
-      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "crash", serverId);
+    // Auto-select Java image tag for itzg/minecraft-server based on MC version
+    let dockerImage = server.docker_image;
+    if (dockerImage.startsWith("itzg/minecraft-server")) {
+      // If the DB already has an explicit tag (e.g. java21), respect it
+      const existingTag = dockerImage.includes(":") ? dockerImage.split(":")[1] : null;
+      const hasExplicitJavaTag = existingTag && /^java\d+$/.test(existingTag);
 
-      const embed = {
-        title: "🔴 Servidor caído",
-        description: `El servidor **${serverName}** se ha detenido inesperadamente.`,
-        color: 15158332,
-        timestamp: new Date().toISOString(),
-      };
-
-      // Try configured crash channel first
-      const crashChannelRow = botSettingsQueries.get.get("crashes_channel_id");
-      const botToken = process.env.DISCORD_BOT_TOKEN;
-
-      if (crashChannelRow?.value && botToken) {
-        try {
-          await fetch(`https://discord.com/api/v10/channels/${crashChannelRow.value}/messages`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bot ${botToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ embeds: [embed] }),
-          });
-          return; // sent via bot API, skip webhook fallback
-        } catch (err) {
-          console.error("Failed to send crash notification via bot:", err);
+      if (hasExplicitJavaTag) {
+        // User chose a specific Java version in the config — don't override it
+        dockerImage = `itzg/minecraft-server:${existingTag}`;
+      } else {
+        const version = envVars.VERSION ?? "LATEST";
+        const parts = version.split(".").map(Number);
+        const minor = parts[1] ?? 0;
+        const patch = parts[2] ?? 0;
+        let javaTag = "java21"; // default for latest/modern
+        if (version !== "LATEST" && version !== "SNAPSHOT") {
+          if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
+          else if (minor >= 18) javaTag = "java17";
+          else javaTag = "java8";
         }
+        dockerImage = `itzg/minecraft-server:${javaTag}`;
+      }
+    }
+
+    try {
+      // Mark any currently running server's session as replaced
+      const active = await getActiveContainer();
+      if (active) {
+        stopJoinableWatcher(active.name);
+        markIntentionalStop(active.name);
+        serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
       }
 
-      // Fallback to webhook
-      const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-      if (webhookUrl) {
-        try {
-          await fetch(webhookUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ embeds: [embed] }),
-          });
-        } catch (err) {
-          console.error("Failed to send crash webhook:", err);
+      await startGameContainer(server.id, dockerImage, server.port, envVars, volumes);
+
+      // Record new session
+      serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
+
+      // Watch logs for "Done" line to detect when server is joinable
+      beginLogWatching(server.id);
+
+      // Watch for unexpected stops (crashes)
+      const serverName = server.name;
+      const serverId = server.id;
+      watchContainer(serverId, async () => {
+        serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "crash", serverId);
+
+        const embed = {
+          title: "🔴 Servidor caído",
+          description: `El servidor **${serverName}** se ha detenido inesperadamente.`,
+          color: 15158332,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Try configured crash channel first
+        const crashChannelRow = botSettingsQueries.get.get("crashes_channel_id");
+        const botToken = process.env.DISCORD_BOT_TOKEN;
+
+        if (crashChannelRow?.value && botToken) {
+          try {
+            await fetch(`https://discord.com/api/v10/channels/${crashChannelRow.value}/messages`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bot ${botToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ embeds: [embed] }),
+            });
+            return; // sent via bot API, skip webhook fallback
+          } catch (err) {
+            console.error("Failed to send crash notification via bot:", err);
+          }
         }
-      }
-    });
 
-    return c.json({ ok: true, message: `${server.name} started` });
-  } catch (err) {
-    console.error("Start error:", err);
-    return c.json({ error: "Failed to start server" }, 500);
-  }
-});
+        // Fallback to webhook
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (webhookUrl) {
+          try {
+            await fetch(webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ embeds: [embed] }),
+            });
+          } catch (err) {
+            console.error("Failed to send crash webhook:", err);
+          }
+        }
+      });
+
+      return c.json({ ok: true, message: `${server.name} started` });
+    } catch (err) {
+      console.error("Start error:", err);
+      return c.json({ error: "Failed to start server" }, 500);
+    }
+  },
+);
 
 // Stop active game server
-servers.post("/:id/stop", requireAuthOrBotKey, requireApproved, async (c) => {
-  const { id } = c.req.param();
+servers.post(
+  "/:id/stop",
+  requireAuthOrBotKey,
+  requireApproved,
+  requireServerAccess(),
+  async (c) => {
+    const { id } = c.req.param();
 
-  // Special "active" pseudo-id
-  if (id === "active") {
-    const active = await getActiveContainer();
-    if (!active) return c.json({ ok: true, message: "No server running" });
-    stopJoinableWatcher(active.name);
-    markIntentionalStop(active.name);
-    await stopGameContainer(active.name);
-    serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", active.name);
-    return c.json({ ok: true, message: `${active.name} stopped` });
-  }
+    // Special "active" pseudo-id
+    if (id === "active") {
+      const active = await getActiveContainer();
+      if (!active) return c.json({ ok: true, message: "No server running" });
+      stopJoinableWatcher(active.name);
+      markIntentionalStop(active.name);
+      await stopGameContainer(active.name);
+      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", active.name);
+      return c.json({ ok: true, message: `${active.name} stopped` });
+    }
 
-  const server = serverQueries.getById.get(id);
-  if (!server) return c.json({ error: "Server not found" }, 404);
+    const server = serverQueries.getById.get(id);
+    if (!server) return c.json({ error: "Server not found" }, 404);
 
-  try {
-    stopJoinableWatcher(id);
-    markIntentionalStop(id);
-    await stopGameContainer(id);
-    serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", id);
-    return c.json({ ok: true, message: `${server.name} stopped` });
-  } catch (err) {
-    console.error("Stop error:", err);
-    return c.json({ error: "Failed to stop server" }, 500);
-  }
-});
+    try {
+      stopJoinableWatcher(id);
+      markIntentionalStop(id);
+      await stopGameContainer(id);
+      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", id);
+      return c.json({ ok: true, message: `${server.name} stopped` });
+    } catch (err) {
+      console.error("Stop error:", err);
+      return c.json({ error: "Failed to stop server" }, 500);
+    }
+  },
+);
 
 // Live logs via Server-Sent Events
-servers.get("/:id/logs", requireAuth, requireApproved, async (c) => {
+servers.get("/:id/logs", requireAuth, requireApproved, requireServerAccess(), async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -421,7 +456,7 @@ servers.get("/:id/logs", requireAuth, requireApproved, async (c) => {
 });
 
 // Real-time CPU/RAM stats via Server-Sent Events
-servers.get("/:id/stats", requireAuth, requireApproved, async (c) => {
+servers.get("/:id/stats", requireAuth, requireApproved, requireServerAccess(), async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -470,8 +505,8 @@ servers.get("/:id/stats", requireAuth, requireApproved, async (c) => {
   });
 });
 
-// Get editable config for a server
-servers.get("/:id/config", requireAuth, requireApproved, async (c) => {
+// Get editable config for a server (admin only)
+servers.get("/:id/config", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -487,8 +522,8 @@ servers.get("/:id/config", requireAuth, requireApproved, async (c) => {
   });
 });
 
-// Update editable config for a server
-servers.put("/:id/config", requireAuth, requireApproved, async (c) => {
+// Update editable config for a server (admin only)
+servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -522,8 +557,8 @@ servers.put("/:id/config", requireAuth, requireApproved, async (c) => {
   return c.json({ ok: true });
 });
 
-// Upload custom banner image
-servers.post("/:id/banner", requireAuth, requireApproved, async (c) => {
+// Upload custom banner image (admin only)
+servers.post("/:id/banner", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -600,8 +635,8 @@ servers.get("/:id/banner", async (c) => {
   return c.json({ error: "No banner found" }, 404);
 });
 
-// Delete custom banner (reset to default)
-servers.delete("/:id/banner", requireAuth, requireApproved, async (c) => {
+// Delete custom banner (admin only)
+servers.delete("/:id/banner", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -626,7 +661,7 @@ servers.delete("/:id/banner", requireAuth, requireApproved, async (c) => {
 });
 
 // Session history for a server
-servers.get("/:id/history", requireAuth, requireApproved, async (c) => {
+servers.get("/:id/history", requireAuth, requireApproved, requireServerAccess(), async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -644,7 +679,7 @@ servers.get("/:id/history", requireAuth, requireApproved, async (c) => {
 });
 
 // Online players (Minecraft only, via RCON "list")
-servers.get("/:id/players", requireAuth, requireApproved, async (c) => {
+servers.get("/:id/players", requireAuth, requireApproved, requireServerAccess(), async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -682,8 +717,8 @@ servers.get("/:id/players", requireAuth, requireApproved, async (c) => {
   }
 });
 
-// Execute RCON command (Minecraft only)
-servers.post("/:id/command", requireAuth, requireApproved, async (c) => {
+// Execute RCON command (admin only)
+servers.post("/:id/command", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -713,14 +748,14 @@ servers.post("/:id/command", requireAuth, requireApproved, async (c) => {
 
 // --- Backup routes ---
 
-// List ALL backups across all servers
-servers.get("/backups/all", requireAuth, requireApproved, (c) => {
+// List ALL backups across all servers (admin only)
+servers.get("/backups/all", requireAuth, requireApproved, requireAdmin, (c) => {
   const backups = backupQueries.listAll.all();
   return c.json(backups);
 });
 
-// List backups for a server
-servers.get("/:id/backups", requireAuth, requireApproved, (c) => {
+// List backups for a server (server access required)
+servers.get("/:id/backups", requireAuth, requireApproved, requireServerAccess(), (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -729,8 +764,8 @@ servers.get("/:id/backups", requireAuth, requireApproved, (c) => {
   return c.json(backups);
 });
 
-// Create a backup
-servers.post("/:id/backups", requireAuth, requireApproved, async (c) => {
+// Create a backup (admin only)
+servers.post("/:id/backups", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -744,31 +779,37 @@ servers.post("/:id/backups", requireAuth, requireApproved, async (c) => {
   }
 });
 
-// Download a backup
-servers.get("/:id/backups/:bid/download", requireAuth, requireApproved, (c) => {
-  const { id, bid } = c.req.param();
-  const backup = backupQueries.getById.get(Number(bid));
-  if (!backup || backup.server_id !== id) {
-    return c.json({ error: "Backup not found" }, 404);
-  }
+// Download a backup (server access required)
+servers.get(
+  "/:id/backups/:bid/download",
+  requireAuth,
+  requireApproved,
+  requireServerAccess(),
+  (c) => {
+    const { id, bid } = c.req.param();
+    const backup = backupQueries.getById.get(Number(bid));
+    if (!backup || backup.server_id !== id) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
 
-  const filePath = getBackupFilePath(backup);
-  if (!existsSync(filePath)) {
-    return c.json({ error: "Backup file not found on disk" }, 404);
-  }
+    const filePath = getBackupFilePath(backup);
+    if (!existsSync(filePath)) {
+      return c.json({ error: "Backup file not found on disk" }, 404);
+    }
 
-  const file = Bun.file(filePath);
-  return new Response(file.stream(), {
-    headers: {
-      "Content-Type": "application/gzip",
-      "Content-Disposition": `attachment; filename="${backup.filename}"`,
-      "Content-Length": String(backup.size_bytes),
-    },
-  });
-});
+    const file = Bun.file(filePath);
+    return new Response(file.stream(), {
+      headers: {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": `attachment; filename="${backup.filename}"`,
+        "Content-Length": String(backup.size_bytes),
+      },
+    });
+  },
+);
 
-// Restore a backup
-servers.post("/:id/backups/:bid/restore", requireAuth, requireApproved, async (c) => {
+// Restore a backup (admin only)
+servers.post("/:id/backups/:bid/restore", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id, bid } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -782,8 +823,8 @@ servers.post("/:id/backups/:bid/restore", requireAuth, requireApproved, async (c
   }
 });
 
-// Delete a backup
-servers.delete("/:id/backups/:bid", requireAuth, requireApproved, (c) => {
+// Delete a backup (admin only)
+servers.delete("/:id/backups/:bid", requireAuth, requireApproved, requireAdmin, (c) => {
   const { id, bid } = c.req.param();
   const backup = backupQueries.getById.get(Number(bid));
   if (!backup || backup.server_id !== id) {

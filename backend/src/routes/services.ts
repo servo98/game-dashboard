@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { docker, streamHostStats, streamServiceLogs, streamServiceStats } from "../docker";
-import { requireApproved, requireAuth } from "../middleware/auth";
+import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
 
 const services = new Hono();
 
@@ -49,13 +49,13 @@ function sseResponse(
 
 // --- Static routes first ---
 
-// Host stats SSE
-services.get("/host/stats", requireAuth, requireApproved, async (c) => {
+// Host stats SSE (admin only)
+services.get("/host/stats", requireAuth, requireApproved, requireAdmin, async (c) => {
   return sseResponse(c.req.raw, (signal) => streamHostStats(signal));
 });
 
-// Multiplexed service stats SSE — streams all compose services in one connection
-services.get("/stats", requireAuth, requireApproved, async (c) => {
+// Multiplexed service stats SSE (admin only)
+services.get("/stats", requireAuth, requireApproved, requireAdmin, async (c) => {
   const abortController = new AbortController();
   c.req.raw.signal.addEventListener("abort", () => abortController.abort());
 
@@ -96,8 +96,8 @@ services.get("/stats", requireAuth, requireApproved, async (c) => {
 
 // --- Parameterized routes ---
 
-// Restart a compose service
-services.post("/:name/restart", requireAuth, requireApproved, async (c) => {
+// Restart a compose service (admin only)
+services.post("/:name/restart", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { name } = c.req.param();
 
   if (!isAllowed(name)) {
@@ -117,8 +117,8 @@ services.post("/:name/restart", requireAuth, requireApproved, async (c) => {
   }
 });
 
-// Service logs SSE
-services.get("/:name/logs", requireAuth, requireApproved, async (c) => {
+// Service logs SSE (admin only)
+services.get("/:name/logs", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { name } = c.req.param();
   if (!isAllowed(name)) {
     return c.json({ error: `Unknown service. Allowed: ${ALLOWED_SERVICES.join(", ")}` }, 400);

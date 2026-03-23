@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
-import { panelUserQueries, sessionQueries } from "../db";
+import { panelUserQueries, sessionQueries, userServerAccessQueries } from "../db";
 import { getCookie, requireAuth } from "../middleware/auth";
 
 const auth = new Hono<{ Variables: { session: Session } }>();
@@ -9,12 +9,21 @@ const DISCORD_API = "https://discord.com/api/v10";
 const SESSION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
 
 auth.get("/discord", (c) => {
+  // Check for invite code — store it in a cookie so we can redirect after OAuth
+  const invite = c.req.query("invite");
+
   const params = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID!,
     redirect_uri: process.env.DISCORD_REDIRECT_URI!,
     response_type: "code",
     scope: "identify",
   });
+
+  if (invite) {
+    // Store invite code in state param (Discord passes it back)
+    params.set("state", `invite:${invite}`);
+  }
+
   return c.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
 });
 
@@ -23,6 +32,10 @@ auth.get("/callback", async (c) => {
   if (!code) {
     return c.json({ error: "Missing code" }, 400);
   }
+
+  // Check for invite code from OAuth state
+  const state = c.req.query("state") ?? "";
+  const inviteCode = state.startsWith("invite:") ? state.slice(7) : null;
 
   // Exchange code for access token
   const tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
@@ -73,8 +86,10 @@ auth.get("/callback", async (c) => {
 
   if (!panelUser) {
     if (allowedIds.includes(user.id)) {
-      // Whitelisted user, auto-approve
+      // Whitelisted user, auto-approve as admin
       panelUserQueries.insert.run(user.id, displayName, user.avatar, "approved");
+      // Set role to admin
+      panelUserQueries.updateRole.run("admin", user.id);
     } else {
       // New user, pending approval
       panelUserQueries.insert.run(user.id, displayName, user.avatar, "pending");
@@ -119,6 +134,11 @@ auth.get("/callback", async (c) => {
     }
   }
 
+  // If there's an invite code, redirect to the invite page
+  if (inviteCode) {
+    redirectPath = `/invite/${inviteCode}`;
+  }
+
   // Default: redirect based on status
   return new Response(null, {
     status: 302,
@@ -132,14 +152,24 @@ auth.get("/callback", async (c) => {
 auth.get("/me", requireAuth, (c) => {
   const session = c.get("session");
   const panelUser = panelUserQueries.get.get(session.discord_id);
-  return c.json({
+
+  const response: Record<string, unknown> = {
     discord_id: session.discord_id,
     username: session.username,
     avatar: session.avatar
       ? `https://cdn.discordapp.com/avatars/${session.discord_id}/${session.avatar}.png`
       : null,
     status: panelUser?.status ?? "pending",
-  });
+    role: panelUser?.role ?? "user",
+  };
+
+  // For non-admin users, include their server access list
+  if (panelUser?.role !== "admin") {
+    const access = userServerAccessQueries.listByUser.all(session.discord_id);
+    response.server_access = access.map((a) => a.server_id);
+  }
+
+  return c.json(response);
 });
 
 auth.post("/logout", requireAuth, (c) => {

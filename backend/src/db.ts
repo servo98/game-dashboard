@@ -79,6 +79,52 @@ db.exec(`
   );
 `);
 
+// --- Permission system tables ---
+
+// user_server_access: which servers each user can manage
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_server_access (
+    discord_id TEXT NOT NULL,
+    server_id TEXT NOT NULL,
+    granted_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    granted_by TEXT NOT NULL,
+    PRIMARY KEY (discord_id, server_id)
+  );
+`);
+
+// invite_links: invite links with pre-assigned server permissions
+db.exec(`
+  CREATE TABLE IF NOT EXISTS invite_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    server_ids TEXT NOT NULL DEFAULT '[]',
+    created_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    expires_at INTEGER,
+    max_uses INTEGER,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    label TEXT NOT NULL DEFAULT ''
+  );
+`);
+
+// Migration: add role column to panel_users
+try {
+  db.exec(`ALTER TABLE panel_users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+} catch (_) {
+  /* column already exists */
+}
+
+// Auto-set role=admin for ALLOWED_DISCORD_IDS on startup
+{
+  const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const id of allowedIds) {
+    db.exec(`UPDATE panel_users SET role = 'admin' WHERE discord_id = '${id}'`);
+  }
+}
+
 // Migration: add theme columns to servers
 try {
   db.exec(`ALTER TABLE servers ADD COLUMN banner_path TEXT`);
@@ -250,9 +296,29 @@ export type PanelUser = {
   username: string;
   avatar: string | null;
   status: string; // pending | approved | rejected
+  role: string; // admin | user
   requested_at: number;
   approved_at: number | null;
   approved_by: string | null;
+};
+
+export type UserServerAccess = {
+  discord_id: string;
+  server_id: string;
+  granted_at: number;
+  granted_by: string;
+};
+
+export type InviteLink = {
+  id: number;
+  code: string;
+  server_ids: string; // JSON array
+  created_by: string;
+  created_at: number;
+  expires_at: number | null;
+  max_uses: number | null;
+  use_count: number;
+  label: string;
 };
 
 export const panelUserQueries = {
@@ -270,7 +336,39 @@ export const panelUserQueries = {
   updateProfile: db.query<void, [string, string | null, string]>(
     "UPDATE panel_users SET username = ?, avatar = ? WHERE discord_id = ?",
   ),
+  updateRole: db.query<void, [string, string]>(
+    "UPDATE panel_users SET role = ? WHERE discord_id = ?",
+  ),
   delete: db.query<void, [string]>("DELETE FROM panel_users WHERE discord_id = ?"),
+};
+
+export const userServerAccessQueries = {
+  get: db.query<UserServerAccess, [string, string]>(
+    "SELECT * FROM user_server_access WHERE discord_id = ? AND server_id = ?",
+  ),
+  listByUser: db.query<UserServerAccess, [string]>(
+    "SELECT * FROM user_server_access WHERE discord_id = ?",
+  ),
+  insert: db.query<void, [string, string, string]>(
+    "INSERT OR IGNORE INTO user_server_access (discord_id, server_id, granted_by) VALUES (?, ?, ?)",
+  ),
+  deleteByUser: db.query<void, [string]>("DELETE FROM user_server_access WHERE discord_id = ?"),
+  deleteByUserAndServer: db.query<void, [string, string]>(
+    "DELETE FROM user_server_access WHERE discord_id = ? AND server_id = ?",
+  ),
+};
+
+export const inviteLinkQueries = {
+  getByCode: db.query<InviteLink, [string]>("SELECT * FROM invite_links WHERE code = ?"),
+  getById: db.query<InviteLink, [number]>("SELECT * FROM invite_links WHERE id = ?"),
+  listAll: db.query<InviteLink, []>("SELECT * FROM invite_links ORDER BY created_at DESC"),
+  insert: db.query<void, [string, string, string, number | null, number | null, string]>(
+    "INSERT INTO invite_links (code, server_ids, created_by, expires_at, max_uses, label) VALUES (?, ?, ?, ?, ?, ?)",
+  ),
+  incrementUse: db.query<void, [string]>(
+    "UPDATE invite_links SET use_count = use_count + 1 WHERE code = ?",
+  ),
+  deleteById: db.query<void, [number]>("DELETE FROM invite_links WHERE id = ?"),
 };
 
 export const mcpTokenQueries = {

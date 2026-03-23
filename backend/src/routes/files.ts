@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { join, resolve } from "path";
 import type { Session } from "../db";
 import { serverQueries } from "../db";
-import { requireApproved, requireAuth } from "../middleware/auth";
+import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
 
 const HOST_DATA_DIR = "/host-data";
 
@@ -89,7 +89,7 @@ function resolveSafePath(
 const files = new Hono<{ Variables: { session: Session } }>();
 
 // List directory
-files.get("/:id/files", requireAuth, requireApproved, (c) => {
+files.get("/:id/files", requireAuth, requireApproved, requireAdmin, (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -150,7 +150,7 @@ files.get("/:id/files", requireAuth, requireApproved, (c) => {
 });
 
 // Download file
-files.get("/:id/files/download", requireAuth, requireApproved, (c) => {
+files.get("/:id/files/download", requireAuth, requireApproved, requireAdmin, (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -184,7 +184,7 @@ files.get("/:id/files/download", requireAuth, requireApproved, (c) => {
 });
 
 // Upload files (multipart)
-files.post("/:id/files/upload", requireAuth, requireApproved, async (c) => {
+files.post("/:id/files/upload", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -233,7 +233,7 @@ files.post("/:id/files/upload", requireAuth, requireApproved, async (c) => {
 });
 
 // Delete file or directory
-files.delete("/:id/files", requireAuth, requireApproved, (c) => {
+files.delete("/:id/files", requireAuth, requireApproved, requireAdmin, (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
@@ -262,7 +262,7 @@ files.delete("/:id/files", requireAuth, requireApproved, (c) => {
 });
 
 // Create directory
-files.post("/:id/files/mkdir", requireAuth, requireApproved, (c) => {
+files.post("/:id/files/mkdir", requireAuth, requireApproved, requireAdmin, (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);

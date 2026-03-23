@@ -20,6 +20,8 @@ export type User = {
   username: string;
   avatar: string | null;
   status: "pending" | "approved" | "rejected";
+  role: "admin" | "user";
+  server_access?: string[]; // only for role="user"
 };
 
 export type PanelUser = {
@@ -27,9 +29,30 @@ export type PanelUser = {
   username: string;
   avatar: string | null;
   status: "pending" | "approved" | "rejected";
+  role: "admin" | "user";
   requested_at: number;
   approved_at: number | null;
   approved_by: string | null;
+  server_access?: string[];
+};
+
+export type InviteLinkInfo = {
+  id: number;
+  code: string;
+  servers: Array<{ id: string; name: string }>;
+  label: string;
+  created_at: number;
+  expires_at: number | null;
+  expired: boolean;
+  max_uses: number | null;
+  use_count: number;
+};
+
+export type InvitePublicInfo = {
+  code: string;
+  label: string;
+  servers: Array<{ id: string; name: string; icon: string | null }>;
+  expires_at: number | null;
 };
 
 export type ContainerStats = {
@@ -337,6 +360,31 @@ export const api = {
   approveUser: (id: string) => request<{ ok: boolean }>(`/users/${id}/approve`, { method: "PUT" }),
   rejectUser: (id: string) => request<{ ok: boolean }>(`/users/${id}/reject`, { method: "PUT" }),
   deleteUser: (id: string) => request<{ ok: boolean }>(`/users/${id}`, { method: "DELETE" }),
+
+  /** Invites (admin) */
+  createInvite: (data: {
+    server_ids: string[];
+    expires_in_hours?: number;
+    max_uses?: number;
+    label?: string;
+  }) =>
+    request<{ ok: boolean; code: string; url: string }>("/invites", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  listInvites: () => request<InviteLinkInfo[]>("/invites"),
+  deleteInvite: (id: number) => request<{ ok: boolean }>(`/invites/${id}`, { method: "DELETE" }),
+  getInviteInfo: (code: string) => request<InvitePublicInfo>(`/invites/${code}/info`),
+  acceptInvite: (code: string) =>
+    request<{ ok: boolean }>(`/invites/${code}/accept`, { method: "POST" }),
+
+  /** User server access (admin) */
+  getUserServers: (discordId: string) => request<string[]>(`/users/${discordId}/servers`),
+  setUserServers: (discordId: string, serverIds: string[]) =>
+    request<{ ok: boolean }>(`/users/${discordId}/servers`, {
+      method: "PUT",
+      body: JSON.stringify({ server_ids: serverIds }),
+    }),
 
   /** MCP tokens */
   listMcpTokens: () => request<McpTokenRecord[]>("/mcp-tokens"),

@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { api } from "./api";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
+import Invite from "./pages/Invite";
 import Login from "./pages/Login";
 import Pending from "./pages/Pending";
 import Status from "./pages/Status";
@@ -49,6 +50,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<Pending />} />
+          <Route path="/invite/:code" element={<Invite />} />
           <Route path="/status" element={<Status />} />
           <Route path="/" element={<Home />} />
           <Route path="*" element={<Navigate to="/" replace />} />

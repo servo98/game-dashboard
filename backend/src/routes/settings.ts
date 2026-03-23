@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
 import { getAllPanelSettings, panelSettingsQueries } from "../db";
-import { requireApproved, requireAuth, requireAuthOrBotKey } from "../middleware/auth";
+import {
+  requireAdmin,
+  requireApproved,
+  requireAuth,
+  requireAuthOrBotKey,
+} from "../middleware/auth";
 
 const settings = new Hono<{ Variables: { session: Session } }>();
 
@@ -9,7 +14,7 @@ settings.get("/", requireAuthOrBotKey, (c) => {
   return c.json(getAllPanelSettings());
 });
 
-settings.put("/", requireAuth, requireApproved, async (c) => {
+settings.put("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   const body = await c.req.json<Record<string, string | number>>();
 
   const allowedKeys = [

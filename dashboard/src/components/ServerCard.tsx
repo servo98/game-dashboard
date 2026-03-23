@@ -29,6 +29,7 @@ type Props = {
   hostMemTotalMB?: number;
   hostDomain?: string;
   iconUrl?: string;
+  isAdmin?: boolean;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -66,6 +67,7 @@ export default memo(function ServerCard({
   hostMemTotalMB,
   hostDomain = "aypapol.com",
   iconUrl,
+  isAdmin = true,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -259,21 +261,25 @@ export default memo(function ServerCard({
             </button>
           </>
         )}
-        <button
-          onClick={() => onEditConfig(server.id)}
-          title="Edit config"
-          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
-        >
-          <SettingsIcon />
-        </button>
-        <button
-          onClick={() => onOpenFiles(server.id)}
-          title="Browse files"
-          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
-        >
-          <FolderIcon />
-        </button>
-        {!isRunning && !confirmDelete && (
+        {isAdmin && (
+          <button
+            onClick={() => onEditConfig(server.id)}
+            title="Edit config"
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
+          >
+            <SettingsIcon />
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => onOpenFiles(server.id)}
+            title="Browse files"
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
+          >
+            <FolderIcon />
+          </button>
+        )}
+        {isAdmin && !isRunning && !confirmDelete && (
           <button
             onClick={() => handleDeleteClick(false)}
             title="Delete server"
@@ -282,7 +288,7 @@ export default memo(function ServerCard({
             <TrashIcon />
           </button>
         )}
-        {!isRunning && confirmDelete && (
+        {isAdmin && !isRunning && confirmDelete && (
           <div className="flex gap-1">
             <button
               onClick={() => handleDeleteClick(false)}
@@ -300,17 +306,19 @@ export default memo(function ServerCard({
             </button>
           </div>
         )}
-        <button
-          onClick={toggleBackups}
-          className={`px-3 py-2 rounded-xl transition-colors ${
-            showBackups
-              ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
-              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
-          }`}
-          title="Backups"
-        >
-          <BoxIcon />
-        </button>
+        {isAdmin && (
+          <button
+            onClick={toggleBackups}
+            className={`px-3 py-2 rounded-xl transition-colors ${
+              showBackups
+                ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
+                : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
+            }`}
+            title="Backups"
+          >
+            <BoxIcon />
+          </button>
+        )}
         <button
           onClick={toggleHistory}
           className={`px-3 py-2 rounded-xl transition-colors ${
