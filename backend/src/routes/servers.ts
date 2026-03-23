@@ -30,7 +30,9 @@ import {
   requireServerAccess,
 } from "../middleware/auth";
 
-const servers = new Hono<{ Variables: { session: Session } }>();
+const servers = new Hono<{
+  Variables: { session: Session; isBotRequest?: boolean; role?: string; discordId?: string };
+}>();
 
 // Game catalog — public
 servers.get("/catalog", (c) => {
