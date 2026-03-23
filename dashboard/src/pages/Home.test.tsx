@@ -71,7 +71,13 @@ const { default: Home } = await import("./Home");
 describe("Home page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockMe.mockResolvedValue({ discord_id: "1", username: "testuser", avatar: null });
+    mockMe.mockResolvedValue({
+      discord_id: "1",
+      username: "testuser",
+      avatar: null,
+      status: "approved",
+      role: "admin",
+    });
     mockListServers.mockResolvedValue([
       { id: "minecraft", name: "Minecraft", game_type: "sandbox", port: 25565, status: "stopped" },
     ]);

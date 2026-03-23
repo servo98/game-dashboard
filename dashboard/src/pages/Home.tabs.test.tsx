@@ -38,7 +38,13 @@ vi.mock("../theme", () => ({
 
 vi.mock("../api", () => ({
   api: {
-    me: vi.fn().mockResolvedValue({ discord_id: "1", username: "user", avatar: null }),
+    me: vi.fn().mockResolvedValue({
+      discord_id: "1",
+      username: "user",
+      avatar: null,
+      status: "approved",
+      role: "admin",
+    }),
     listServers: vi.fn().mockResolvedValue([]),
     getSettings: vi.fn().mockResolvedValue({ host_domain: "example.com" }),
     getCatalog: vi.fn().mockResolvedValue([]),

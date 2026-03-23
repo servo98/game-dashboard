@@ -53,6 +53,7 @@ vi.mock("../db", () => ({
         username: "testuser",
         avatar: null,
         status: "approved",
+        role: "admin",
         requested_at: 0,
         approved_at: 0,
         approved_by: null,
@@ -63,7 +64,23 @@ vi.mock("../db", () => ({
     insert: { run: vi.fn() },
     updateStatus: { run: vi.fn() },
     updateProfile: { run: vi.fn() },
+    updateRole: { run: vi.fn() },
     delete: { run: vi.fn() },
+  },
+  userServerAccessQueries: {
+    get: { get: vi.fn() },
+    listByUser: { all: vi.fn(() => []) },
+    insert: { run: vi.fn() },
+    deleteByUser: { run: vi.fn() },
+    deleteByUserAndServer: { run: vi.fn() },
+  },
+  inviteLinkQueries: {
+    getByCode: { get: vi.fn() },
+    getById: { get: vi.fn() },
+    listAll: { all: vi.fn(() => []) },
+    insert: { run: vi.fn() },
+    incrementUse: { run: vi.fn() },
+    deleteById: { run: vi.fn() },
   },
   mcpTokenQueries: {
     getByToken: { get: vi.fn() },
@@ -113,10 +130,13 @@ describe("GET /", () => {
     vi.clearAllMocks();
   });
 
-  it("returns servers list with status (public, no auth needed)", async () => {
+  it("returns servers list with status", async () => {
+    mockSessionGet.mockReturnValue(session);
     mockServerGetAll.mockReturnValue([server]);
     mockGetContainerStatus.mockResolvedValue("stopped");
-    const res = await servers.request("/");
+    const res = await servers.request("/", {
+      headers: { cookie: "session=valid-token" },
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveLength(1);
@@ -125,8 +145,11 @@ describe("GET /", () => {
   });
 
   it("returns empty array when no servers", async () => {
+    mockSessionGet.mockReturnValue(session);
     mockServerGetAll.mockReturnValue([]);
-    const res = await servers.request("/");
+    const res = await servers.request("/", {
+      headers: { cookie: "session=valid-token" },
+    });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
