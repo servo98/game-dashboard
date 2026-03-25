@@ -163,22 +163,18 @@ servers.delete("/:id", requireAuth, requireApproved, requireAdmin, async (c) => 
     return c.json({ error: "Cannot delete a running server. Stop it first." }, 400);
   }
 
-  const deleteFiles = c.req.query("deleteFiles") === "true";
-
   serverSessionQueries.deleteByServerId.run(id);
   serverQueries.deleteById.run(id);
 
-  // Optionally remove volume data from disk
-  if (deleteFiles) {
-    const volumes = JSON.parse(server.volumes) as Record<string, string>;
-    for (const hostPath of Object.keys(volumes)) {
-      if (!hostPath.startsWith("/data/")) continue;
-      const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
-      try {
-        rmSync(accessPath, { recursive: true });
-      } catch {
-        // best-effort — directory may not exist
-      }
+  // Always remove volume data from disk
+  const volumes = JSON.parse(server.volumes) as Record<string, string>;
+  for (const hostPath of Object.keys(volumes)) {
+    if (!hostPath.startsWith("/data/")) continue;
+    const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
+    try {
+      rmSync(accessPath, { recursive: true });
+    } catch {
+      // best-effort — directory may not exist
     }
   }
 

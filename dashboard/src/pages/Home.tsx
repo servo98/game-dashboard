@@ -374,13 +374,19 @@ export default function Home() {
             {/* Server grid */}
             {servers.length === 0 ? (
               <div className="text-center text-gray-600 py-16">
-                <p>No servers configured.</p>
-                <button
-                  onClick={() => setShowGameStore(true)}
-                  className="mt-3 text-brand-400 hover:text-brand-300 text-sm"
-                >
-                  Add your first game server
-                </button>
+                {isAdmin ? (
+                  <>
+                    <p>No servers configured.</p>
+                    <button
+                      onClick={() => setShowGameStore(true)}
+                      className="mt-3 text-brand-400 hover:text-brand-300 text-sm"
+                    >
+                      Add your first game server
+                    </button>
+                  </>
+                ) : (
+                  <p>No servers assigned to you yet. Ask an admin to give you access.</p>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

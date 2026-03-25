@@ -110,9 +110,9 @@ export default memo(function ServerCard({
     }
   }
 
-  function handleDeleteClick(deleteFiles: boolean) {
+  function handleDeleteClick() {
     if (confirmDelete) {
-      onDelete(server.id, deleteFiles);
+      onDelete(server.id, true);
       setConfirmDelete(false);
     } else {
       setConfirmDelete(true);
@@ -281,7 +281,7 @@ export default memo(function ServerCard({
         )}
         {isAdmin && !isRunning && !confirmDelete && (
           <button
-            onClick={() => handleDeleteClick(false)}
+            onClick={() => handleDeleteClick()}
             title="Delete server"
             className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"
           >
@@ -289,22 +289,13 @@ export default memo(function ServerCard({
           </button>
         )}
         {isAdmin && !isRunning && confirmDelete && (
-          <div className="flex gap-1">
-            <button
-              onClick={() => handleDeleteClick(false)}
-              title="Delete server only"
-              className="px-2.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors"
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => handleDeleteClick(true)}
-              title="Delete server and all files"
-              className="px-2.5 py-2 rounded-xl bg-red-800 hover:bg-red-900 text-white text-xs font-medium transition-colors"
-            >
-              + Files
-            </button>
-          </div>
+          <button
+            onClick={() => handleDeleteClick()}
+            title="Confirm delete server and files"
+            className="px-2.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors"
+          >
+            Confirm Delete
+          </button>
         )}
         {isAdmin && (
           <button
