@@ -141,12 +141,11 @@ describe("ServerCard", () => {
     render(<ServerCard server={stoppedServer} {...defaultProps} />);
     const deleteBtn = screen.getByTitle("Delete server");
     fireEvent.click(deleteBtn);
-    // First click shows "Delete" and "+ Files" options
-    expect(screen.getByTitle("Delete server only")).toBeInTheDocument();
-    expect(screen.getByTitle("Delete server and all files")).toBeInTheDocument();
+    // First click shows confirm button
+    expect(screen.getByTitle("Confirm delete server and files")).toBeInTheDocument();
     expect(defaultProps.onDelete).not.toHaveBeenCalled();
-    // Second click on "Delete" actually deletes (without files)
-    fireEvent.click(screen.getByTitle("Delete server only"));
-    expect(defaultProps.onDelete).toHaveBeenCalledWith("minecraft", false);
+    // Second click confirms deletion
+    fireEvent.click(screen.getByTitle("Confirm delete server and files"));
+    expect(defaultProps.onDelete).toHaveBeenCalledWith("minecraft", true);
   });
 });
