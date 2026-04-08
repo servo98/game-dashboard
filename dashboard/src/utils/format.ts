@@ -1,7 +1,11 @@
+const SUBDOMAIN_MAP: Record<string, string> = {
+  "25565": "mc",
+  "30000": "rolcito",
+};
+
 export function connectAddress(gameType: string, port: number, hostDomain: string): string {
-  if (gameType === "sandbox" && port === 25565) {
-    return `mc.${hostDomain}`;
-  }
+  const sub = SUBDOMAIN_MAP[String(port)];
+  if (sub) return `${sub}.${hostDomain}`;
   return `${hostDomain}:${port}`;
 }
 

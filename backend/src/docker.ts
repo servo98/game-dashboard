@@ -1,5 +1,5 @@
 import Dockerode from "dockerode";
-import { chmodSync, mkdirSync } from "fs";
+import { chmodSync, chownSync, mkdirSync } from "fs";
 import { createConnection } from "net";
 import { getPanelSetting } from "./db";
 
@@ -145,7 +145,9 @@ export async function startGameContainer(
     const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
     try {
       mkdirSync(accessPath, { recursive: true });
-      chmodSync(accessPath, 0o775);
+      chmodSync(accessPath, 0o777);
+      // Many game images (e.g. felddy/foundryvtt) run as uid 1000 — chown so they can write
+      chownSync(accessPath, 1000, 1000);
     } catch {
       // best-effort
     }

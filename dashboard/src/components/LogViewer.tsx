@@ -344,6 +344,12 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
               </button>
             ))}
             <button
+              onClick={() => setLines([])}
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded border text-gray-400 border-gray-600 hover:text-gray-200 hover:bg-gray-700 hover:border-gray-500 transition-colors"
+            >
+              Clear
+            </button>
+            <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors p-1 ml-1"
             >

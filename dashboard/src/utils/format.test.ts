@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { connectAddress, formatDuration, formatLine, formatSize } from "./format";
 
 describe("connectAddress", () => {
-  it("returns mc.domain for sandbox on port 25565", () => {
+  it("returns mc.domain for port 25565", () => {
     expect(connectAddress("sandbox", 25565, "aypapol.com")).toBe("mc.aypapol.com");
   });
 
-  it("returns domain:port for non-sandbox", () => {
-    expect(connectAddress("fps", 27015, "aypapol.com")).toBe("aypapol.com:27015");
+  it("returns rolcito.domain for port 30000", () => {
+    expect(connectAddress("tabletop", 30000, "aypapol.com")).toBe("rolcito.aypapol.com");
   });
 
-  it("returns domain:port for sandbox on non-25565 port", () => {
-    expect(connectAddress("sandbox", 19132, "aypapol.com")).toBe("aypapol.com:19132");
+  it("returns domain:port for unmapped ports", () => {
+    expect(connectAddress("fps", 27015, "aypapol.com")).toBe("aypapol.com:27015");
   });
 });
 
