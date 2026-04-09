@@ -147,6 +147,58 @@ invoices.get("/freelancers", requireAuth, requireApproved, requireInvoiceRole("c
   return c.json(freelancers);
 });
 
+// --- Freelancer profile (MUST be before /:id) ---
+invoices.get("/profile", requireAuth, requireApproved, requireInvoiceRole("freelancer"), (c) => {
+  const discordId = c.get("discordId") as string;
+  const profile = freelancerProfileQueries.get.get(discordId);
+  return c.json(profile ?? null);
+});
+
+invoices.put(
+  "/profile",
+  requireAuth,
+  requireApproved,
+  requireInvoiceRole("freelancer"),
+  async (c) => {
+    const discordId = c.get("discordId") as string;
+    const body = await c.req.json<Partial<FreelancerProfile>>();
+    const user = panelUserQueries.get.get(discordId);
+
+    freelancerProfileQueries.upsert.run(
+      discordId,
+      body.display_name ?? user?.username ?? "Unknown",
+      body.rfc ?? null,
+      body.email ?? null,
+      body.bank_name ?? null,
+      body.account_holder ?? null,
+      body.account_number ?? null,
+      body.routing_number ?? null,
+      body.account_type ?? null,
+      body.currency ?? "USD",
+      body.billed_to_name ?? null,
+      body.billed_to_address ?? null,
+      body.billed_to_phone ?? null,
+    );
+
+    return c.json({ ok: true });
+  },
+);
+
+// --- Admin: set invoice role (MUST be before /:id) ---
+invoices.put("/role/:discordId", requireAuth, requireApproved, requireAdmin, async (c) => {
+  const { discordId } = c.req.param();
+  const body = await c.req.json<{ invoice_role: string | null }>();
+  const valid = [null, "contador", "freelancer"];
+  if (!valid.includes(body.invoice_role)) {
+    return c.json({ error: "Invalid invoice role. Use: contador, freelancer, or null" }, 400);
+  }
+  const user = panelUserQueries.get.get(discordId);
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  panelUserQueries.updateInvoiceRole.run(body.invoice_role, discordId);
+  return c.json({ ok: true });
+});
+
 // --- Get single invoice ---
 invoices.get(
   "/:id",
@@ -304,58 +356,6 @@ invoices.delete("/:id", requireAuth, requireApproved, requireInvoiceRole("contad
   if (!invoice) return c.json({ error: "Invoice not found" }, 404);
 
   invoiceQueries.deleteById.run(id);
-  return c.json({ ok: true });
-});
-
-// --- Freelancer profile ---
-invoices.get("/profile", requireAuth, requireApproved, requireInvoiceRole("freelancer"), (c) => {
-  const discordId = c.get("discordId") as string;
-  const profile = freelancerProfileQueries.get.get(discordId);
-  return c.json(profile ?? null);
-});
-
-invoices.put(
-  "/profile",
-  requireAuth,
-  requireApproved,
-  requireInvoiceRole("freelancer"),
-  async (c) => {
-    const discordId = c.get("discordId") as string;
-    const body = await c.req.json<Partial<FreelancerProfile>>();
-    const user = panelUserQueries.get.get(discordId);
-
-    freelancerProfileQueries.upsert.run(
-      discordId,
-      body.display_name ?? user?.username ?? "Unknown",
-      body.rfc ?? null,
-      body.email ?? null,
-      body.bank_name ?? null,
-      body.account_holder ?? null,
-      body.account_number ?? null,
-      body.routing_number ?? null,
-      body.account_type ?? null,
-      body.currency ?? "USD",
-      body.billed_to_name ?? null,
-      body.billed_to_address ?? null,
-      body.billed_to_phone ?? null,
-    );
-
-    return c.json({ ok: true });
-  },
-);
-
-// --- Admin: set invoice role ---
-invoices.put("/role/:discordId", requireAuth, requireApproved, requireAdmin, async (c) => {
-  const { discordId } = c.req.param();
-  const body = await c.req.json<{ invoice_role: string | null }>();
-  const valid = [null, "contador", "freelancer"];
-  if (!valid.includes(body.invoice_role)) {
-    return c.json({ error: "Invalid invoice role. Use: contador, freelancer, or null" }, 400);
-  }
-  const user = panelUserQueries.get.get(discordId);
-  if (!user) return c.json({ error: "User not found" }, 404);
-
-  panelUserQueries.updateInvoiceRole.run(body.invoice_role, discordId);
   return c.json({ ok: true });
 });
 
