@@ -8,11 +8,20 @@ import {
   invoiceItemQueries,
   invoiceQueries,
   panelUserQueries,
+  type Session,
 } from "../db";
 import { generateCommercialPdf } from "../invoice-pdf";
 import { requireAdmin, requireApproved, requireAuth, requireInvoiceRole } from "../middleware/auth";
 
-const invoices = new Hono();
+const invoices = new Hono<{
+  Variables: {
+    session: Session;
+    discordId: string;
+    role: string;
+    invoiceRole: string;
+    isBotRequest?: boolean;
+  };
+}>();
 
 // --- Upload invoice (contador only) ---
 invoices.post(
@@ -184,7 +193,7 @@ invoices.get(
       return c.json({ error: "Access denied" }, 403);
     }
 
-    return new Response(invoice.timbrado_pdf, {
+    return new Response(new Uint8Array(invoice.timbrado_pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${invoice.cfdi_uuid}_timbrado.pdf"`,
@@ -229,7 +238,7 @@ invoices.get(
       profile,
     );
 
-    return new Response(pdfBytes, {
+    return new Response(pdfBytes as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${invoice.cfdi_uuid}_commercial.pdf"`,
@@ -279,7 +288,7 @@ invoices.get(
       [`${invoice.cfdi_uuid}_commercial.pdf`]: commercialPdf,
     });
 
-    return new Response(zipData, {
+    return new Response(zipData as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="invoice_${invoice.cfdi_uuid}.zip"`,
