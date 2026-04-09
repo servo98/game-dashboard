@@ -121,12 +121,20 @@ try {
   /* column already exists */
 }
 
-// Auto-set role=admin for ALLOWED_DISCORD_IDS on startup
+// Auto-set role=admin for ALLOWED_DISCORD_IDS on startup, demote anyone removed
 {
   const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  // Demote anyone who is admin but no longer in the list
+  if (allowedIds.length > 0) {
+    const placeholders = allowedIds.map(() => "?").join(",");
+    db.exec(
+      `UPDATE panel_users SET role = 'user' WHERE role = 'admin' AND discord_id NOT IN (${placeholders})`,
+      allowedIds,
+    );
+  }
   for (const id of allowedIds) {
     db.exec(`UPDATE panel_users SET role = 'admin' WHERE discord_id = '${id}'`);
   }
