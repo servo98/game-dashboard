@@ -40,7 +40,8 @@ export async function execRconCommand(serverId: string, command: string): Promis
       if (!output && raw.length > 0) {
         output = raw.toString("utf-8");
       }
-      resolve(output.trim());
+      // Strip ANSI escape codes (color/formatting)
+      resolve(output.replace(/\x1b\[[0-9;]*m/g, "").trim());
     });
 
     stream.on("error", reject);

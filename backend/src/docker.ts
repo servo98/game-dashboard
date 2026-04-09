@@ -210,13 +210,18 @@ export function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+// RCON internal log lines are noise — filter them from game logs
+const RCON_NOISE = /RCON Listener|RCON Client|RconClient|Thread RCON/;
+
 export function formatLogLine(raw: string): string {
   const clean = stripAnsi(raw);
   const tsMatch = clean.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s?/);
   if (tsMatch) {
     const msg = clean.slice(tsMatch[0].length);
+    if (RCON_NOISE.test(msg)) return "";
     return `${tsMatch[1]}Z\t${msg}`; // ISO timestamp + tab + message
   }
+  if (RCON_NOISE.test(clean)) return "";
   return clean;
 }
 
@@ -355,7 +360,8 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     if (rawBuf.length > 0) {
       const decoded = dechunk();
       for (const line of extractLines(decoded, isTty)) {
-        yield formatLogLine(line);
+        const formatted = formatLogLine(line);
+        if (formatted) yield formatted;
       }
     }
 
@@ -367,7 +373,8 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
       const decoded = dechunk();
       if (decoded.length > 0) {
         for (const line of extractLines(decoded, isTty)) {
-          yield formatLogLine(line);
+          const formatted = formatLogLine(line);
+          if (formatted) yield formatted;
         }
       }
     }
