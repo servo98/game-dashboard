@@ -338,6 +338,7 @@ invoices.get(
     const zipData = zipSync({
       [`${invoice.cfdi_uuid}_timbrado.pdf`]: new Uint8Array(invoice.timbrado_pdf),
       [`${invoice.cfdi_uuid}_commercial.pdf`]: commercialPdf,
+      [`${invoice.cfdi_uuid}.xml`]: new TextEncoder().encode(invoice.timbrado_xml),
     });
 
     return new Response(zipData as unknown as BodyInit, {
