@@ -107,6 +107,21 @@ export async function requireAuthOrBotKey(c: Context, next: Next) {
   return requireAuth(c, next);
 }
 
+/** Check if user has one of the allowed invoice roles. Must be used after requireAuth + requireApproved. */
+export function requireInvoiceRole(...allowed: string[]) {
+  return async (c: Context, next: Next) => {
+    if (c.get("isBotRequest")) return next();
+
+    const discordId = c.get("discordId") as string;
+    const user = panelUserQueries.get.get(discordId);
+    if (!user?.invoice_role || !allowed.includes(user.invoice_role)) {
+      return c.json({ error: "Invoice access required" }, 403);
+    }
+    c.set("invoiceRole", user.invoice_role);
+    await next();
+  };
+}
+
 export function getCookie(req: Request, name: string): string | undefined {
   const cookie = req.headers.get("cookie") ?? "";
   const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));

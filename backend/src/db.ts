@@ -114,6 +114,13 @@ try {
   /* column already exists */
 }
 
+// Migration: add invoice_role column to panel_users
+try {
+  db.exec(`ALTER TABLE panel_users ADD COLUMN invoice_role TEXT`);
+} catch (_) {
+  /* column already exists */
+}
+
 // Auto-set role=admin for ALLOWED_DISCORD_IDS on startup
 {
   const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
@@ -141,6 +148,65 @@ try {
 } catch (_) {
   /* column already exists */
 }
+
+// --- Invoice / billing tables ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS freelancer_profiles (
+    discord_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    rfc TEXT,
+    email TEXT,
+    bank_name TEXT,
+    account_holder TEXT,
+    account_number TEXT,
+    routing_number TEXT,
+    account_type TEXT,
+    currency TEXT DEFAULT 'USD',
+    billed_to_name TEXT,
+    billed_to_address TEXT,
+    billed_to_phone TEXT,
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    freelancer_discord_id TEXT NOT NULL,
+    cfdi_uuid TEXT NOT NULL UNIQUE,
+    emisor_rfc TEXT NOT NULL,
+    emisor_nombre TEXT,
+    receptor_rfc TEXT NOT NULL,
+    receptor_nombre TEXT,
+    subtotal REAL NOT NULL,
+    total REAL NOT NULL,
+    moneda TEXT NOT NULL DEFAULT 'MXN',
+    forma_pago TEXT,
+    metodo_pago TEXT,
+    fecha_emision TEXT,
+    fecha_timbrado TEXT,
+    sello_sat TEXT,
+    sello_cfdi TEXT,
+    no_certificado_sat TEXT,
+    cadena_original TEXT,
+    timbrado_xml TEXT NOT NULL,
+    timbrado_pdf BLOB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'uploaded',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    uploaded_by TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    clave_prod_serv TEXT,
+    descripcion TEXT NOT NULL,
+    cantidad REAL NOT NULL DEFAULT 1,
+    clave_unidad TEXT,
+    unidad TEXT,
+    valor_unitario REAL NOT NULL,
+    importe REAL NOT NULL,
+    objeto_imp TEXT
+  );
+`);
 
 export type Server = {
   id: string;
@@ -297,6 +363,7 @@ export type PanelUser = {
   avatar: string | null;
   status: string; // pending | approved | rejected
   role: string; // admin | user
+  invoice_role: string | null; // contador | freelancer | null
   requested_at: number;
   approved_at: number | null;
   approved_by: string | null;
@@ -340,6 +407,9 @@ export const panelUserQueries = {
     "UPDATE panel_users SET role = ? WHERE discord_id = ?",
   ),
   delete: db.query<void, [string]>("DELETE FROM panel_users WHERE discord_id = ?"),
+  updateInvoiceRole: db.query<void, [string | null, string]>(
+    "UPDATE panel_users SET invoice_role = ? WHERE discord_id = ?",
+  ),
 };
 
 export const userServerAccessQueries = {
@@ -385,5 +455,189 @@ export const mcpTokenQueries = {
   ),
   updateLastUsed: db.query<void, [number]>(
     "UPDATE mcp_tokens SET last_used_at = unixepoch() WHERE id = ?",
+  ),
+};
+
+// --- Invoice types & queries ---
+
+export type FreelancerProfile = {
+  discord_id: string;
+  display_name: string;
+  rfc: string | null;
+  email: string | null;
+  bank_name: string | null;
+  account_holder: string | null;
+  account_number: string | null;
+  routing_number: string | null;
+  account_type: string | null;
+  currency: string | null;
+  billed_to_name: string | null;
+  billed_to_address: string | null;
+  billed_to_phone: string | null;
+  updated_at: number;
+};
+
+export type Invoice = {
+  id: number;
+  freelancer_discord_id: string;
+  cfdi_uuid: string;
+  emisor_rfc: string;
+  emisor_nombre: string | null;
+  receptor_rfc: string;
+  receptor_nombre: string | null;
+  subtotal: number;
+  total: number;
+  moneda: string;
+  forma_pago: string | null;
+  metodo_pago: string | null;
+  fecha_emision: string | null;
+  fecha_timbrado: string | null;
+  sello_sat: string | null;
+  sello_cfdi: string | null;
+  no_certificado_sat: string | null;
+  cadena_original: string | null;
+  timbrado_xml: string;
+  timbrado_pdf: Buffer;
+  status: string;
+  created_at: number;
+  uploaded_by: string;
+};
+
+export type InvoiceItem = {
+  id: number;
+  invoice_id: number;
+  clave_prod_serv: string | null;
+  descripcion: string;
+  cantidad: number;
+  clave_unidad: string | null;
+  unidad: string | null;
+  valor_unitario: number;
+  importe: number;
+  objeto_imp: string | null;
+};
+
+export const freelancerProfileQueries = {
+  get: db.query<FreelancerProfile, [string]>(
+    "SELECT * FROM freelancer_profiles WHERE discord_id = ?",
+  ),
+  upsert: db.query<
+    void,
+    [
+      string,
+      string,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+    ]
+  >(
+    `INSERT INTO freelancer_profiles (discord_id, display_name, rfc, email, bank_name, account_holder, account_number, routing_number, account_type, currency, billed_to_name, billed_to_address, billed_to_phone)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(discord_id) DO UPDATE SET
+       display_name=excluded.display_name, rfc=excluded.rfc, email=excluded.email,
+       bank_name=excluded.bank_name, account_holder=excluded.account_holder,
+       account_number=excluded.account_number, routing_number=excluded.routing_number,
+       account_type=excluded.account_type, currency=excluded.currency,
+       billed_to_name=excluded.billed_to_name, billed_to_address=excluded.billed_to_address,
+       billed_to_phone=excluded.billed_to_phone, updated_at=unixepoch()`,
+  ),
+};
+
+// For listing invoices without the heavy BLOB columns
+export type InvoiceSummary = {
+  id: number;
+  freelancer_discord_id: string;
+  cfdi_uuid: string;
+  emisor_rfc: string;
+  emisor_nombre: string | null;
+  receptor_rfc: string;
+  receptor_nombre: string | null;
+  subtotal: number;
+  total: number;
+  moneda: string;
+  forma_pago: string | null;
+  metodo_pago: string | null;
+  fecha_emision: string | null;
+  fecha_timbrado: string | null;
+  status: string;
+  created_at: number;
+  uploaded_by: string;
+};
+
+const INVOICE_SUMMARY_COLS = `id, freelancer_discord_id, cfdi_uuid, emisor_rfc, emisor_nombre,
+  receptor_rfc, receptor_nombre, subtotal, total, moneda, forma_pago, metodo_pago,
+  fecha_emision, fecha_timbrado, status, created_at, uploaded_by`;
+
+export const invoiceQueries = {
+  insert: db.query<
+    void,
+    [
+      string,
+      string,
+      string,
+      string | null,
+      string,
+      string | null,
+      number,
+      number,
+      string,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      string,
+      Buffer,
+      string,
+    ]
+  >(
+    `INSERT INTO invoices (freelancer_discord_id, cfdi_uuid, emisor_rfc, emisor_nombre,
+      receptor_rfc, receptor_nombre, subtotal, total, moneda, forma_pago, metodo_pago,
+      fecha_emision, fecha_timbrado, sello_sat, sello_cfdi, no_certificado_sat, cadena_original,
+      timbrado_xml, timbrado_pdf, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ),
+  getById: db.query<Invoice, [number]>("SELECT * FROM invoices WHERE id = ?"),
+  getByUuid: db.query<Invoice, [string]>("SELECT * FROM invoices WHERE cfdi_uuid = ?"),
+  listAll: db.query<InvoiceSummary, []>(
+    `SELECT ${INVOICE_SUMMARY_COLS} FROM invoices ORDER BY created_at DESC`,
+  ),
+  listByFreelancer: db.query<InvoiceSummary, [string]>(
+    `SELECT ${INVOICE_SUMMARY_COLS} FROM invoices WHERE freelancer_discord_id = ? ORDER BY created_at DESC`,
+  ),
+  deleteById: db.query<void, [number]>("DELETE FROM invoices WHERE id = ?"),
+  lastInsertId: db.query<{ id: number }, []>("SELECT last_insert_rowid() as id"),
+};
+
+export const invoiceItemQueries = {
+  insert: db.query<
+    void,
+    [
+      number,
+      string | null,
+      string,
+      number,
+      string | null,
+      string | null,
+      number,
+      number,
+      string | null,
+    ]
+  >(
+    `INSERT INTO invoice_items (invoice_id, clave_prod_serv, descripcion, cantidad, clave_unidad, unidad, valor_unitario, importe, objeto_imp)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ),
+  listByInvoice: db.query<InvoiceItem, [number]>(
+    "SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC",
   ),
 };

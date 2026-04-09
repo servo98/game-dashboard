@@ -22,6 +22,7 @@ const CHANNEL_KEYS = [
   "crashes_channel_id",
   "logs_channel_id",
   "quests_channel_id",
+  "invoices_channel_id",
 ] as const;
 
 botSettings.get("/settings", requireAuthOrBotKey, async (c) => {

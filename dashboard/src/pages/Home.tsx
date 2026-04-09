@@ -13,8 +13,11 @@ import BackupsTab from "../components/BackupsTab";
 import BotSettings from "../components/BotSettings";
 import ConfigEditor from "../components/ConfigEditor";
 import FileManager from "../components/FileManager";
+import FreelancerProfileForm from "../components/FreelancerProfileForm";
 import GameStore from "../components/GameStore";
 import HostStatsBar from "../components/HostStatsBar";
+import InvoiceList from "../components/InvoiceList";
+import InvoiceUpload from "../components/InvoiceUpload";
 import LogViewer from "../components/LogViewer";
 import McpTokens from "../components/McpTokens";
 import PanelSettings from "../components/PanelSettings";
@@ -24,10 +27,7 @@ import ThemeBanner from "../components/ThemeBanner";
 import UsersTab from "../components/UsersTab";
 import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
-type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users";
-
-const ADMIN_TABS: Tab[] = ["servers", "bot", "mcp", "backups", "users", "settings"];
-const USER_TABS: Tab[] = ["servers"];
+type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users" | "facturas";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
 
@@ -53,6 +53,7 @@ export default function Home() {
   const [showGameStore, setShowGameStore] = useState(false);
   const [fileManagerId, setFileManagerId] = useState<string | null>(null);
   const [hostDomain, setHostDomain] = useState("aypapol.com");
+  const [invoiceRefresh, setInvoiceRefresh] = useState(0);
   const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
   const [sseConnected, setSseConnected] = useState(true);
 
@@ -328,12 +329,18 @@ export default function Home() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-gray-800">
-          {(isAdmin ? ADMIN_TABS : USER_TABS).map((t) => (
+        <div className="flex gap-1 mb-6 border-b border-gray-800 overflow-x-auto">
+          {((): Tab[] => {
+            const tabs: Tab[] = isAdmin
+              ? ["servers", "bot", "mcp", "backups", "users", "settings"]
+              : ["servers"];
+            if (user?.invoice_role) tabs.push("facturas");
+            return tabs;
+          })().map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px whitespace-nowrap ${
                 tab === t
                   ? "border-brand-500 text-white"
                   : "border-transparent text-gray-500 hover:text-gray-300"
@@ -349,7 +356,9 @@ export default function Home() {
                       ? "Backups"
                       : t === "users"
                         ? "Users"
-                        : "Settings"}
+                        : t === "facturas"
+                          ? "Facturas"
+                          : "Settings"}
             </button>
           ))}
         </div>
@@ -479,6 +488,20 @@ export default function Home() {
         {tab === "settings" && (
           <div className="max-w-lg">
             <PanelSettings />
+          </div>
+        )}
+
+        {tab === "facturas" && user?.invoice_role && (
+          <div className="max-w-3xl">
+            {user.invoice_role === "contador" && (
+              <InvoiceUpload onUploaded={() => setInvoiceRefresh((k) => k + 1)} />
+            )}
+            <InvoiceList invoiceRole={user.invoice_role} refreshKey={invoiceRefresh} />
+            {user.invoice_role === "freelancer" && (
+              <div className="mt-8">
+                <FreelancerProfileForm />
+              </div>
+            )}
           </div>
         )}
       </main>

@@ -21,6 +21,7 @@ export type User = {
   avatar: string | null;
   status: "pending" | "approved" | "rejected";
   role: "admin" | "user";
+  invoice_role: "contador" | "freelancer" | null;
   server_access?: string[]; // only for role="user"
 };
 
@@ -30,6 +31,7 @@ export type PanelUser = {
   avatar: string | null;
   status: "pending" | "approved" | "rejected";
   role: "admin" | "user";
+  invoice_role: "contador" | "freelancer" | null;
   requested_at: number;
   approved_at: number | null;
   approved_by: string | null;
@@ -86,6 +88,7 @@ export type BotSettings = {
   crashes_channel_id: string | null;
   logs_channel_id: string | null;
   quests_channel_id: string | null;
+  invoices_channel_id: string | null;
   commands: Array<{ name: string; description: string }>;
 };
 
@@ -183,6 +186,67 @@ export type CreateServerRequest = {
   env_vars?: Record<string, string>;
   volumes?: Record<string, string>;
   icon?: string;
+};
+
+// --- Invoice types ---
+
+export type InvoiceSummary = {
+  id: number;
+  freelancer_discord_id: string;
+  cfdi_uuid: string;
+  emisor_rfc: string;
+  emisor_nombre: string | null;
+  receptor_rfc: string;
+  receptor_nombre: string | null;
+  subtotal: number;
+  total: number;
+  moneda: string;
+  forma_pago: string | null;
+  metodo_pago: string | null;
+  fecha_emision: string | null;
+  fecha_timbrado: string | null;
+  status: string;
+  created_at: number;
+  uploaded_by: string;
+};
+
+export type InvoiceDetail = InvoiceSummary & {
+  items: InvoiceItemRecord[];
+};
+
+export type InvoiceItemRecord = {
+  id: number;
+  invoice_id: number;
+  clave_prod_serv: string | null;
+  descripcion: string;
+  cantidad: number;
+  clave_unidad: string | null;
+  unidad: string | null;
+  valor_unitario: number;
+  importe: number;
+  objeto_imp: string | null;
+};
+
+export type FreelancerProfile = {
+  discord_id: string;
+  display_name: string;
+  rfc: string | null;
+  email: string | null;
+  bank_name: string | null;
+  account_holder: string | null;
+  account_number: string | null;
+  routing_number: string | null;
+  account_type: string | null;
+  currency: string | null;
+  billed_to_name: string | null;
+  billed_to_address: string | null;
+  billed_to_phone: string | null;
+};
+
+export type InvoiceFreelancer = {
+  discord_id: string;
+  username: string;
+  avatar: string | null;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -384,6 +448,42 @@ export const api = {
     request<{ ok: boolean }>(`/users/${discordId}/servers`, {
       method: "PUT",
       body: JSON.stringify({ server_ids: serverIds }),
+    }),
+
+  /** Invoices */
+  listInvoices: () => request<InvoiceSummary[]>("/invoices"),
+  getInvoice: (id: number) => request<InvoiceDetail>(`/invoices/${id}`),
+  deleteInvoice: (id: number) => request<{ ok: boolean }>(`/invoices/${id}`, { method: "DELETE" }),
+  listFreelancers: () => request<InvoiceFreelancer[]>("/invoices/freelancers"),
+  uploadInvoice: async (freelancerId: string, xml: File, pdf: File) => {
+    const form = new FormData();
+    form.append("xml", xml);
+    form.append("pdf", pdf);
+    form.append("freelancer_id", freelancerId);
+    const res = await fetch(`${BASE}/invoices/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error: string }).error ?? res.statusText);
+    }
+    return res.json() as Promise<{ ok: boolean; id: number; uuid: string }>;
+  },
+  commercialPdfUrl: (id: number) => `${BASE}/invoices/${id}/commercial-pdf`,
+  timbradoPdfUrl: (id: number) => `${BASE}/invoices/${id}/timbrado-pdf`,
+  bundleUrl: (id: number) => `${BASE}/invoices/${id}/bundle`,
+  getInvoiceProfile: () => request<FreelancerProfile | null>("/invoices/profile"),
+  updateInvoiceProfile: (profile: Partial<FreelancerProfile>) =>
+    request<{ ok: boolean }>("/invoices/profile", {
+      method: "PUT",
+      body: JSON.stringify(profile),
+    }),
+  setInvoiceRole: (discordId: string, role: string | null) =>
+    request<{ ok: boolean }>(`/invoices/role/${discordId}`, {
+      method: "PUT",
+      body: JSON.stringify({ invoice_role: role }),
     }),
 
   /** MCP tokens */

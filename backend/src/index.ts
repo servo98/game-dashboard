@@ -10,6 +10,7 @@ import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
 import fileRoutes from "./routes/files";
 import inviteRoutes from "./routes/invites";
+import invoiceRoutes from "./routes/invoices";
 import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
@@ -30,6 +31,8 @@ app.use(
       process.env.PUBLIC_URL ?? "http://localhost:5173",
       "http://localhost:5173",
       "http://localhost:4173",
+      "https://facturas.aypapol.com",
+      "https://game.aypapol.com",
     ],
     credentials: true,
   }),
@@ -121,6 +124,7 @@ app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
 app.route("/api/users", userRoutes);
 app.route("/api/invites", inviteRoutes);
+app.route("/api/invoices", invoiceRoutes);
 app.route("/oauth", oauthRoutes);
 registerWellKnown(app);
 

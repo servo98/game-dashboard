@@ -8,6 +8,9 @@ const auth = new Hono<{ Variables: { session: Session } }>();
 const DISCORD_API = "https://discord.com/api/v10";
 const SESSION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
 
+const isProduction = (process.env.PUBLIC_URL ?? "").includes("aypapol.com");
+const cookieDomain = isProduction ? "; Domain=.aypapol.com" : "";
+
 auth.get("/discord", (c) => {
   // Check for invite code — store it in a cookie so we can redirect after OAuth
   const invite = c.req.query("invite");
@@ -126,7 +129,7 @@ auth.get("/callback", async (c) => {
           ["Location", returnPath],
           [
             "Set-Cookie",
-            `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}`,
+            `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
           ],
           ["Set-Cookie", "oauth_return=; Path=/; HttpOnly; Max-Age=0"],
         ],
@@ -144,7 +147,7 @@ auth.get("/callback", async (c) => {
     status: 302,
     headers: {
       Location: `${publicUrl}${redirectPath}`,
-      "Set-Cookie": `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}`,
+      "Set-Cookie": `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
     },
   });
 });
@@ -161,6 +164,7 @@ auth.get("/me", requireAuth, (c) => {
       : null,
     status: panelUser?.status ?? "pending",
     role: panelUser?.role ?? "user",
+    invoice_role: panelUser?.invoice_role ?? null,
   };
 
   // For non-admin users, include their server access list
@@ -182,7 +186,7 @@ auth.post("/logout", requireAuth, (c) => {
     status: 200,
     headers: {
       "Content-Type": "application/json",
-      "Set-Cookie": "session=; Path=/; HttpOnly; Max-Age=0",
+      "Set-Cookie": `session=; Path=/; HttpOnly; Max-Age=0${cookieDomain}`,
     },
   });
 });

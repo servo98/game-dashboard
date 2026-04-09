@@ -1,6 +1,36 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type GameServer, type InviteLinkInfo, type PanelUser } from "../api";
 
+function InvoiceRoleSelect({ user, onChanged }: { user: PanelUser; onChanged: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleChange(role: string) {
+    setSaving(true);
+    try {
+      await api.setInvoiceRole(user.discord_id, role || null);
+      onChanged();
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <select
+      value={user.invoice_role ?? ""}
+      onChange={(e) => handleChange(e.target.value)}
+      disabled={saving}
+      className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-300 disabled:opacity-50"
+      title="Invoice role"
+    >
+      <option value="">Sin rol factura</option>
+      <option value="contador">Contador</option>
+      <option value="freelancer">Freelancer</option>
+    </select>
+  );
+}
+
 export default function UsersTab() {
   const [users, setUsers] = useState<PanelUser[]>([]);
   const [invites, setInvites] = useState<InviteLinkInfo[]>([]);
@@ -378,6 +408,7 @@ export default function UsersTab() {
                   <p className="text-sm font-medium text-white truncate">{u.username}</p>
                   <p className="text-xs text-purple-400/60">Admin — full access</p>
                 </div>
+                <InvoiceRoleSelect user={u} onChanged={fetchAll} />
               </div>
             ))}
           </div>
@@ -425,7 +456,8 @@ export default function UsersTab() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5 items-center">
+                    <InvoiceRoleSelect user={u} onChanged={fetchAll} />
                     <button
                       onClick={() => startEditAccess(u)}
                       className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-xs font-medium transition-colors"

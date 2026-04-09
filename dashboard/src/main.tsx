@@ -5,10 +5,15 @@ import { api } from "./api";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import Invite from "./pages/Invite";
+import InvoiceHome from "./pages/InvoiceHome";
 import Login from "./pages/Login";
 import Pending from "./pages/Pending";
 import Status from "./pages/Status";
 import "./index.css";
+
+const isFacturas =
+  window.location.hostname === "facturas.aypapol.com" ||
+  window.location.hostname.startsWith("facturas.");
 
 // Global error reporting — throttled to 1 per 30s
 let lastReport = 0;
@@ -50,10 +55,19 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<Pending />} />
-          <Route path="/invite/:code" element={<Invite />} />
-          <Route path="/status" element={<Status />} />
-          <Route path="/" element={<Home />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {isFacturas ? (
+            <>
+              <Route path="/" element={<InvoiceHome />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            <>
+              <Route path="/invite/:code" element={<Invite />} />
+              <Route path="/status" element={<Status />} />
+              <Route path="/" element={<Home />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
