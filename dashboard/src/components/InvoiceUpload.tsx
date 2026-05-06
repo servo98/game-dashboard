@@ -16,7 +16,7 @@ export default function InvoiceUpload({ onUploaded }: { onUploaded: () => void }
     api
       .listFreelancers()
       .then(setFreelancers)
-      .catch(() => {});
+      .catch((err) => setError(`No se pudieron cargar freelancers: ${(err as Error).message}`));
   }, []);
 
   async function handleUpload() {
