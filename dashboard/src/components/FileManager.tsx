@@ -12,11 +12,66 @@ type Props = {
 type UploadItem = {
   id: string;
   file: File;
+  /** Path relative to the drop target, preserving folder structure (e.g. "mods/config/x.json") */
+  relativePath: string;
   progress: number; // 0-100
   status: "pending" | "uploading" | "done" | "error";
   error?: string;
   abort?: () => void;
 };
+
+type DroppedFile = { file: File; relativePath: string };
+
+// Read a single file from a FileSystemFileEntry
+function readEntryFile(entry: FileSystemFileEntry): Promise<File> {
+  return new Promise((resolve, reject) => entry.file(resolve, reject));
+}
+
+// readEntries() returns at most 100 entries per call — must keep calling until it returns empty
+function readAllDirEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const all: FileSystemEntry[] = [];
+    const readBatch = () => {
+      reader.readEntries((batch) => {
+        if (batch.length === 0) {
+          resolve(all);
+          return;
+        }
+        all.push(...batch);
+        readBatch();
+      }, reject);
+    };
+    readBatch();
+  });
+}
+
+// Recursively collect every file under an entry, building its relative path
+async function walkEntry(
+  entry: FileSystemEntry,
+  prefix: string,
+  out: DroppedFile[],
+): Promise<void> {
+  if (entry.isFile) {
+    const file = await readEntryFile(entry as FileSystemFileEntry);
+    out.push({ file, relativePath: prefix + entry.name });
+  } else if (entry.isDirectory) {
+    const reader = (entry as FileSystemDirectoryEntry).createReader();
+    const children = await readAllDirEntries(reader);
+    for (const child of children) {
+      await walkEntry(child, `${prefix}${entry.name}/`, out);
+    }
+  }
+}
+
+// Collect dropped files, descending into folders. Entries must be captured
+// synchronously from the drop event before any await (the list is invalidated after).
+async function collectFromEntries(entries: (FileSystemEntry | null)[]): Promise<DroppedFile[]> {
+  const out: DroppedFile[] = [];
+  for (const entry of entries) {
+    if (entry) await walkEntry(entry, "", out);
+  }
+  return out;
+}
 
 const FILE_ICONS: Record<string, string> = {
   dir: "\u{1F4C1}",
@@ -182,6 +237,7 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
           serverId,
           uploadPath,
           next.file,
+          next.relativePath,
           (loaded, total) => {
             const pct = Math.round((loaded / total) * 100);
             setUploads((prev) => prev.map((u) => (u.id === next.id ? { ...u, progress: pct } : u)));
@@ -215,13 +271,13 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
     fetchEntries(currentPathRef.current);
   }, [serverId, fetchEntries]);
 
-  function enqueueFiles(files: FileList | File[]) {
-    const fileArr = Array.from(files);
-    if (fileArr.length === 0) return;
+  function enqueueFiles(files: DroppedFile[]) {
+    if (files.length === 0) return;
 
-    const newItems: UploadItem[] = fileArr.map((file) => ({
+    const newItems: UploadItem[] = files.map(({ file, relativePath }) => ({
       id: `upload-${++uploadIdCounter}`,
       file,
+      relativePath,
       progress: 0,
       status: "pending" as const,
     }));
@@ -274,8 +330,27 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
     e.stopPropagation();
     dragCounterRef.current = 0;
     setDragOver(false);
-    if (e.dataTransfer.files.length > 0) {
-      enqueueFiles(e.dataTransfer.files);
+
+    const dt = e.dataTransfer;
+    // Capture entries synchronously — dataTransfer.items is cleared after the event handler returns
+    const entries: (FileSystemEntry | null)[] = [];
+    if (dt.items && dt.items.length > 0) {
+      for (let i = 0; i < dt.items.length; i++) {
+        const it = dt.items[i];
+        if (it.kind === "file" && typeof it.webkitGetAsEntry === "function") {
+          entries.push(it.webkitGetAsEntry());
+        }
+      }
+    }
+
+    if (entries.some(Boolean)) {
+      // Folder-aware path: descend into any dropped directories
+      collectFromEntries(entries).then((dropped) => {
+        if (dropped.length > 0) enqueueFiles(dropped);
+      });
+    } else if (dt.files.length > 0) {
+      // Fallback for browsers without the entries API
+      enqueueFiles(Array.from(dt.files).map((file) => ({ file, relativePath: file.name })));
     }
   }
 
@@ -345,7 +420,11 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
               multiple
               className="hidden"
               onChange={(e) => {
-                if (e.target.files) enqueueFiles(e.target.files);
+                if (e.target.files) {
+                  enqueueFiles(
+                    Array.from(e.target.files).map((file) => ({ file, relativePath: file.name })),
+                  );
+                }
                 e.target.value = "";
               }}
             />
@@ -436,7 +515,9 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
             <div className="absolute inset-0 bg-brand-500/10 border-2 border-dashed border-brand-500 rounded-lg z-10 flex items-center justify-center pointer-events-none">
               <div className="text-center">
                 <div className="text-3xl mb-2">&#x1F4E4;</div>
-                <p className="text-brand-400 font-medium text-sm">Drop files to upload</p>
+                <p className="text-brand-400 font-medium text-sm">
+                  Drop files or folders to upload
+                </p>
                 <p className="text-brand-400/60 text-xs mt-1">
                   to {currentPath === "/" ? "root" : currentPath}
                 </p>
@@ -605,7 +686,9 @@ function UploadRow({ item, onDismiss }: { item: UploadItem; onDismiss: () => voi
       {/* File info + progress */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-gray-300 truncate">{item.file.name}</span>
+          <span className="text-gray-300 truncate" title={item.relativePath}>
+            {item.relativePath}
+          </span>
           <span className="text-gray-500 shrink-0">{formatSize(item.file.size)}</span>
         </div>
         {(isActive || isPending) && (

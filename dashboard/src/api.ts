@@ -506,6 +506,7 @@ export function uploadFileWithProgress(
   serverId: string,
   path: string,
   file: File,
+  relativePath: string,
   onProgress: (loaded: number, total: number) => void,
 ): { promise: Promise<{ ok: boolean; uploaded: string[] }>; abort: () => void } {
   const xhr = new XMLHttpRequest();
@@ -538,6 +539,8 @@ export function uploadFileWithProgress(
     xhr.onabort = () => reject(new Error("Upload cancelled"));
 
     const form = new FormData();
+    // Send the relative path first so the backend can recreate the folder structure
+    form.append("relativePath", relativePath);
     form.append("file", file);
     xhr.send(form);
   });

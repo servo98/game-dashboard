@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, realpathSync, rmSync, statSync } from "fs";
 import { Hono } from "hono";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import type { Session } from "../db";
 import { serverQueries } from "../db";
 import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
@@ -203,9 +203,11 @@ files.post("/:id/files/upload", requireAuth, requireApproved, requireAdmin, asyn
 
   try {
     const formData = await c.req.formData();
+    const relativePathField = formData.get("relativePath");
     const uploaded: string[] = [];
 
-    for (const [_key, value] of formData.entries()) {
+    for (const [key, value] of formData.entries()) {
+      if (key === "relativePath") continue;
       if (typeof value === "string") continue;
       const file = value as unknown as File;
 
@@ -214,15 +216,32 @@ files.post("/:id/files/upload", requireAuth, requireApproved, requireAdmin, asyn
         return c.json({ error: `File ${file.name} exceeds 100MB limit` }, 400);
       }
 
-      const targetPath = join(resolved.fsPath, file.name);
-      // Re-verify the target is still within bounds
-      const safeTarget = resolve(targetPath);
-      const vol = volumes.find((v) => safeTarget.startsWith(v.accessPath));
-      if (!vol) return c.json({ error: `Invalid file name: ${file.name}` }, 403);
+      // Use the relative path (folder structure) when provided, else just the file name
+      const rawRel =
+        typeof relativePathField === "string" && relativePathField.length > 0
+          ? relativePathField
+          : file.name;
+      // Normalize separators, drop empty/"." segments, and reject any ".." traversal
+      const segments = rawRel
+        .replace(/\\/g, "/")
+        .split("/")
+        .filter((seg) => seg && seg !== ".");
+      if (segments.length === 0 || segments.some((seg) => seg === "..")) {
+        return c.json({ error: `Invalid file name: ${rawRel}` }, 403);
+      }
+      const safeRel = segments.join("/");
+
+      const targetPath = resolve(join(resolved.fsPath, safeRel));
+      // Re-verify the target is still within a volume's bounds
+      const vol = volumes.find((v) => targetPath.startsWith(v.accessPath));
+      if (!vol) return c.json({ error: `Invalid file name: ${rawRel}` }, 403);
+
+      // Recreate parent folders (for nested uploads from dropped directories)
+      mkdirSync(dirname(targetPath), { recursive: true });
 
       const buffer = await file.arrayBuffer();
       await Bun.write(targetPath, buffer);
-      uploaded.push(file.name);
+      uploaded.push(safeRel);
     }
 
     return c.json({ ok: true, uploaded });
