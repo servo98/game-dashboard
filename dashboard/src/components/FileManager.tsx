@@ -17,8 +17,18 @@ type UploadItem = {
   progress: number; // 0-100
   status: "pending" | "uploading" | "done" | "error";
   error?: string;
+  /** How many times this file has been attempted (for auto-retry) */
+  attempts: number;
   abort?: () => void;
 };
+
+// How many files to upload at once. Bulk folder uploads (Foundry modules can be
+// thousands of small files) would crawl one-at-a-time, so we run a small pool.
+const MAX_CONCURRENT_UPLOADS = 4;
+// Auto-retry transient failures (network blips) before giving up on a file.
+const MAX_UPLOAD_ATTEMPTS = 3;
+// Errors that are deterministic — retrying won't help, so fail fast.
+const NON_RETRYABLE = /exceeds|Invalid file name|Invalid path|Expected multipart|No volumes/i;
 
 type DroppedFile = { file: File; relativePath: string };
 
@@ -154,6 +164,8 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
   // Upload queue
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const processingRef = useRef(false);
+  // IDs currently claimed by a worker — prevents two workers grabbing the same file
+  const claimedRef = useRef<Set<string>>(new Set());
   const uploadsRef = useRef(uploads);
   uploadsRef.current = uploads;
   const currentPathRef = useRef(currentPath);
@@ -215,61 +227,95 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
     setCurrentPath(`/${parts.slice(0, index + 1).join("/")}`);
   }
 
-  // Process upload queue — one file at a time
+  // Upload a single file, retrying transient failures up to MAX_UPLOAD_ATTEMPTS.
+  const uploadOne = useCallback(
+    async (item: UploadItem) => {
+      const uploadPath = currentPathRef.current;
+
+      for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
+        try {
+          const { promise, abort } = uploadFileWithProgress(
+            serverId,
+            uploadPath,
+            item.file,
+            item.relativePath,
+            (loaded, total) => {
+              const pct = Math.round((loaded / total) * 100);
+              setUploads((prev) =>
+                prev.map((u) => (u.id === item.id ? { ...u, progress: pct } : u)),
+              );
+            },
+          );
+
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.id === item.id
+                ? { ...u, abort, status: "uploading" as const, attempts: attempt }
+                : u,
+            ),
+          );
+
+          await promise;
+
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.id === item.id
+                ? { ...u, status: "done" as const, progress: 100, error: undefined }
+                : u,
+            ),
+          );
+          return;
+        } catch (err) {
+          const msg = (err as Error).message;
+          // User cancelled — the item is being removed by dismissUpload, just stop.
+          if (msg === "Upload cancelled") return;
+
+          // Give up on deterministic errors or after the last attempt.
+          if (NON_RETRYABLE.test(msg) || attempt === MAX_UPLOAD_ATTEMPTS) {
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === item.id
+                  ? { ...u, status: "error" as const, error: msg, attempts: attempt }
+                  : u,
+              ),
+            );
+            return;
+          }
+
+          // Transient failure — back off, then retry.
+          await new Promise((r) => setTimeout(r, 400 * attempt));
+        }
+      }
+    },
+    [serverId],
+  );
+
+  // Process the upload queue with a small pool of concurrent workers.
   const processQueue = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
 
-    while (true) {
-      const items = uploadsRef.current;
-      const next = items.find((u) => u.status === "pending");
-      if (!next) break;
-
-      // Mark as uploading
-      setUploads((prev) =>
-        prev.map((u) => (u.id === next.id ? { ...u, status: "uploading" as const } : u)),
-      );
-
-      const uploadPath = currentPathRef.current;
-
-      try {
-        const { promise, abort } = uploadFileWithProgress(
-          serverId,
-          uploadPath,
-          next.file,
-          next.relativePath,
-          (loaded, total) => {
-            const pct = Math.round((loaded / total) * 100);
-            setUploads((prev) => prev.map((u) => (u.id === next.id ? { ...u, progress: pct } : u)));
-          },
+    const worker = async () => {
+      while (true) {
+        const next = uploadsRef.current.find(
+          (u) => u.status === "pending" && !claimedRef.current.has(u.id),
         );
-
-        // Store abort function
-        setUploads((prev) => prev.map((u) => (u.id === next.id ? { ...u, abort } : u)));
-
-        await promise;
-
+        if (!next) break;
+        claimedRef.current.add(next.id); // synchronous claim — no two workers grab the same file
         setUploads((prev) =>
-          prev.map((u) =>
-            u.id === next.id ? { ...u, status: "done" as const, progress: 100 } : u,
-          ),
+          prev.map((u) => (u.id === next.id ? { ...u, status: "uploading" as const } : u)),
         );
-      } catch (err) {
-        const msg = (err as Error).message;
-        if (msg !== "Upload cancelled") {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.id === next.id ? { ...u, status: "error" as const, error: msg } : u,
-            ),
-          );
-        }
+        await uploadOne(next);
+        claimedRef.current.delete(next.id);
       }
-    }
+    };
+
+    await Promise.all(Array.from({ length: MAX_CONCURRENT_UPLOADS }, () => worker()));
 
     processingRef.current = false;
-    // Refresh file list after all uploads
+    // Refresh file list after all uploads settle
     fetchEntries(currentPathRef.current);
-  }, [serverId, fetchEntries]);
+  }, [uploadOne, fetchEntries]);
 
   function enqueueFiles(files: DroppedFile[]) {
     if (files.length === 0) return;
@@ -280,10 +326,23 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
       relativePath,
       progress: 0,
       status: "pending" as const,
+      attempts: 0,
     }));
 
     setUploads((prev) => [...prev, ...newItems]);
     // Start processing after state update
+    setTimeout(() => processQueue(), 0);
+  }
+
+  // Re-queue only the files that failed, leaving successful ones untouched.
+  function retryFailed() {
+    setUploads((prev) =>
+      prev.map((u) =>
+        u.status === "error"
+          ? { ...u, status: "pending" as const, progress: 0, error: undefined, attempts: 0 }
+          : u,
+      ),
+    );
     setTimeout(() => processQueue(), 0);
   }
 
@@ -387,10 +446,16 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
 
   const pathParts = currentPath.split("/").filter(Boolean);
   const hasActiveUploads = uploads.length > 0;
+  const totalUploads = uploads.length;
   const uploadingCount = uploads.filter(
     (u) => u.status === "uploading" || u.status === "pending",
   ).length;
+  const doneCount = uploads.filter((u) => u.status === "done").length;
+  const errorCount = uploads.filter((u) => u.status === "error").length;
   const hasFinished = uploads.some((u) => u.status === "done" || u.status === "error");
+  // Render only the actionable rows (in-flight + failed). Pending/done are summarized
+  // as counts so a 1700-file folder upload doesn't render thousands of DOM rows.
+  const visibleUploads = uploads.filter((u) => u.status === "uploading" || u.status === "error");
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -627,26 +692,44 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
         {/* Upload queue panel */}
         {hasActiveUploads && (
           <div className="border-t border-gray-800 bg-gray-950">
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-xs text-gray-400">
-                {uploadingCount > 0
-                  ? `Uploading ${uploadingCount} file${uploadingCount !== 1 ? "s" : ""}...`
-                  : "Uploads complete"}
+            <div className="flex items-center justify-between px-4 py-2 gap-3">
+              <span className="text-xs text-gray-400 flex items-center gap-2 min-w-0">
+                <span className="truncate">
+                  {uploadingCount > 0
+                    ? `Subiendo ${doneCount}/${totalUploads}...`
+                    : errorCount > 0
+                      ? "Subida finalizada con errores"
+                      : "Subida completa"}
+                </span>
+                {doneCount > 0 && <span className="text-green-400 shrink-0">✓ {doneCount}</span>}
+                {errorCount > 0 && <span className="text-red-400 shrink-0">✗ {errorCount}</span>}
               </span>
-              {hasFinished && (
-                <button
-                  onClick={clearFinished}
-                  className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  Clear finished
-                </button>
-              )}
+              <div className="flex items-center gap-3 shrink-0">
+                {errorCount > 0 && uploadingCount === 0 && (
+                  <button
+                    onClick={retryFailed}
+                    className="text-[11px] px-2 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors"
+                  >
+                    Reintentar fallidos ({errorCount})
+                  </button>
+                )}
+                {hasFinished && (
+                  <button
+                    onClick={clearFinished}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="max-h-40 overflow-y-auto px-4 pb-3 flex flex-col gap-1.5">
-              {uploads.map((item) => (
-                <UploadRow key={item.id} item={item} onDismiss={() => dismissUpload(item.id)} />
-              ))}
-            </div>
+            {visibleUploads.length > 0 && (
+              <div className="max-h-40 overflow-y-auto px-4 pb-3 flex flex-col gap-1.5">
+                {visibleUploads.map((item) => (
+                  <UploadRow key={item.id} item={item} onDismiss={() => dismissUpload(item.id)} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -699,7 +782,12 @@ function UploadRow({ item, onDismiss }: { item: UploadItem; onDismiss: () => voi
             />
           </div>
         )}
-        {isError && item.error && <p className="text-red-400 mt-0.5 truncate">{item.error}</p>}
+        {isError && item.error && (
+          <p className="text-red-400 mt-0.5 truncate" title={item.error}>
+            {item.error}
+            {item.attempts > 1 ? ` (tras ${item.attempts} intentos)` : ""}
+          </p>
+        )}
       </div>
 
       {/* Percentage / dismiss */}
