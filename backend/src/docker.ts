@@ -155,9 +155,22 @@ export async function startGameContainer(
     }
   }
 
-  // Pull image if not present locally
+  // Pull image if not present locally. Registries privados (p. ej. GHCR) exigen
+  // auth explícita: el daemon NO usa las credenciales de `docker login` del host,
+  // así que pasamos authconfig cuando la imagen es de ghcr.io y hay token (GHCR_TOKEN
+  // en .env, un PAT de GitHub con scope read:packages).
+  const pullOpts: {
+    authconfig?: { username: string; password: string; serveraddress: string };
+  } = {};
+  if (image.startsWith("ghcr.io/") && process.env.GHCR_TOKEN) {
+    pullOpts.authconfig = {
+      username: process.env.GHCR_USER ?? "x-access-token",
+      password: process.env.GHCR_TOKEN,
+      serveraddress: "ghcr.io",
+    };
+  }
   await new Promise<void>((resolve, reject) => {
-    docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+    docker.pull(image, pullOpts, (err: Error | null, stream: NodeJS.ReadableStream) => {
       if (err) return reject(err);
       docker.modem.followProgress(stream, (err: Error | null) => {
         if (err) return reject(err);
