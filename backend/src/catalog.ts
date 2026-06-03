@@ -307,6 +307,23 @@ export const GAME_CATALOG: GameTemplate[] = [
     default_volumes: { "/data/vintagestory": "/data" },
   },
 
+  // --- Tools / web apps (siempre detrás de su propio subdominio) ---
+  {
+    id: "desglosador3000",
+    name: "Desglosador 3000",
+    category: "tools",
+    icon: "https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f3ac.png",
+    docker_image: "ghcr.io/servo98/desglosador3000:latest",
+    default_port: 8080,
+    // Los secretos se resuelven desde /root/game-panel/.env vía el allowlist de
+    // expansión ${VAR} en docker.ts (mismo patrón que VALHEIM_SERVER_PASS).
+    default_env: {
+      JWT_SECRET: "${DESGLOSADOR_JWT_SECRET}",
+      ANTHROPIC_API_KEY: "${DESGLOSADOR_ANTHROPIC_API_KEY}",
+    },
+    default_volumes: { "/data/desglosador3000": "/data" },
+  },
+
   // --- Other ---
   {
     id: "avserver",

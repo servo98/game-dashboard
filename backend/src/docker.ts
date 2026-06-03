@@ -122,6 +122,8 @@ export async function startGameContainer(
     "MINECRAFT_SERVER_PASS",
     "RCON_PASSWORD",
     "SERVER_PASS",
+    "DESGLOSADOR_JWT_SECRET",
+    "DESGLOSADOR_ANTHROPIC_API_KEY",
   ]);
 
   const resolvedEnv = Object.fromEntries(

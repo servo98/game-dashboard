@@ -1,0 +1,14 @@
+{
+  "id": "desglosador3000",
+  "name": "Desglosador 3000",
+  "game_type": "tools",
+  "docker_image": "ghcr.io/servo98/desglosador3000:latest",
+  "port": 8080,
+  "env_vars": {
+    "JWT_SECRET": "${DESGLOSADOR_JWT_SECRET}",
+    "ANTHROPIC_API_KEY": "${DESGLOSADOR_ANTHROPIC_API_KEY}"
+  },
+  "volumes": {
+    "/data/desglosador3000": "/data"
+  }
+}
