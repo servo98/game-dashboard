@@ -140,6 +140,13 @@ try {
   }
 }
 
+// Migration: add kind column to invoices (mensual | bono)
+try {
+  db.exec(`ALTER TABLE invoices ADD COLUMN kind TEXT NOT NULL DEFAULT 'mensual'`);
+} catch (_) {
+  /* column already exists */
+}
+
 // Migration: add theme columns to servers
 try {
   db.exec(`ALTER TABLE servers ADD COLUMN banner_path TEXT`);
@@ -198,6 +205,7 @@ db.exec(`
     timbrado_xml TEXT NOT NULL,
     timbrado_pdf BLOB NOT NULL,
     status TEXT NOT NULL DEFAULT 'uploaded',
+    kind TEXT NOT NULL DEFAULT 'mensual',
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
     uploaded_by TEXT NOT NULL
   );
@@ -507,6 +515,7 @@ export type Invoice = {
   timbrado_xml: string;
   timbrado_pdf: Buffer;
   status: string;
+  kind: string; // mensual | bono
   created_at: number;
   uploaded_by: string;
 };
@@ -575,13 +584,14 @@ export type InvoiceSummary = {
   fecha_emision: string | null;
   fecha_timbrado: string | null;
   status: string;
+  kind: string; // mensual | bono
   created_at: number;
   uploaded_by: string;
 };
 
 const INVOICE_SUMMARY_COLS = `id, freelancer_discord_id, cfdi_uuid, emisor_rfc, emisor_nombre,
   receptor_rfc, receptor_nombre, subtotal, total, moneda, forma_pago, metodo_pago,
-  fecha_emision, fecha_timbrado, status, created_at, uploaded_by`;
+  fecha_emision, fecha_timbrado, status, kind, created_at, uploaded_by`;
 
 export const invoiceQueries = {
   insert: db.query<
@@ -607,13 +617,14 @@ export const invoiceQueries = {
       string,
       Buffer,
       string,
+      string,
     ]
   >(
     `INSERT INTO invoices (freelancer_discord_id, cfdi_uuid, emisor_rfc, emisor_nombre,
       receptor_rfc, receptor_nombre, subtotal, total, moneda, forma_pago, metodo_pago,
       fecha_emision, fecha_timbrado, sello_sat, sello_cfdi, no_certificado_sat, cadena_original,
-      timbrado_xml, timbrado_pdf, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      timbrado_xml, timbrado_pdf, uploaded_by, kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ),
   getById: db.query<Invoice, [number]>("SELECT * FROM invoices WHERE id = ?"),
   getByUuid: db.query<Invoice, [string]>("SELECT * FROM invoices WHERE cfdi_uuid = ?"),

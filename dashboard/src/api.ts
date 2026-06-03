@@ -206,6 +206,7 @@ export type InvoiceSummary = {
   fecha_emision: string | null;
   fecha_timbrado: string | null;
   status: string;
+  kind: string; // mensual | bono
   created_at: number;
   uploaded_by: string;
 };
@@ -459,11 +460,18 @@ export const api = {
   getInvoice: (id: number) => request<InvoiceDetail>(`/invoices/${id}`),
   deleteInvoice: (id: number) => request<{ ok: boolean }>(`/invoices/${id}`, { method: "DELETE" }),
   listFreelancers: () => request<InvoiceFreelancer[]>("/invoices/freelancers"),
-  uploadInvoice: async (freelancerId: string, xml: File, pdf: File) => {
+  uploadInvoice: async (opts: {
+    xml: File;
+    pdf: File;
+    kind: "mensual" | "bono";
+    /** Only used by contador; freelancers always upload for themselves. */
+    freelancerId?: string;
+  }) => {
     const form = new FormData();
-    form.append("xml", xml);
-    form.append("pdf", pdf);
-    form.append("freelancer_id", freelancerId);
+    form.append("xml", opts.xml);
+    form.append("pdf", opts.pdf);
+    form.append("kind", opts.kind);
+    if (opts.freelancerId) form.append("freelancer_id", opts.freelancerId);
     const res = await fetch(`${BASE}/invoices/upload`, {
       method: "POST",
       credentials: "include",

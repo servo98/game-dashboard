@@ -493,9 +493,10 @@ export default function Home() {
 
         {tab === "facturas" && user?.invoice_role && (
           <div className="max-w-3xl">
-            {user.invoice_role === "contador" && (
-              <InvoiceUpload onUploaded={() => setInvoiceRefresh((k) => k + 1)} />
-            )}
+            <InvoiceUpload
+              invoiceRole={user.invoice_role}
+              onUploaded={() => setInvoiceRefresh((k) => k + 1)}
+            />
             <InvoiceList invoiceRole={user.invoice_role} refreshKey={invoiceRefresh} />
             {user.invoice_role === "freelancer" && (
               <div className="mt-8">

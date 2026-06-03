@@ -67,6 +67,15 @@ export default function InvoiceList({ invoiceRole, refreshKey }: Props) {
               <span className="px-2 py-0.5 rounded-full text-xs bg-gray-800 text-gray-400">
                 {inv.status}
               </span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs ${
+                  inv.kind === "bono"
+                    ? "bg-amber-500/15 text-amber-400"
+                    : "bg-gray-800 text-gray-400"
+                }`}
+              >
+                {inv.kind === "bono" ? "Bono" : "Mensualidad"}
+              </span>
             </div>
             <span className="text-sm font-semibold text-white">
               ${inv.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}

@@ -97,9 +97,10 @@ export default function InvoiceHome() {
       </header>
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        {user.invoice_role === "contador" && (
-          <InvoiceUpload onUploaded={() => setRefreshKey((k) => k + 1)} />
-        )}
+        <InvoiceUpload
+          invoiceRole={user.invoice_role}
+          onUploaded={() => setRefreshKey((k) => k + 1)}
+        />
 
         <InvoiceList invoiceRole={user.invoice_role} refreshKey={refreshKey} />
 

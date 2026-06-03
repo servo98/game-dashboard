@@ -23,17 +23,26 @@ const invoices = new Hono<{
   };
 }>();
 
-// --- Upload invoice (contador only) ---
+// --- Upload invoice (contador uploads for anyone; freelancer only for themselves) ---
 invoices.post(
   "/upload",
   requireAuth,
   requireApproved,
-  requireInvoiceRole("contador"),
+  requireInvoiceRole("contador", "freelancer"),
   async (c) => {
+    const role = c.get("invoiceRole") as string;
+    const discordId = c.get("discordId") as string;
+
     const form = await c.req.formData();
     const xmlFile = form.get("xml") as File | null;
     const pdfFile = form.get("pdf") as File | null;
-    const freelancerId = form.get("freelancer_id") as string | null;
+    // Freelancers can only upload for themselves; ignore any freelancer_id they send.
+    const freelancerId =
+      role === "freelancer" ? discordId : (form.get("freelancer_id") as string | null);
+
+    // Invoice kind: mensual (monthly) or bono (bonus / out-of-month)
+    const kindRaw = (form.get("kind") as string | null) ?? "mensual";
+    const kind = kindRaw === "bono" ? "bono" : "mensual";
 
     if (!xmlFile || !pdfFile || !freelancerId) {
       return c.json({ error: "xml, pdf, and freelancer_id are required" }, 400);
@@ -63,8 +72,6 @@ invoices.post(
     // Read PDF as buffer
     const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
 
-    const uploadedBy = c.get("discordId") as string;
-
     // Insert invoice
     invoiceQueries.insert.run(
       freelancerId,
@@ -86,7 +93,8 @@ invoices.post(
       parsed.cadenaOriginal,
       xmlText,
       pdfBuffer,
-      uploadedBy,
+      discordId,
+      kind,
     );
 
     const { id: invoiceId } = invoiceQueries.lastInsertId.get()!;
@@ -107,9 +115,13 @@ invoices.post(
     }
 
     // Discord notification
-    sendInvoiceNotification(parsed.uuid, parsed.total, parsed.moneda, freelancer.username).catch(
-      (err) => console.error("Invoice notification error:", err),
-    );
+    sendInvoiceNotification(
+      parsed.uuid,
+      parsed.total,
+      parsed.moneda,
+      freelancer.username,
+      kind,
+    ).catch((err) => console.error("Invoice notification error:", err));
 
     return c.json({ ok: true, id: invoiceId, uuid: parsed.uuid });
   },
@@ -366,16 +378,19 @@ async function sendInvoiceNotification(
   total: number,
   moneda: string,
   freelancerName: string,
+  kind: string,
 ) {
   const channelRow = botSettingsQueries.get.get("invoices_channel_id");
   const botToken = process.env.DISCORD_BOT_TOKEN;
 
   if (!channelRow?.value || !botToken) return;
 
+  const kindLabel = kind === "bono" ? "Bono" : "Mensualidad";
+
   const embed = {
     title: "Nueva Factura Subida",
-    description: `Factura para **${freelancerName}**`,
-    color: 3066993,
+    description: `Factura (${kindLabel}) para **${freelancerName}**`,
+    color: kind === "bono" ? 15844367 : 3066993,
     fields: [
       { name: "UUID", value: uuid, inline: false },
       {
@@ -383,6 +398,7 @@ async function sendInvoiceNotification(
         value: `$${total.toLocaleString("en-US", { minimumFractionDigits: 2 })} ${moneda}`,
         inline: true,
       },
+      { name: "Tipo", value: kindLabel, inline: true },
     ],
     timestamp: new Date().toISOString(),
   };
