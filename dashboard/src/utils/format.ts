@@ -1,6 +1,7 @@
 const SUBDOMAIN_MAP: Record<string, string> = {
   "25565": "mc",
   "30000": "rolcito",
+  "8080": "desglosador3000",
 };
 
 export function connectAddress(gameType: string, port: number, hostDomain: string): string {

@@ -10,6 +10,10 @@ describe("connectAddress", () => {
     expect(connectAddress("tabletop", 30000, "aypapol.com")).toBe("rolcito.aypapol.com");
   });
 
+  it("returns desglosador3000.domain for port 8080", () => {
+    expect(connectAddress("tools", 8080, "aypapol.com")).toBe("desglosador3000.aypapol.com");
+  });
+
   it("returns domain:port for unmapped ports", () => {
     expect(connectAddress("fps", 27015, "aypapol.com")).toBe("aypapol.com:27015");
   });
