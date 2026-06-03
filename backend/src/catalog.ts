@@ -319,7 +319,11 @@ export const GAME_CATALOG: GameTemplate[] = [
     // expansión ${VAR} en docker.ts (mismo patrón que VALHEIM_SERVER_PASS).
     default_env: {
       JWT_SECRET: "${DESGLOSADOR_JWT_SECRET}",
-      ANTHROPIC_API_KEY: "${DESGLOSADOR_ANTHROPIC_API_KEY}",
+      GEMINI_API_KEY: "${DESGLOSADOR_GEMINI_API_KEY}",
+      GEMINI_MODEL: "${DESGLOSADOR_GEMINI_MODEL}",
+      RESEND_API_KEY: "${DESGLOSADOR_RESEND_API_KEY}",
+      EMAIL_FROM: "${DESGLOSADOR_EMAIL_FROM}",
+      APP_URL: "${DESGLOSADOR_APP_URL}",
     },
     default_volumes: { "/data/desglosador3000": "/data" },
   },

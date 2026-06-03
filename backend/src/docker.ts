@@ -123,7 +123,11 @@ export async function startGameContainer(
     "RCON_PASSWORD",
     "SERVER_PASS",
     "DESGLOSADOR_JWT_SECRET",
-    "DESGLOSADOR_ANTHROPIC_API_KEY",
+    "DESGLOSADOR_GEMINI_API_KEY",
+    "DESGLOSADOR_GEMINI_MODEL",
+    "DESGLOSADOR_RESEND_API_KEY",
+    "DESGLOSADOR_EMAIL_FROM",
+    "DESGLOSADOR_APP_URL",
   ]);
 
   const resolvedEnv = Object.fromEntries(
