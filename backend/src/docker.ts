@@ -170,9 +170,9 @@ export async function startGameContainer(
     };
   }
   await new Promise<void>((resolve, reject) => {
-    docker.pull(image, pullOpts, (err: Error | null, stream: NodeJS.ReadableStream) => {
+    docker.pull(image, pullOpts, (err: Error | null, stream?: NodeJS.ReadableStream) => {
       if (err) return reject(err);
-      docker.modem.followProgress(stream, (err: Error | null) => {
+      docker.modem.followProgress(stream as NodeJS.ReadableStream, (err: Error | null) => {
         if (err) return reject(err);
         resolve();
       });
