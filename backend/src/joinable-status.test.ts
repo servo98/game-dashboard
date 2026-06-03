@@ -30,6 +30,10 @@ describe("joinable-status", () => {
     expect(isJoinableLine("Done preparing spawn area")).toBe(false);
   });
 
+  it("isJoinableLine matches desglosador api-ready line", () => {
+    expect(isJoinableLine("[api] escuchando en http://localhost:3001 (IA: heurístico)")).toBe(true);
+  });
+
   it("setStarting → status is 'starting'", () => {
     setStarting("test-server");
     expect(getJoinableStatus("test-server")).toBe("starting");

@@ -5,11 +5,17 @@ type JoinableState = "starting" | "joinable";
 const statusMap = new Map<string, JoinableState>();
 const watcherAborts = new Map<string, AbortController>();
 
-/** Regex matching the Minecraft "Done" log line indicating the server is joinable */
-const DONE_REGEX = /Done \(\d+[.,]\d+s\)! For help, type "help"/;
+/**
+ * Patrones de "listo" por servidor. Cuando el watcher ve una de estas líneas en
+ * los logs, marca el server como joinable (deja de mostrar "Starting...").
+ * - Minecraft: la línea "Done (..s)!".
+ * - Desglosador 3000 (web app): el api imprime "[api] escuchando en http..." al
+ *   bindear; en ese momento la web ya queda servible por el nginx interno.
+ */
+const READY_REGEXES = [/Done \(\d+[.,]\d+s\)! For help, type "help"/, /\[api\] escuchando en http/];
 
 export function isJoinableLine(line: string): boolean {
-  return DONE_REGEX.test(line);
+  return READY_REGEXES.some((re) => re.test(line));
 }
 
 export function getJoinableStatus(serverId: string): JoinableState | null {
