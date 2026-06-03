@@ -22,9 +22,17 @@ export const mockDocker = {
   getContainer: vi.fn().mockReturnValue(mockContainer),
   listContainers: vi.fn().mockResolvedValue([]),
   createContainer: vi.fn().mockResolvedValue(mockContainer),
-  pull: vi.fn((_image: string, cb: (err: Error | null, stream: unknown) => void) => {
-    cb(null, { on: vi.fn(), pipe: vi.fn() });
-  }),
+  // Acepta tanto pull(image, cb) como pull(image, opts, cb) — la 2ª firma la usa
+  // el pull autenticado de GHCR (authconfig).
+  pull: vi.fn(
+    (_image: string, optsOrCb: unknown, maybeCb?: (err: Error | null, stream: unknown) => void) => {
+      const cb = (typeof optsOrCb === "function" ? optsOrCb : maybeCb) as (
+        err: Error | null,
+        stream: unknown,
+      ) => void;
+      cb(null, { on: vi.fn(), pipe: vi.fn() });
+    },
+  ),
   modem: {
     followProgress: vi.fn((_stream: unknown, cb: (err: Error | null) => void) => {
       cb(null);
