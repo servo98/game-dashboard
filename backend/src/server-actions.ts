@@ -1,9 +1,15 @@
 import { createBackup } from "./backup";
 import { findTemplateByImage } from "./catalog";
-import { botSettingsQueries, type Server, serverQueries, serverSessionQueries } from "./db";
 import {
-  getActiveContainer,
+  botSettingsQueries,
+  getPanelSetting,
+  type Server,
+  serverQueries,
+  serverSessionQueries,
+} from "./db";
+import {
   getContainerStatus,
+  getRunningGameServers,
   markIntentionalStop,
   startGameContainer,
   stopGameContainer,
@@ -16,7 +22,11 @@ import { beginLogWatching, stopJoinableWatcher } from "./joinable-status";
 // y las rutas HTTP lo mapeen a códigos de estado.
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
-  | { ok: false; error: string; code: "not_found" | "invalid" | "backup_failed" | "docker" };
+  | {
+      ok: false;
+      error: string;
+      code: "not_found" | "invalid" | "backup_failed" | "docker" | "resource";
+    };
 
 // ─── Helper: resolución de parámetros de arranque ────────────────────────────
 // Puro (salvo el side-effect de persistir volúmenes auto-arreglados): produce la
@@ -109,12 +119,35 @@ export async function startServer(
   const { image, env, volumes } = resolveStartParams(server, id);
 
   try {
-    // Marca la sesión de cualquier servidor en ejecución como reemplazada
-    const active = await getActiveContainer();
-    if (active) {
-      stopJoinableWatcher(active.name);
-      markIntentionalStop(active.name);
-      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
+    // Varios servidores pueden correr a la vez. Antes de arrancar, aplica dos
+    // guard-rails sobre los que YA están corriendo (excluyendo a este mismo id):
+    //   1. Puerto: con NetworkMode host, dos servidores en el mismo puerto chocan.
+    //   2. RAM: la suma de memoria reservada + la del nuevo no debe superar el tope.
+    const running = (await getRunningGameServers()).filter((r) => r.name !== id);
+
+    for (const r of running) {
+      const other = serverQueries.getById.get(r.name);
+      if (other && other.port === server.port) {
+        return {
+          ok: false,
+          code: "resource",
+          error: `El puerto ${server.port} ya lo usa el servidor "${other.name}". Cambia el puerto antes de arrancar.`,
+        };
+      }
+    }
+
+    const reservedBytes = running.reduce((sum, r) => sum + r.memoryBytes, 0);
+    const perServerGb = Number(getPanelSetting("game_memory_limit_gb"));
+    const hostLimitGb = Number(getPanelSetting("host_memory_limit_gb"));
+    const newBytes = perServerGb * 1024 ** 3;
+    const hostLimitBytes = hostLimitGb * 1024 ** 3;
+    if (reservedBytes + newBytes > hostLimitBytes) {
+      const usedGb = (reservedBytes / 1024 ** 3).toFixed(1);
+      return {
+        ok: false,
+        code: "resource",
+        error: `RAM insuficiente: ${usedGb} GB reservados + ${perServerGb} GB del nuevo servidor superan el tope de ${hostLimitGb} GB. Detén otro servidor o sube host_memory_limit_gb.`,
+      };
     }
 
     await startGameContainer(server.id, image, server.port, env, volumes);

@@ -2,12 +2,17 @@ import type { GameServer } from "../api";
 
 type Props = {
   banner: string;
-  activeServer: GameServer | null;
-  loading: boolean;
+  activeServers: GameServer[];
+  loadingId: string | null;
   onStop: (id: string) => void;
 };
 
-export default function ThemeBanner({ banner, activeServer, loading, onStop }: Props) {
+export default function ThemeBanner({ banner, activeServers, loadingId, onStop }: Props) {
+  // El primero corriendo es el "primario" que se muestra destacado en el banner;
+  // los demás se controlan desde sus propias tarjetas más abajo.
+  const primary = activeServers[0] ?? null;
+  const extra = activeServers.length - 1;
+
   return (
     <div className="relative mb-6 h-40 sm:h-48 rounded-2xl overflow-hidden">
       {/* Background image */}
@@ -20,16 +25,19 @@ export default function ThemeBanner({ banner, activeServer, loading, onStop }: P
       <div className="relative h-full flex flex-col justify-end p-4 sm:p-6">
         <div className="flex items-end justify-between gap-4">
           <div>
-            {activeServer ? (
+            {primary ? (
               <>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                   <span className="text-xs text-green-400 font-medium uppercase tracking-wide">
-                    Running
+                    {activeServers.length > 1 ? `${activeServers.length} Running` : "Running"}
                   </span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">{activeServer.name}</h2>
-                <p className="text-sm text-gray-400 mt-0.5">Port {activeServer.port}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-white">{primary.name}</h2>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  Port {primary.port}
+                  {extra > 0 && ` · +${extra} more running`}
+                </p>
               </>
             ) : (
               <>
@@ -39,13 +47,13 @@ export default function ThemeBanner({ banner, activeServer, loading, onStop }: P
             )}
           </div>
 
-          {activeServer && (
+          {primary && (
             <button
-              onClick={() => onStop(activeServer.id)}
-              disabled={loading}
+              onClick={() => onStop(primary.id)}
+              disabled={loadingId === primary.id}
               className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 hover:text-red-200 text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
             >
-              {loading ? "Stopping..." : "Stop Server"}
+              {loadingId === primary.id ? "Stopping..." : "Stop Server"}
             </button>
           )}
         </div>

@@ -83,22 +83,21 @@ app.get("/api/health/status", async (c) => {
     }),
   );
 
-  // Check for active game container
-  let activeGame = null;
+  // Check for running game containers (varios pueden correr a la vez)
+  let activeGames: { name: string; image: string; status: string }[] = [];
   try {
     const containers = await docker.listContainers({ all: false });
-    const gameContainer = containers.find(
-      (c) =>
-        c.Names.some((n) => n.startsWith(`/${projectName}-`)) &&
-        !c.Labels["com.docker.compose.service"],
-    );
-    if (gameContainer) {
-      activeGame = {
+    activeGames = containers
+      .filter(
+        (c) =>
+          c.Names.some((n) => n.startsWith(`/${projectName}-`)) &&
+          !c.Labels["com.docker.compose.service"],
+      )
+      .map((gameContainer) => ({
         name: gameContainer.Names[0].replace(/^\//, "").replace(`${projectName}-`, ""),
         image: gameContainer.Image,
         status: gameContainer.Status,
-      };
-    }
+      }));
   } catch {
     // ignore
   }
@@ -107,7 +106,9 @@ app.get("/api/health/status", async (c) => {
     status: services.every((s) => s.status === "healthy") ? "operational" : "degraded",
     backendUptime: Math.floor((Date.now() - BOOT_TIME) / 1000),
     services,
-    activeGame,
+    activeGames,
+    // Back-compat: primer juego corriendo (la UI nueva usa activeGames)
+    activeGame: activeGames[0] ?? null,
     timestamp: new Date().toISOString(),
   });
 });

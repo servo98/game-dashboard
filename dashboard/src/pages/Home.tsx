@@ -236,23 +236,23 @@ export default function Home() {
     [servers],
   );
 
-  const activeServer = useMemo(
-    () => servers.find((s) => s.status === "running") ?? null,
-    [servers],
-  );
+  // Varios servidores pueden estar corriendo a la vez
+  const runningServers = useMemo(() => servers.filter((s) => s.status === "running"), [servers]);
+  // El "primario" (primero corriendo) define el tema/banner
+  const primaryServer = runningServers[0] ?? null;
   const isAdmin = user?.role === "admin";
   const editConfigServer = editConfigId ? servers.find((s) => s.id === editConfigId) : null;
 
-  // Dynamic theme based on active game
+  // Dynamic theme based on the primary running game
   const currentTheme = useMemo(
     () =>
-      activeServer
-        ? resolveTheme(activeServer.game_type, {
-            banner_path: activeServer.banner_path,
-            accent_color: activeServer.accent_color,
+      primaryServer
+        ? resolveTheme(primaryServer.game_type, {
+            banner_path: primaryServer.banner_path,
+            accent_color: primaryServer.accent_color,
           })
         : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors },
-    [activeServer],
+    [primaryServer],
   );
 
   useEffect(() => {
@@ -308,8 +308,8 @@ export default function Home() {
         {/* Hero banner */}
         <ThemeBanner
           banner={currentTheme.banner}
-          activeServer={activeServer}
-          loading={!!activeServer && loadingId === activeServer.id}
+          activeServers={runningServers}
+          loadingId={loadingId}
           onStop={handleStop}
         />
 

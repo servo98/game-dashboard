@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { execRconCommand } from "./adapters/minecraft/rcon";
 import { backupQueries, getPanelSetting, serverQueries } from "./db";
-import { getActiveContainer, getContainerStatus } from "./docker";
+import { getContainerStatus, getRunningGameServers } from "./docker";
 
 const BACKUP_DIR = "/data/backups";
 const HOST_DATA_DIR = "/host-data";
@@ -188,19 +188,24 @@ export function startAutoBackupTimer(): void {
         const intervalHours = Number(getPanelSetting("auto_backup_interval_hours"));
         if (intervalHours <= 0) return;
 
-        const active = await getActiveContainer();
-        if (!active) return;
+        // Respalda CADA servidor corriendo (varios pueden estar activos a la vez)
+        const running = await getRunningGameServers();
+        if (running.length === 0) return;
 
-        const serverId = active.name;
-        const backups = backupQueries.list.all(serverId);
-        const lastBackupTime = backups.length > 0 ? backups[0].created_at : 0;
         const now = Math.floor(Date.now() / 1000);
         const intervalSeconds = intervalHours * 3600;
 
-        if (now - lastBackupTime >= intervalSeconds) {
-          console.log(`[auto-backup] Creating backup for ${serverId}`);
-          await createBackup(serverId);
-          console.log(`[auto-backup] Backup created for ${serverId}`);
+        for (const { name: serverId } of running) {
+          const backups = backupQueries.list.all(serverId);
+          const lastBackupTime = backups.length > 0 ? backups[0].created_at : 0;
+          if (now - lastBackupTime < intervalSeconds) continue;
+          try {
+            console.log(`[auto-backup] Creating backup for ${serverId}`);
+            await createBackup(serverId);
+            console.log(`[auto-backup] Backup created for ${serverId}`);
+          } catch (err) {
+            console.error(`[auto-backup] Error backing up ${serverId}:`, err);
+          }
         }
       } catch (err) {
         console.error("[auto-backup] Error:", err);

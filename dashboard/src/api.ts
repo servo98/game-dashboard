@@ -135,6 +135,7 @@ export type BackupRecord = {
 export type PanelSettings = {
   host_domain: string;
   game_memory_limit_gb: string;
+  host_memory_limit_gb: string;
   game_cpu_limit: string;
   auto_stop_hours: string;
   max_backups_per_server: string;

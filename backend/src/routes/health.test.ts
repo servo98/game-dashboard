@@ -88,27 +88,27 @@ describe("GET /api/health/status", () => {
         }),
       );
 
-      let activeGame = null;
+      let activeGames: { name: string; image: string; status: string }[] = [];
       try {
         const containers = await mockListContainers({ all: false });
-        const gameContainer = containers.find(
-          (c: { Names: string[]; Labels: Record<string, string> }) =>
-            c.Names.some((n: string) => n.startsWith(`/${projectName}-`)) &&
-            !c.Labels["com.docker.compose.service"],
-        );
-        if (gameContainer) {
-          activeGame = {
+        activeGames = containers
+          .filter(
+            (c: { Names: string[]; Labels: Record<string, string> }) =>
+              c.Names.some((n: string) => n.startsWith(`/${projectName}-`)) &&
+              !c.Labels["com.docker.compose.service"],
+          )
+          .map((gameContainer: { Names: string[]; Image: string; Status: string }) => ({
             name: gameContainer.Names[0].replace(/^\//, "").replace(`${projectName}-`, ""),
             image: gameContainer.Image,
             status: gameContainer.Status,
-          };
-        }
+          }));
       } catch {}
 
       return c.json({
         status: services.every((s) => s.status === "healthy") ? "operational" : "degraded",
         services,
-        activeGame,
+        activeGames,
+        activeGame: activeGames[0] ?? null,
         timestamp: new Date().toISOString(),
       });
     });
@@ -154,7 +154,7 @@ describe("GET /api/health/status", () => {
     expect(body.status).toBe("degraded");
   });
 
-  it("includes activeGame when a game container is running", async () => {
+  it("includes activeGames when a game container is running", async () => {
     const mockContainerObj = {
       inspect: vi.fn().mockResolvedValue({
         State: { Running: true, StartedAt: "2026-01-01T00:00:00Z" },
@@ -173,10 +173,47 @@ describe("GET /api/health/status", () => {
 
     const res = await app.request("/api/health/status");
     const body = await res.json();
+    expect(body.activeGames).toEqual([
+      {
+        name: "minecraft",
+        image: "itzg/minecraft-server",
+        status: "Up 2 hours",
+      },
+    ]);
+    // Back-compat single field
     expect(body.activeGame).toEqual({
       name: "minecraft",
       image: "itzg/minecraft-server",
       status: "Up 2 hours",
     });
+  });
+
+  it("includes multiple activeGames when several containers are running", async () => {
+    const mockContainerObj = {
+      inspect: vi.fn().mockResolvedValue({
+        State: { Running: true, StartedAt: "2026-01-01T00:00:00Z" },
+        RestartCount: 0,
+      }),
+    };
+    mockGetContainer.mockReturnValue(mockContainerObj);
+    mockListContainers.mockResolvedValue([
+      {
+        Names: ["/game-panel-minecraft"],
+        Image: "itzg/minecraft-server",
+        Status: "Up 2 hours",
+        Labels: {},
+      },
+      {
+        Names: ["/game-panel-valheim"],
+        Image: "lloesche/valheim-server",
+        Status: "Up 1 hour",
+        Labels: {},
+      },
+    ]);
+
+    const res = await app.request("/api/health/status");
+    const body = await res.json();
+    expect(body.activeGames).toHaveLength(2);
+    expect(body.activeGames.map((g: { name: string }) => g.name)).toEqual(["minecraft", "valheim"]);
   });
 });

@@ -20,6 +20,7 @@ settings.put("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   const allowedKeys = [
     "host_domain",
     "game_memory_limit_gb",
+    "host_memory_limit_gb",
     "game_cpu_limit",
     "auto_stop_hours",
     "max_backups_per_server",

@@ -1,14 +1,15 @@
 import { createMinecraftAdapter, getServerDataPath } from "./adapters/minecraft/index";
 import { getQuestTitleMap } from "./adapters/minecraft/quests";
 import { botSettingsQueries, serverQueries } from "./db";
-import { getActiveContainer } from "./docker";
+import { getRunningGameServers } from "./docker";
 
 const POLL_INTERVAL = 30_000; // 30 seconds
 const MAX_NOTIFICATIONS_PER_CYCLE = 5;
 
-/** Snapshot of completed quest IDs per player */
-const previousState = new Map<string, Set<string>>();
-let isFirstLoad = true;
+/** Quest snapshot per server: completed quest IDs per player + first-load flag.
+ * Per-server para no mezclar el progreso entre varios servidores corriendo. */
+type ServerQuestState = { completed: Map<string, Set<string>>; isFirstLoad: boolean };
+const serverStates = new Map<string, ServerQuestState>();
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
@@ -32,20 +33,29 @@ export function stopQuestPoller(): void {
 
 async function pollQuests(): Promise<void> {
   try {
-    // 1. Check if there's an active MC server
-    const active = await getActiveContainer();
-    if (!active) {
-      // Server stopped — reset state for fresh start next time
-      if (previousState.size > 0) {
-        console.log("[QuestPoller] No active server, clearing snapshot");
-        previousState.clear();
-        isFirstLoad = true;
+    // Pollea CADA servidor corriendo (varios pueden estar activos a la vez)
+    const running = await getRunningGameServers();
+    const runningIds = new Set(running.map((r) => r.name));
+
+    // Limpia el snapshot de servidores que ya no están corriendo
+    for (const id of [...serverStates.keys()]) {
+      if (!runningIds.has(id)) {
+        console.log(`[QuestPoller] ${id} stopped, clearing snapshot`);
+        serverStates.delete(id);
       }
-      return;
     }
 
-    // 2. Check if it's a Minecraft server with FTB Quests
-    const serverId = active.name;
+    for (const { name } of running) {
+      await pollServerQuests(name);
+    }
+  } catch (err) {
+    console.error("[QuestPoller] Error during poll cycle:", err);
+  }
+}
+
+async function pollServerQuests(serverId: string): Promise<void> {
+  try {
+    // Solo servidores Minecraft con FTB Quests
     const server = serverQueries.getById.get(serverId);
     if (!server || server.game_type !== "minecraft") return;
 
@@ -55,11 +65,20 @@ async function pollQuests(): Promise<void> {
     const adapter = await createMinecraftAdapter(serverId);
     if (!adapter || !adapter.detectedSystems.includes("ftbquests")) return;
 
-    // 3. Read all quest progress
+    // Read all quest progress
     const allProgress = await adapter.getAllQuestProgress();
     if (allProgress.length === 0) return;
 
-    // 4. Compare with previous snapshot
+    // Estado por-servidor (crea uno en el primer ciclo)
+    let state = serverStates.get(serverId);
+    if (!state) {
+      state = { completed: new Map(), isFirstLoad: true };
+      serverStates.set(serverId, state);
+    }
+    const previousState = state.completed;
+    const isFirstLoad = state.isFirstLoad;
+
+    // Compare with previous snapshot
     const newCompletions: { playerName: string; questId: string }[] = [];
 
     for (const progress of allProgress) {
@@ -79,12 +98,12 @@ async function pollQuests(): Promise<void> {
       previousState.set(progress.playerName, currentCompleted);
     }
 
-    // 5. On first load, just record state without notifying
+    // On first load, just record state without notifying
     if (isFirstLoad) {
       console.log(
-        `[QuestPoller] Initial snapshot loaded: ${allProgress.length} players, ${Array.from(previousState.values()).reduce((sum, s) => sum + s.size, 0)} total completed quests`,
+        `[QuestPoller] [${serverId}] Initial snapshot loaded: ${allProgress.length} players, ${Array.from(previousState.values()).reduce((sum, s) => sum + s.size, 0)} total completed quests`,
       );
-      isFirstLoad = false;
+      state.isFirstLoad = false;
       return;
     }
 

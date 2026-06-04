@@ -6,8 +6,8 @@ import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
 import { backupQueries, serverQueries, serverSessionQueries, userServerAccessQueries } from "../db";
 import {
-  getActiveContainer,
   getContainerStatus,
+  getRunningGameServers,
   streamContainerLogs,
   streamContainerStats,
 } from "../docker";
@@ -220,6 +220,8 @@ servers.post(
     const result = await startServer(id);
     if (!result.ok) {
       if (result.code === "not_found") return c.json({ error: "Server not found" }, 404);
+      // Puerto en conflicto o RAM insuficiente → 409 con el mensaje real para la UI
+      if (result.code === "resource") return c.json({ error: result.error }, 409);
       console.error("Start error:", result.error);
       return c.json({ error: "Failed to start server" }, 500);
     }
@@ -237,16 +239,19 @@ servers.post(
   async (c) => {
     const { id } = c.req.param();
 
-    // Special "active" pseudo-id
+    // Special "active" pseudo-id — solo válido si hay exactamente UN server corriendo
     if (id === "active") {
-      const active = await getActiveContainer();
-      if (!active) return c.json({ ok: true, message: "No server running" });
-      const result = await stopServer(active.name);
+      const running = await getRunningGameServers();
+      if (running.length === 0) return c.json({ ok: true, message: "No server running" });
+      if (running.length > 1) {
+        return c.json({ error: "Multiple servers running. Specify a server id to stop." }, 400);
+      }
+      const result = await stopServer(running[0].name);
       if (!result.ok) {
         console.error("Stop error:", result.error);
         return c.json({ error: "Failed to stop server" }, 500);
       }
-      return c.json({ ok: true, message: `${active.name} stopped` });
+      return c.json({ ok: true, message: `${running[0].name} stopped` });
     }
 
     const server = serverQueries.getById.get(id);

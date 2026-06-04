@@ -4,6 +4,7 @@ export const mockContainer = {
   inspect: vi.fn().mockResolvedValue({
     State: { Running: true, StartedAt: "2026-01-01T00:00:00Z", Health: null },
     Config: { Tty: false },
+    HostConfig: { Memory: 4 * 1024 * 1024 * 1024 },
     RestartCount: 0,
   }),
   start: vi.fn().mockResolvedValue(undefined),

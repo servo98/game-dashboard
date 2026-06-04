@@ -23,10 +23,10 @@ vi.mock("../db", () => ({
 }));
 
 // ─── Mock docker ────────────────────────────────────────────────────────────
-const mockGetActiveContainer = vi.fn().mockResolvedValue(null);
+const mockGetRunningGameServers = vi.fn().mockResolvedValue([]);
 const mockGetContainerStatus = vi.fn().mockResolvedValue("running" as const);
 vi.mock("../docker", () => ({
-  getActiveContainer: (...a: unknown[]) => mockGetActiveContainer(...a),
+  getRunningGameServers: (...a: unknown[]) => mockGetRunningGameServers(...a),
   getContainerStatus: (...a: unknown[]) => mockGetContainerStatus(...a),
 }));
 
@@ -86,7 +86,7 @@ describe("MCP read tools — list_servers", () => {
     // A plain (non-admin) MCP token authenticates; no browser session.
     mockSessionGet.mockReturnValue(undefined);
     mockTokenGetByToken.mockReturnValue({ id: 1, token: "mcp-token", player_name: "p" });
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockGetContainerStatus.mockResolvedValue("running");
     mockCreateAdapter.mockResolvedValue(fakeAdapter);
   });

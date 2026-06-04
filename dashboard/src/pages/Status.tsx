@@ -21,7 +21,7 @@ type HealthResponse = {
   status: "operational" | "degraded";
   backendUptime: number;
   services: ServiceHealth[];
-  activeGame: ActiveGame | null;
+  activeGames: ActiveGame[];
   timestamp: string;
 };
 
@@ -223,24 +223,29 @@ export default function Status() {
           </div>
         )}
 
-        {/* Active game */}
+        {/* Active games */}
         {data && (
           <div className="mb-8">
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-              Active Game Server
+              Active Game Servers
             </h3>
-            {data.activeGame ? (
-              <div className="bg-gray-900 border border-green-800/50 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                  <div>
-                    <span className="font-medium text-white">{data.activeGame.name}</span>
-                    <p className="text-xs text-gray-500 mt-0.5 font-mono">
-                      {data.activeGame.image}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{data.activeGame.status}</p>
+            {data.activeGames.length > 0 ? (
+              <div className="space-y-3">
+                {data.activeGames.map((game) => (
+                  <div
+                    key={game.name}
+                    className="bg-gray-900 border border-green-800/50 rounded-xl p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                      <div>
+                        <span className="font-medium text-white">{game.name}</span>
+                        <p className="text-xs text-gray-500 mt-0.5 font-mono">{game.image}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{game.status}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
             ) : (
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-500">

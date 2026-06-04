@@ -79,6 +79,22 @@ export default function PanelSettings() {
       </label>
 
       <label className="flex flex-col gap-1.5">
+        <span className="text-sm text-gray-300">Host Memory Limit (GB)</span>
+        <input
+          type="number"
+          min="1"
+          max="256"
+          step="1"
+          value={settings.host_memory_limit_gb}
+          onChange={(e) => setSettings({ ...settings, host_memory_limit_gb: e.target.value })}
+          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
+        />
+        <span className="text-xs text-gray-500">
+          Total RAM budget across all running servers — a server won't start if it would exceed this
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
         <span className="text-sm text-gray-300">CPU Limit (vCPUs)</span>
         <input
           type="number"

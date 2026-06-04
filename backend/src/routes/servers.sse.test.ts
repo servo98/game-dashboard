@@ -102,7 +102,7 @@ async function* fakeStatsStream(_id: string, _signal: AbortSignal) {
 vi.mock("../docker", () => ({
   docker: { getContainer: vi.fn(), listContainers: vi.fn().mockResolvedValue([]) },
   gameContainerName: (id: string) => `game-panel-${id}`,
-  getActiveContainer: vi.fn().mockResolvedValue(null),
+  getRunningGameServers: vi.fn().mockResolvedValue([]),
   getContainerStatus: (...args: unknown[]) => mockGetContainerStatus(...args),
   startGameContainer: vi.fn(),
   stopGameContainer: vi.fn(),

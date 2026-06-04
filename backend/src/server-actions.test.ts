@@ -14,6 +14,8 @@ const mockServerGetById = vi.fn();
 const mockSessionStart = vi.fn();
 const mockSessionStop = vi.fn();
 const mockServerUpdate = vi.fn();
+// Por defecto 6 GB para cualquier setting; los tests de RAM lo sobreescriben por clave.
+const mockGetPanelSetting = vi.fn((_key: string) => "6");
 
 vi.mock("./db", () => ({
   db: { exec: vi.fn(), query: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })) },
@@ -32,11 +34,11 @@ vi.mock("./db", () => ({
     deleteByServerId: { run: vi.fn() },
   },
   botSettingsQueries: { get: { get: vi.fn() }, set: { run: vi.fn() }, unset: { run: vi.fn() } },
-  getPanelSetting: vi.fn(() => "6"),
+  getPanelSetting: (...args: [string]) => mockGetPanelSetting(...args),
 }));
 
 // ─── Mock docker ──────────────────────────────────────────────────────────────
-const mockGetActiveContainer = vi.fn().mockResolvedValue(null);
+const mockGetRunningGameServers = vi.fn().mockResolvedValue([]);
 const mockGetContainerStatus = vi.fn().mockResolvedValue("stopped" as const);
 const mockStartGameContainer = vi.fn().mockResolvedValue(undefined);
 const mockStopGameContainer = vi.fn().mockResolvedValue(undefined);
@@ -46,7 +48,7 @@ const mockWatchContainer = vi.fn();
 vi.mock("./docker", () => ({
   docker: { getContainer: vi.fn(), listContainers: vi.fn().mockResolvedValue([]) },
   gameContainerName: (id: string) => `game-panel-${id}`,
-  getActiveContainer: (...args: unknown[]) => mockGetActiveContainer(...args),
+  getRunningGameServers: (...args: unknown[]) => mockGetRunningGameServers(...args),
   getContainerStatus: (...args: unknown[]) => mockGetContainerStatus(...args),
   startGameContainer: (...args: unknown[]) => mockStartGameContainer(...args),
   stopGameContainer: (...args: unknown[]) => mockStopGameContainer(...args),
@@ -89,7 +91,8 @@ const { startServer, stopServer, updateServerConfig, restartServer } = await imp
 describe("startServer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
+    mockGetPanelSetting.mockImplementation((_key: string) => "6");
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
@@ -199,14 +202,63 @@ describe("startServer", () => {
     expect(mockWatchContainer).toHaveBeenCalledWith("minecraft", expect.any(Function));
   });
 
-  it("F2: replace active → stop(replaced) for prior, markIntentionalStop ordered before", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    await start({});
-    expect(mockSessionStop).toHaveBeenCalledWith(expect.any(Number), "replaced", "valheim");
-    expect(mockStopJoinableWatcher).toHaveBeenCalledWith("valheim");
-    const markOrder = mockMarkIntentionalStop.mock.invocationCallOrder[0];
-    const stopOrder = mockSessionStop.mock.invocationCallOrder[0];
-    expect(markOrder).toBeLessThan(stopOrder);
+  it("F2: another server running on a different port → starts WITHOUT stopping it", async () => {
+    // valheim corriendo en 2456; arrancamos minecraft (25565) → ambos conviven.
+    // Tope host amplio para que el guard de RAM no interfiera (se prueba aparte en F4).
+    mockGetPanelSetting.mockImplementation((key: string) =>
+      key === "host_memory_limit_gb" ? "64" : "6",
+    );
+    mockGetRunningGameServers.mockResolvedValue([
+      { id: "abc", name: "valheim", memoryBytes: 1 * 1024 ** 3 },
+    ]);
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim"
+        ? makeServer({ id: "valheim", port: 2456 })
+        : makeServer({ id: "minecraft", port: 25565 }),
+    );
+    const r = await startServer("minecraft");
+    expect(r.ok).toBe(true);
+    // No se detiene al otro servidor
+    expect(mockSessionStop).not.toHaveBeenCalled();
+    expect(mockStopGameContainer).not.toHaveBeenCalled();
+    expect(mockStartGameContainer).toHaveBeenCalled();
+  });
+
+  it("F3: port already used by a running server → 'resource' error, does not start", async () => {
+    silenceConsole();
+    mockGetRunningGameServers.mockResolvedValue([
+      { id: "abc", name: "valheim", memoryBytes: 1 * 1024 ** 3 },
+    ]);
+    // valheim corriendo en 25565; minecraft también pide 25565 → conflicto
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim"
+        ? makeServer({ id: "valheim", port: 25565 })
+        : makeServer({ id: "minecraft", port: 25565 }),
+    );
+    const r = await startServer("minecraft");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("resource");
+    expect(mockStartGameContainer).not.toHaveBeenCalled();
+  });
+
+  it("F4: total reserved RAM + new server exceeds host limit → 'resource' error", async () => {
+    silenceConsole();
+    // 5 GB ya reservados; nuevo = 6 GB; tope host = 8 GB → 11 > 8
+    mockGetRunningGameServers.mockResolvedValue([
+      { id: "abc", name: "valheim", memoryBytes: 5 * 1024 ** 3 },
+    ]);
+    mockGetPanelSetting.mockImplementation((key: string) =>
+      key === "host_memory_limit_gb" ? "8" : "6",
+    );
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim"
+        ? makeServer({ id: "valheim", port: 2456 })
+        : makeServer({ id: "minecraft", port: 25565 }),
+    );
+    const r = await startServer("minecraft");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("resource");
+    expect(mockStartGameContainer).not.toHaveBeenCalled();
   });
 
   it("F5/F6: docker throws → code 'docker', no session/watcher", async () => {
@@ -354,7 +406,8 @@ describe("restartServer", () => {
     mockCreateBackup.mockResolvedValue({ id: 1 });
     mockStartGameContainer.mockResolvedValue(undefined);
     mockStopGameContainer.mockResolvedValue(undefined);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
+    mockGetPanelSetting.mockImplementation((_key: string) => "6");
     mockFindTemplateByImage.mockReturnValue(undefined);
     mockServerGetById.mockReturnValue(makeServer());
   });

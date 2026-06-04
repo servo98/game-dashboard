@@ -48,7 +48,7 @@ const healthyResponse = {
       cpuPercent: 0.1,
     },
   ],
-  activeGame: null,
+  activeGames: [],
   timestamp: new Date().toISOString(),
 };
 
@@ -120,7 +120,7 @@ describe("Status page", () => {
   it("shows active game info when a game is running", async () => {
     const responseWithGame = {
       ...healthyResponse,
-      activeGame: { name: "minecraft", image: "itzg/minecraft-server", status: "Up 2 hours" },
+      activeGames: [{ name: "minecraft", image: "itzg/minecraft-server", status: "Up 2 hours" }],
     };
     mockFetch.mockResolvedValue({
       ok: true,

@@ -11,19 +11,45 @@ export function gameContainerName(serverId: string) {
   return `${CONTAINER_PREFIX}${serverId}`;
 }
 
-/** Return the currently running game container (if any) */
-export async function getActiveContainer(): Promise<{ id: string; name: string } | null> {
+/** List running game containers — excludes Compose-managed services
+ * (Compose containers have the "com.docker.compose.service" label). */
+async function listGameContainers() {
   const containers = await docker.listContainers({ all: false });
-  // Filter to game containers only — exclude Compose-managed services
-  // (Compose containers have the "com.docker.compose.service" label)
-  const active = containers.find(
+  return containers.filter(
     (c) =>
       c.Names.some((n) => n.startsWith(`/${CONTAINER_PREFIX}`)) &&
       !c.Labels["com.docker.compose.service"],
   );
-  if (!active) return null;
-  const serverId = active.Names[0].replace(`/${CONTAINER_PREFIX}`, "");
-  return { id: active.Id, name: serverId };
+}
+
+/** Return the first currently running game container (if any).
+ * Back-compat helper for callers that only need "some" running server. */
+export async function getActiveContainer(): Promise<{ id: string; name: string } | null> {
+  const game = await listGameContainers();
+  if (game.length === 0) return null;
+  const serverId = game[0].Names[0].replace(`/${CONTAINER_PREFIX}`, "");
+  return { id: game[0].Id, name: serverId };
+}
+
+/** Return ALL currently running game servers, with each container's reserved
+ * memory (HostConfig.Memory in bytes) — used to enforce the global RAM guard. */
+export async function getRunningGameServers(): Promise<
+  { id: string; name: string; memoryBytes: number }[]
+> {
+  const game = await listGameContainers();
+  return Promise.all(
+    game.map(async (c) => {
+      const name = c.Names[0].replace(`/${CONTAINER_PREFIX}`, "");
+      let memoryBytes = 0;
+      try {
+        const info = await docker.getContainer(c.Id).inspect();
+        memoryBytes = info.HostConfig?.Memory ?? 0;
+      } catch {
+        // best-effort — un contenedor sin límite explícito cuenta como 0
+      }
+      return { id: c.Id, name, memoryBytes };
+    }),
+  );
 }
 
 /** Get status of a specific game container */
@@ -90,7 +116,8 @@ export function markIntentionalStop(serverId: string): void {
   }
 }
 
-/** Start a game container. Stops any currently running game container first. */
+/** Start a game container. Multiple game containers may run concurrently;
+ * caller (server-actions) enforces port + RAM guard-rails beforehand. */
 export async function startGameContainer(
   serverId: string,
   image: string,
@@ -98,12 +125,6 @@ export async function startGameContainer(
   envVars: Record<string, string>,
   volumes: Record<string, string>,
 ): Promise<void> {
-  // Stop any currently running game container
-  const active = await getActiveContainer();
-  if (active) {
-    await stopGameContainer(active.name);
-  }
-
   const containerName = gameContainerName(serverId);
 
   // Remove existing stopped container if present

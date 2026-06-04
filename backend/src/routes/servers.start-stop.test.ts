@@ -17,6 +17,7 @@ const mockServerGetAll = vi.fn(() => []);
 const mockSessionStart = vi.fn();
 const mockSessionStop = vi.fn();
 const mockServerUpdate = vi.fn();
+const mockGetPanelSetting = vi.fn((_key: string) => "6");
 
 vi.mock("../db", () => ({
   db: { exec: vi.fn(), query: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })) },
@@ -99,12 +100,12 @@ vi.mock("../db", () => ({
     deleteById: { run: vi.fn() },
     updateLastUsed: { run: vi.fn() },
   },
-  getPanelSetting: vi.fn(() => "6"),
+  getPanelSetting: (...args: [string]) => mockGetPanelSetting(...args),
   getAllPanelSettings: vi.fn(() => ({})),
 }));
 
 // Mock docker
-const mockGetActiveContainer = vi.fn().mockResolvedValue(null);
+const mockGetRunningGameServers = vi.fn().mockResolvedValue([]);
 const mockGetContainerStatus = vi.fn().mockResolvedValue("stopped" as const);
 const mockStartGameContainer = vi.fn().mockResolvedValue(undefined);
 const mockStopGameContainer = vi.fn().mockResolvedValue(undefined);
@@ -114,7 +115,7 @@ const mockWatchContainer = vi.fn();
 vi.mock("../docker", () => ({
   docker: { getContainer: vi.fn(), listContainers: vi.fn().mockResolvedValue([]) },
   gameContainerName: (id: string) => `game-panel-${id}`,
-  getActiveContainer: (...args: unknown[]) => mockGetActiveContainer(...args),
+  getRunningGameServers: (...args: unknown[]) => mockGetRunningGameServers(...args),
   getContainerStatus: (...args: unknown[]) => mockGetContainerStatus(...args),
   startGameContainer: (...args: unknown[]) => mockStartGameContainer(...args),
   stopGameContainer: (...args: unknown[]) => mockStopGameContainer(...args),
@@ -163,7 +164,7 @@ describe("POST /:id/start", () => {
     process.env.BOT_API_KEY = "test-bot-key";
     mockServerGetById.mockReturnValue(server);
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
@@ -210,15 +211,32 @@ describe("POST /:id/start", () => {
     expect((await res.json()).ok).toBe(true);
   });
 
-  it("stops active server before starting new one", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
+  it("starts a new server WITHOUT stopping another running on a different port", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim" ? makeServer({ id: "valheim", port: 2456 }) : server,
+    );
     const res = await servers.request("/minecraft/start", {
       method: "POST",
       headers: { cookie: "session=valid-token" },
     });
     expect(res.status).toBe(200);
-    expect(mockMarkIntentionalStop).toHaveBeenCalledWith("valheim");
-    expect(mockSessionStop).toHaveBeenCalled();
+    expect(mockMarkIntentionalStop).not.toHaveBeenCalled();
+    expect(mockSessionStop).not.toHaveBeenCalled();
+  });
+
+  it("rejects start with 409 when another running server uses the same port", async () => {
+    silenceConsole();
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
+    // valheim corriendo en el mismo puerto (25565) que minecraft
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim" ? makeServer({ id: "valheim", port: 25565 }) : server,
+    );
+    const res = await servers.request("/minecraft/start", {
+      method: "POST",
+      headers: { cookie: "session=valid-token" },
+    });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -255,8 +273,8 @@ describe("POST /:id/stop", () => {
     expect(res.status).toBe(200);
   });
 
-  it("handles 'active' pseudo-id when a server is running", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "minecraft" });
+  it("handles 'active' pseudo-id when exactly one server is running", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "minecraft", memoryBytes: 0 }]);
     const res = await servers.request("/active/stop", {
       method: "POST",
       headers: { cookie: "session=valid-token" },
@@ -266,8 +284,21 @@ describe("POST /:id/stop", () => {
     expect(mockStopGameContainer).toHaveBeenCalledWith("minecraft");
   });
 
+  it("rejects 'active' pseudo-id with 400 when multiple servers are running", async () => {
+    mockGetRunningGameServers.mockResolvedValue([
+      { id: "a", name: "minecraft", memoryBytes: 0 },
+      { id: "b", name: "valheim", memoryBytes: 0 },
+    ]);
+    const res = await servers.request("/active/stop", {
+      method: "POST",
+      headers: { cookie: "session=valid-token" },
+    });
+    expect(res.status).toBe(400);
+    expect(mockStopGameContainer).not.toHaveBeenCalled();
+  });
+
   it("handles 'active' pseudo-id when no server is running", async () => {
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     const res = await servers.request("/active/stop", {
       method: "POST",
       headers: { cookie: "session=valid-token" },
@@ -285,7 +316,7 @@ describe("A — Java Image Tag Selection", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
@@ -413,7 +444,7 @@ describe("B — Modpack TYPE Handling", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
@@ -484,39 +515,46 @@ describe("C — Server Switching Atomicity", () => {
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
 
-  it("C1: start B while A running → markIntentionalStop(A)", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    mockServerGetById.mockReturnValue(makeServer());
+  // Helper: A (valheim, port 2456) corriendo sin reservar RAM
+  const aRunningDifferentPort = () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim" ? makeServer({ id: "valheim", port: 2456 }) : makeServer(),
+    );
+  };
+
+  it("C1: start B while A running (distinct port) → does NOT markIntentionalStop(A)", async () => {
+    aRunningDifferentPort();
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    expect(mockMarkIntentionalStop).toHaveBeenCalledWith("valheim");
+    expect(mockMarkIntentionalStop).not.toHaveBeenCalled();
   });
 
-  it("C2: start B while A running → session closed 'replaced' for A", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    mockServerGetById.mockReturnValue(makeServer());
+  it("C2: start B while A running → A's session is NOT closed as 'replaced'", async () => {
+    aRunningDifferentPort();
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    expect(mockSessionStop).toHaveBeenCalledWith(expect.any(Number), "replaced", "valheim");
+    expect(mockSessionStop).not.toHaveBeenCalled();
   });
 
-  it("C3: restart same server → stops self then starts fresh", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "minecraft" });
+  it("C3: start same server id while running → starts fresh, no self-stop bookkeeping", async () => {
+    // minecraft ya corriendo; se filtra a sí mismo, así que no hay conflicto de puerto
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "minecraft", memoryBytes: 0 }]);
     mockServerGetById.mockReturnValue(makeServer());
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    expect(mockMarkIntentionalStop).toHaveBeenCalledWith("minecraft");
+    expect(mockMarkIntentionalStop).not.toHaveBeenCalled();
     expect(mockStartGameContainer).toHaveBeenCalled();
   });
 
   it("C4: start when nothing running → stopGameContainer never called directly", async () => {
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockServerGetById.mockReturnValue(makeServer());
     await servers.request("/minecraft/start", {
       method: "POST",
@@ -526,8 +564,8 @@ describe("C — Server Switching Atomicity", () => {
     expect(mockMarkIntentionalStop).not.toHaveBeenCalled();
   });
 
-  it("C5: stop 'active' with running server → correct serverId + session 'user'", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "minecraft" });
+  it("C5: stop 'active' with one running server → correct serverId + session 'user'", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "minecraft", memoryBytes: 0 }]);
     mockServerGetById.mockReturnValue(makeServer());
     const res = await servers.request("/active/stop", {
       method: "POST",
@@ -539,7 +577,7 @@ describe("C — Server Switching Atomicity", () => {
   });
 
   it("C6: stop 'active' with nothing running → 200 'No server running'", async () => {
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     const res = await servers.request("/active/stop", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
@@ -549,14 +587,13 @@ describe("C — Server Switching Atomicity", () => {
     expect(body.message).toBe("No server running");
   });
 
-  it("C7: start B while A running → stopJoinableWatcher called for A", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    mockServerGetById.mockReturnValue(makeServer());
+  it("C7: start B while A running → does NOT call stopJoinableWatcher for A", async () => {
+    aRunningDifferentPort();
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    expect(mockStopJoinableWatcher).toHaveBeenCalledWith("valheim");
+    expect(mockStopJoinableWatcher).not.toHaveBeenCalledWith("valheim");
   });
 });
 
@@ -567,7 +604,7 @@ describe("D — Volume Auto-fix", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
   });
 
@@ -652,7 +689,7 @@ describe("E — Port Injection", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
@@ -727,7 +764,7 @@ describe("F — Session Tracking", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockStopGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
@@ -743,14 +780,16 @@ describe("F — Session Tracking", () => {
     expect(mockSessionStart).toHaveBeenCalledWith("minecraft", expect.any(Number));
   });
 
-  it("F2: replace A with B → start(B) + stop(A, 'replaced')", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    mockServerGetById.mockReturnValue(makeServer());
+  it("F2: start B while A running (distinct port) → start(B), A's session untouched", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim" ? makeServer({ id: "valheim", port: 2456 }) : makeServer(),
+    );
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    expect(mockSessionStop).toHaveBeenCalledWith(expect.any(Number), "replaced", "valheim");
+    expect(mockSessionStop).not.toHaveBeenCalled();
     expect(mockSessionStart).toHaveBeenCalledWith("minecraft", expect.any(Number));
   });
 
@@ -763,8 +802,8 @@ describe("F — Session Tracking", () => {
     expect(mockSessionStop).toHaveBeenCalledWith(expect.any(Number), "user", "minecraft");
   });
 
-  it("F4: stop 'active' → stop called with active container's name", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
+  it("F4: stop 'active' (single running) → stop called with that container's name", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
     await servers.request("/active/stop", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
@@ -803,7 +842,7 @@ describe("G — Crash Watcher", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockStopGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
@@ -829,17 +868,16 @@ describe("G — Crash Watcher", () => {
     expect(mockWatchContainer).not.toHaveBeenCalled();
   });
 
-  it("G3: replace server → markIntentionalStop before stop", async () => {
-    mockGetActiveContainer.mockResolvedValue({ id: "abc", name: "valheim" });
-    mockServerGetById.mockReturnValue(makeServer());
+  it("G3: start B while A running (distinct port) → crash watcher registered for B", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "valheim", memoryBytes: 0 }]);
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim" ? makeServer({ id: "valheim", port: 2456 }) : makeServer(),
+    );
     await servers.request("/minecraft/start", {
       method: "POST",
       headers: { "X-Bot-Api-Key": "test-bot-key" },
     });
-    // markIntentionalStop must be called before session stop
-    const markOrder = mockMarkIntentionalStop.mock.invocationCallOrder[0];
-    const stopOrder = mockSessionStop.mock.invocationCallOrder[0];
-    expect(markOrder).toBeLessThan(stopOrder);
+    expect(mockWatchContainer).toHaveBeenCalledWith("minecraft", expect.any(Function));
   });
 
   it("G4: stop by ID → markIntentionalStop before stopGameContainer", async () => {
@@ -863,7 +901,7 @@ describe("H — Auth Edge Cases", () => {
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
     mockServerGetById.mockReturnValue(makeServer());
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockStopGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
@@ -911,7 +949,7 @@ describe("I — Error Handling", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });
 
@@ -967,7 +1005,7 @@ describe("J — Env Var Passthrough", () => {
     vi.clearAllMocks();
     process.env.BOT_API_KEY = "test-bot-key";
     mockSessionGet.mockReturnValue(session);
-    mockGetActiveContainer.mockResolvedValue(null);
+    mockGetRunningGameServers.mockResolvedValue([]);
     mockStartGameContainer.mockResolvedValue(undefined);
     mockFindTemplateByImage.mockReturnValue(undefined);
   });

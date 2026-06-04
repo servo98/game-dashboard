@@ -6,7 +6,7 @@ import type { GameAdapter } from "../adapters/adapter";
 import { createMinecraftAdapter } from "../adapters/minecraft/index";
 import { sanitize } from "../adapters/minecraft/sanitize";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
-import { getActiveContainer, getContainerStatus } from "../docker";
+import { getContainerStatus, getRunningGameServers } from "../docker";
 import { isAdminDiscordId } from "../middleware/auth";
 import { restartServer, startServer, stopServer, updateServerConfig } from "../server-actions";
 
@@ -40,6 +40,12 @@ function errorResult(error: string) {
 
 function noServer() {
   return errorResult("No game server is currently running.");
+}
+
+function ambiguousServer() {
+  return errorResult(
+    "Multiple servers are running. Specify which one with the 'server_id' parameter.",
+  );
 }
 
 function noServerData(serverId: string) {
@@ -76,13 +82,15 @@ function isAdmin(req: Request): boolean {
 
 // ─── Adapter resolution ───────────────────────────────────────────────────────
 
+type ResolvedAdapter = { adapter: GameAdapter; serverId: string; isRunning: boolean };
+
 /**
- * Resolve adapter for a given server_id, or the active server if not specified.
- * Returns [adapter, serverId, isRunning] or null if no server found.
+ * Resolve adapter for a given server_id, or the single running server if not specified.
+ * Returns the resolved adapter, `null` if no server found/running, or the literal
+ * `"ambiguous"` when no server_id was given but MORE THAN ONE server is running
+ * (the caller must then ask the user to specify `server_id`).
  */
-async function resolveAdapter(
-  serverId?: string,
-): Promise<{ adapter: GameAdapter; serverId: string; isRunning: boolean } | null> {
+async function resolveAdapter(serverId?: string): Promise<ResolvedAdapter | null | "ambiguous"> {
   if (serverId) {
     // Specific server requested — works even if stopped
     const adapter = await createMinecraftAdapter(serverId);
@@ -91,12 +99,13 @@ async function resolveAdapter(
     return { adapter, serverId, isRunning: status === "running" };
   }
 
-  // Default: active (running) server
-  const active = await getActiveContainer();
-  if (!active) return null;
-  const adapter = await createMinecraftAdapter(active.name);
+  // Default: the running server — but with several running it's ambiguous
+  const running = await getRunningGameServers();
+  if (running.length === 0) return null;
+  if (running.length > 1) return "ambiguous";
+  const adapter = await createMinecraftAdapter(running[0].name);
   if (!adapter) return null;
-  return { adapter, serverId: active.name, isRunning: true };
+  return { adapter, serverId: running[0].name, isRunning: true };
 }
 
 // ─── MCP Server factory ───────────────────────────────────────────────────────
@@ -125,7 +134,6 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     {},
     async () => {
       const servers = serverQueries.getAll.all();
-      const active = await getActiveContainer();
 
       const result = await Promise.all(
         servers.map(async (s) => {
@@ -140,7 +148,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
             game_type: s.game_type,
             docker_image: s.docker_image,
             status,
-            is_active: active?.name === s.id,
+            is_active: status === "running",
             is_minecraft: isMinecraft,
             detected_systems: adapter?.detectedSystems ?? [],
             port: s.port,
@@ -158,6 +166,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     { ...serverIdParam },
     async ({ server_id }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const { adapter, serverId: sid, isRunning } = resolved;
@@ -202,6 +211,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, chapter }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const chapters = await resolved.adapter.getChapters!();
@@ -239,6 +249,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, quest_id }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const details = await resolved.adapter.getQuestDetails!(quest_id);
@@ -257,6 +268,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, player_name }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
@@ -302,6 +314,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, player_name, chapter, limit }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
@@ -373,6 +386,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, item_name }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const result = await resolved.adapter.searchRecipes!(item_name);
@@ -407,6 +421,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, player_name }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const name = player_name ?? playerName;
@@ -437,6 +452,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const players = await resolved.adapter.listPlayersExtended!();
@@ -483,6 +499,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     },
     async ({ server_id, category, limit }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const cat = category ?? "general";
@@ -507,6 +524,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
     { ...serverIdParam },
     async ({ server_id }) => {
       const resolved = await resolveAdapter(server_id);
+      if (resolved === "ambiguous") return ambiguousServer();
       if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
       const mods = await resolved.adapter.getModListDetailed!();
@@ -536,6 +554,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       },
       async ({ server_id, command }) => {
         const resolved = await resolveAdapter(server_id);
+        if (resolved === "ambiguous") return ambiguousServer();
         if (!resolved) return server_id ? noServerData(server_id) : noServer();
 
         if (!resolved.isRunning) {
@@ -708,9 +727,13 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
 
   server.resource("modpack-scripts", "modpack://scripts", async (uri) => {
     const resolved = await resolveAdapter();
-    if (!resolved) {
+    if (!resolved || resolved === "ambiguous") {
+      const text =
+        resolved === "ambiguous"
+          ? "Multiple servers running — open this resource per-server instead."
+          : "No server running.";
       return {
-        contents: [{ uri: uri.href, mimeType: "text/plain" as const, text: "No server running." }],
+        contents: [{ uri: uri.href, mimeType: "text/plain" as const, text }],
       };
     }
 
@@ -730,13 +753,17 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
 
   server.resource("modpack-info", "modpack://info", async (uri) => {
     const resolved = await resolveAdapter();
-    if (!resolved) {
+    if (!resolved || resolved === "ambiguous") {
+      const error =
+        resolved === "ambiguous"
+          ? "Multiple servers running — specify a server"
+          : "No server running";
       return {
         contents: [
           {
             uri: uri.href,
             mimeType: "application/json" as const,
-            text: JSON.stringify({ error: "No server running" }),
+            text: JSON.stringify({ error }),
           },
         ],
       };
@@ -771,7 +798,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       const resolved = await resolveAdapter();
 
       let questInfo = "No quest system detected.";
-      if (resolved) {
+      if (resolved && resolved !== "ambiguous") {
         const [chapters, progress] = await Promise.all([
           resolved.adapter.getChapters!(),
           resolved.adapter.getQuestProgress!(name),
@@ -822,7 +849,7 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       const resolved = await resolveAdapter();
       let scriptContext = "No recipe scripts available.";
 
-      if (resolved) {
+      if (resolved && resolved !== "ambiguous") {
         const result = await resolved.adapter.searchRecipes!(item);
 
         if (result.structured.length > 0 || result.rawMatches.length > 0) {

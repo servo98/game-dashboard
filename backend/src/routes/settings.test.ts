@@ -150,12 +150,17 @@ describe("PUT /", () => {
     const res = await settings.request("/", {
       method: "PUT",
       headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
-      body: JSON.stringify({ host_domain: "new.com", game_memory_limit_gb: "8" }),
+      body: JSON.stringify({
+        host_domain: "new.com",
+        game_memory_limit_gb: "8",
+        host_memory_limit_gb: "32",
+      }),
     });
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
     expect(mockPanelSettingsSet).toHaveBeenCalledWith("host_domain", "new.com");
     expect(mockPanelSettingsSet).toHaveBeenCalledWith("game_memory_limit_gb", "8");
+    expect(mockPanelSettingsSet).toHaveBeenCalledWith("host_memory_limit_gb", "32");
   });
 
   it("ignores unknown keys", async () => {

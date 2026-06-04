@@ -40,7 +40,7 @@ const ADMIN_USER = { discord_id: "123456", status: "approved", role: "admin" };
 // ─── Mock docker ────────────────────────────────────────────────────────────
 const mockGetContainerStatus = vi.fn().mockResolvedValue("running" as const);
 vi.mock("../docker", () => ({
-  getActiveContainer: vi.fn().mockResolvedValue(null),
+  getRunningGameServers: vi.fn().mockResolvedValue([]),
   getContainerStatus: (...a: unknown[]) => mockGetContainerStatus(...a),
 }));
 

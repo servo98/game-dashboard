@@ -341,6 +341,10 @@ export const botSettingsQueries = {
 const PANEL_SETTINGS_DEFAULTS: Record<string, string> = {
   host_domain: "aypapol.com",
   game_memory_limit_gb: "12",
+  // Tope global de RAM para TODOS los game servers corriendo a la vez. startServer
+  // rechaza un arranque si la memoria reservada (corriendo + el nuevo) lo supera.
+  // El admin debe ajustarlo a la RAM real del host.
+  host_memory_limit_gb: "24",
   game_cpu_limit: "3",
   auto_stop_hours: "0",
   max_backups_per_server: "5",
