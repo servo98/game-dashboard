@@ -121,28 +121,31 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
 
   server.tool(
     "list_servers",
-    "List all configured game servers and their current status",
+    "List all configured servers in the panel (every game and app), with status and image",
     {},
     async () => {
       const servers = serverQueries.getAll.all();
       const active = await getActiveContainer();
 
       const result = await Promise.all(
-        servers
-          .filter((s) => s.game_type === "minecraft")
-          .map(async (s) => {
-            const status = await getContainerStatus(s.id);
-            const adapter = await createMinecraftAdapter(s.id);
-            return {
-              id: s.id,
-              name: s.name,
-              game_type: s.game_type,
-              status,
-              is_active: active?.name === s.id,
-              detected_systems: adapter?.detectedSystems ?? [],
-              port: s.port,
-            };
-          }),
+        servers.map(async (s) => {
+          const status = await getContainerStatus(s.id);
+          // Minecraft se detecta por la imagen (itzg/minecraft-server), no por game_type:
+          // game_type hereda la categoría del catálogo (p. ej. "sandbox"), no "minecraft".
+          const isMinecraft = s.docker_image.includes("itzg/minecraft-server");
+          const adapter = isMinecraft ? await createMinecraftAdapter(s.id) : null;
+          return {
+            id: s.id,
+            name: s.name,
+            game_type: s.game_type,
+            docker_image: s.docker_image,
+            status,
+            is_active: active?.name === s.id,
+            is_minecraft: isMinecraft,
+            detected_systems: adapter?.detectedSystems ?? [],
+            port: s.port,
+          };
+        }),
       );
 
       return successResult(result);
@@ -161,7 +164,10 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
       const serverRecord = serverQueries.getById.get(sid);
       let playerList: string[] = [];
 
-      if (isRunning) {
+      // El listado de jugadores vía RCON "list" solo aplica a Minecraft. Ejecutarlo sobre
+      // otros contenedores devuelve basura (p. ej. "executable file not found in $PATH").
+      const isMinecraft = serverRecord?.docker_image.includes("itzg/minecraft-server") ?? false;
+      if (isRunning && isMinecraft) {
         try {
           const result = await adapter.runCommand!("list");
           playerList = result
@@ -178,6 +184,8 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
         serverId: sid,
         serverName: serverRecord?.name ?? sid,
         gameType: serverRecord?.game_type ?? "unknown",
+        dockerImage: serverRecord?.docker_image ?? "unknown",
+        isMinecraft,
         status: isRunning ? "running" : "stopped",
         playersOnline: playerList,
         detectedSystems: adapter.detectedSystems,
