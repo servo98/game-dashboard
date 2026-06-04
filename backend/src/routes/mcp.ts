@@ -7,6 +7,8 @@ import { createMinecraftAdapter } from "../adapters/minecraft/index";
 import { sanitize } from "../adapters/minecraft/sanitize";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
 import { getActiveContainer, getContainerStatus } from "../docker";
+import { isAdminDiscordId } from "../middleware/auth";
+import { restartServer, startServer, stopServer, updateServerConfig } from "../server-actions";
 
 const mcpRoute = new Hono();
 
@@ -64,7 +66,12 @@ function isAdmin(req: Request): boolean {
   if (!auth?.startsWith("Bearer ")) return false;
   const token = auth.slice(7);
   const session = sessionQueries.get.get(token);
-  return session !== null && session !== undefined;
+  if (!session) return false;
+
+  // OJO: tener sesión NO implica ser admin. Cualquier usuario que complete el login
+  // de Discord (incluso 'pending'/no aprobado) tiene sesión. Las tools destructivas
+  // del MCP deben restringirse a admins reales, igual que requireAdmin en el dashboard.
+  return isAdminDiscordId(session.discord_id);
 }
 
 // ─── Adapter resolution ───────────────────────────────────────────────────────
@@ -537,6 +544,156 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
         }
       },
     );
+
+    // Admin-only: start a server (full orchestration, igual que el dashboard)
+    server.tool(
+      "start_server",
+      "Start a game server (admin only). Applies image/version auto-selection, records session, starts crash + joinable watchers. Stops any other running server first.",
+      {
+        server_id: z.string().describe("Server ID to start (e.g. 'minecraft')."),
+      },
+      async ({ server_id }) => {
+        const r = await startServer(server_id);
+        if (!r.ok) return errorResult(r.error);
+        return successResult({
+          server_id: r.data.serverId,
+          image: r.data.image,
+          message: `Server "${r.data.serverId}" started.`,
+        });
+      },
+    );
+
+    // Admin-only: stop a running server (backup-if-running first)
+    server.tool(
+      "stop_server",
+      "Stop a running game server (admin only).",
+      {
+        server_id: z.string().describe("Server ID to stop."),
+        backup: z
+          .boolean()
+          .optional()
+          .describe("Create a backup before stopping if the server is running (default true)."),
+      },
+      async ({ server_id, backup }) => {
+        if (!serverQueries.getById.get(server_id)) {
+          return errorResult(`Server "${server_id}" not found.`);
+        }
+
+        const status = await getContainerStatus(server_id);
+        if (status !== "running") {
+          return successResult({
+            server_id,
+            message: `Server "${server_id}" is already stopped.`,
+            already_stopped: true,
+          });
+        }
+
+        // El backup (si está corriendo) lo gestiona el servicio stopServer.
+        const r = await stopServer(server_id, "user", { backup: backup !== false });
+        if (!r.ok) return errorResult(r.error);
+        return successResult({ server_id, message: `Server "${server_id}" stopped.` });
+      },
+    );
+
+    // Admin-only: restart a server (backup-if-running handled inside restartServer)
+    server.tool(
+      "restart_server",
+      "Restart a game server (admin only). If stopped, this just starts it.",
+      {
+        server_id: z.string().describe("Server ID to restart."),
+        backup: z
+          .boolean()
+          .optional()
+          .describe("Create a backup before restarting a running server (default true)."),
+      },
+      async ({ server_id, backup }) => {
+        const r = await restartServer(server_id, { backup: backup !== false });
+        if (!r.ok) return errorResult(r.error);
+        return successResult({
+          server_id: r.data.serverId,
+          image: r.data.image,
+          message: `Server "${r.data.serverId}" restarted.`,
+        });
+      },
+    );
+
+    // Admin-only: merge-update env vars (backup first)
+    server.tool(
+      "update_server_env",
+      "Update environment variables for a server (admin only). Merges over existing vars; takes effect on next start. A backup is taken first.",
+      {
+        server_id: z.string().describe("Server ID."),
+        env: z
+          .record(z.string(), z.string().nullable())
+          .describe(
+            "Key→value map merged over current env_vars. Use null as the value to DELETE a key. Only provided keys change; others are kept.",
+          ),
+      },
+      async ({ server_id, env }) => {
+        const r = await updateServerConfig(server_id, { env_vars: env }, { backup: true });
+        if (!r.ok) return errorResult(r.error);
+        // Devuelve solo las claves cambiadas, no todo el env (evita reflejar secretos).
+        return successResult({
+          server_id,
+          changed_keys: Object.keys(env),
+          message: "Environment variables updated. Takes effect on next start.",
+        });
+      },
+    );
+
+    // Admin-only: update docker image/tag (backup first), optional restart
+    server.tool(
+      "update_server_image",
+      "Update the Docker image (and tag) for a server (admin only). Takes effect on next start unless restart=true. A backup is taken first.",
+      {
+        server_id: z.string().describe("Server ID."),
+        image: z
+          .string()
+          .describe(
+            "Full image ref, e.g. 'itzg/minecraft-server:java21' or 'ghcr.io/owner/img:tag'.",
+          ),
+        restart: z
+          .boolean()
+          .optional()
+          .describe(
+            "If true, restart the server now to apply the new image (starts it if currently stopped). Default false.",
+          ),
+      },
+      async ({ server_id, image, restart }) => {
+        // Valida la referencia de imagen antes de tocar la DB o hacer backup.
+        // Admite un prefijo de registry opcional con puerto (p. ej. localhost:5000/img:tag,
+        // registry.example.com:5000/owner/img), repo multi-segmento, tag y digest opcionales.
+        const IMAGE_RE =
+          /^([a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?\/)?[a-z0-9]+([._-][a-z0-9]+)*(\/[a-z0-9]+([._-][a-z0-9]+)*)*(:[a-zA-Z0-9._-]+)?(@sha256:[a-f0-9]{64})?$/;
+        const trimmed = image.trim();
+        if (!trimmed || !IMAGE_RE.test(trimmed)) {
+          return errorResult(`Invalid image reference: ${image}`);
+        }
+
+        const r = await updateServerConfig(server_id, { docker_image: trimmed }, { backup: true });
+        if (!r.ok) return errorResult(r.error);
+
+        // Reinicia ahora si se pidió (start = aplica la nueva imagen vía pull-on-start)
+        if (restart) {
+          // El restart ya hizo backup arriba; evita doble backup en el restart interno
+          const rr = await restartServer(server_id, { backup: false });
+          if (!rr.ok) return errorResult(rr.error);
+          return successResult({
+            server_id,
+            docker_image: rr.data.image,
+            restarted: true,
+            message: `Image updated and server restarted as "${rr.data.image}".`,
+          });
+        }
+
+        return successResult({
+          server_id,
+          docker_image: r.data.docker_image,
+          restarted: false,
+          message: "Image updated. Takes effect on next start.",
+        });
+      },
+    );
   }
 
   // ─── Resources ──────────────────────────────────────────────────────────
@@ -712,6 +869,9 @@ mcpRoute.post("/mcp", async (c) => {
 
   const mcpToken = getMcpToken(c.req.raw);
   const admin = isAdmin(c.req.raw);
+  // Destructive tools are available to an authenticated admin browser session OR
+  // to an MCP token explicitly marked is_admin (remote control from claude.ai).
+  const adminMode = admin || mcpToken?.is_admin === 1;
 
   if (!mcpToken && !admin) {
     const proto = c.req.header("x-forwarded-proto") ?? "http";
@@ -728,7 +888,7 @@ mcpRoute.post("/mcp", async (c) => {
     );
   }
 
-  const server = createMcpServer(mcpToken, admin);
+  const server = createMcpServer(mcpToken, adminMode);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

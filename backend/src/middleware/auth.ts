@@ -1,6 +1,22 @@
 import type { Context, Next } from "hono";
 import { panelUserQueries, sessionQueries, userServerAccessQueries } from "../db";
 
+/**
+ * True if the given Discord user is an admin: present in ALLOWED_DISCORD_IDS (promoted to
+ * role=admin on startup) or an approved panel_user with role=admin (manual promotion).
+ * Shared source of truth for admin checks outside the middleware chain (MCP, OAuth).
+ */
+export function isAdminDiscordId(discordId: string): boolean {
+  const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allowedIds.includes(discordId)) return true;
+
+  const user = panelUserQueries.get.get(discordId);
+  return user?.status === "approved" && user.role === "admin";
+}
+
 export async function requireAuth(c: Context, next: Next) {
   const token =
     c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");

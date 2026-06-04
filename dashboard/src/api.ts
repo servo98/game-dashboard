@@ -146,6 +146,7 @@ export type McpTokenRecord = {
   token_preview: string;
   player_name: string;
   label: string;
+  is_admin: boolean;
   created_at: number;
   last_used_at: number | null;
 };
@@ -500,8 +501,8 @@ export const api = {
 
   /** MCP tokens */
   listMcpTokens: () => request<McpTokenRecord[]>("/mcp-tokens"),
-  createMcpToken: (data: { player_name: string; label?: string }) =>
-    request<{ token: string; player_name: string }>("/mcp-tokens", {
+  createMcpToken: (data: { player_name: string; label?: string; is_admin?: boolean }) =>
+    request<{ token: string; player_name: string; is_admin: boolean }>("/mcp-tokens", {
       method: "POST",
       body: JSON.stringify(data),
     }),

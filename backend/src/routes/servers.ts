@@ -4,24 +4,14 @@ import { execRconCommand } from "../adapters/minecraft/rcon";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
-import {
-  backupQueries,
-  botSettingsQueries,
-  serverQueries,
-  serverSessionQueries,
-  userServerAccessQueries,
-} from "../db";
+import { backupQueries, serverQueries, serverSessionQueries, userServerAccessQueries } from "../db";
 import {
   getActiveContainer,
   getContainerStatus,
-  markIntentionalStop,
-  startGameContainer,
-  stopGameContainer,
   streamContainerLogs,
   streamContainerStats,
-  watchContainer,
 } from "../docker";
-import { beginLogWatching, getJoinableStatus, stopJoinableWatcher } from "../joinable-status";
+import { getJoinableStatus } from "../joinable-status";
 import {
   requireAdmin,
   requireApproved,
@@ -29,6 +19,7 @@ import {
   requireAuthOrBotKey,
   requireServerAccess,
 } from "../middleware/auth";
+import { startServer, stopServer } from "../server-actions";
 
 const servers = new Hono<{
   Variables: { session: Session; isBotRequest?: boolean; role?: string; discordId?: string };
@@ -226,146 +217,14 @@ servers.post(
     const server = serverQueries.getById.get(id);
     if (!server) return c.json({ error: "Server not found" }, 404);
 
-    const envVars = JSON.parse(server.env_vars) as Record<string, string>;
-    let volumes = JSON.parse(server.volumes) as Record<string, string>;
-
-    // Ensure server always has a volume — auto-fix legacy servers without one
-    if (Object.keys(volumes).length === 0) {
-      // Try to match the Docker image to a catalog template for correct volumes
-      const template = findTemplateByImage(server.docker_image);
-      if (template) {
-        // Use catalog volumes but substitute the server ID in host paths
-        volumes = Object.fromEntries(
-          Object.entries(template.default_volumes).map(([host, container]) => [
-            host.replace(new RegExp(`/${template.id}(/|$)`), `/${id}$1`),
-            container,
-          ]),
-        );
-      } else {
-        volumes = { [`/data/${id}`]: "/data" };
-      }
-      serverQueries.update.run(
-        server.name,
-        server.port,
-        server.docker_image,
-        server.env_vars,
-        JSON.stringify(volumes),
-        id,
-      );
-    }
-
-    // Modpack types: auto-detect version from modpack manifest, don't override
-    const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
-    if (MODPACK_TYPES.has(envVars.TYPE)) {
-      delete envVars.VERSION;
-    }
-
-    // Inject CF_API_KEY from backend env when using CurseForge modpacks
-    if (envVars.TYPE === "AUTO_CURSEFORGE" && process.env.CF_API_KEY) {
-      envVars.CF_API_KEY = process.env.CF_API_KEY;
-    }
-
-    // Auto-inject SERVER_PORT for Minecraft servers when using a non-default port
-    // This ensures itzg/minecraft-server binds to the correct port with host networking
-    if (server.game_type === "minecraft" && server.port !== 25565 && !envVars.SERVER_PORT) {
-      envVars.SERVER_PORT = String(server.port);
-    }
-
-    // Auto-select Java image tag for itzg/minecraft-server based on MC version
-    let dockerImage = server.docker_image;
-    if (dockerImage.startsWith("itzg/minecraft-server")) {
-      // If the DB already has an explicit tag (e.g. java21), respect it
-      const existingTag = dockerImage.includes(":") ? dockerImage.split(":")[1] : null;
-      const hasExplicitJavaTag = existingTag && /^java\d+$/.test(existingTag);
-
-      if (hasExplicitJavaTag) {
-        // User chose a specific Java version in the config — don't override it
-        dockerImage = `itzg/minecraft-server:${existingTag}`;
-      } else {
-        const version = envVars.VERSION ?? "LATEST";
-        const parts = version.split(".").map(Number);
-        const minor = parts[1] ?? 0;
-        const patch = parts[2] ?? 0;
-        let javaTag = "java21"; // default for latest/modern
-        if (version !== "LATEST" && version !== "SNAPSHOT") {
-          if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
-          else if (minor >= 18) javaTag = "java17";
-          else javaTag = "java8";
-        }
-        dockerImage = `itzg/minecraft-server:${javaTag}`;
-      }
-    }
-
-    try {
-      // Mark any currently running server's session as replaced
-      const active = await getActiveContainer();
-      if (active) {
-        stopJoinableWatcher(active.name);
-        markIntentionalStop(active.name);
-        serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "replaced", active.name);
-      }
-
-      await startGameContainer(server.id, dockerImage, server.port, envVars, volumes);
-
-      // Record new session
-      serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
-
-      // Watch logs for "Done" line to detect when server is joinable
-      beginLogWatching(server.id);
-
-      // Watch for unexpected stops (crashes)
-      const serverName = server.name;
-      const serverId = server.id;
-      watchContainer(serverId, async () => {
-        serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "crash", serverId);
-
-        const embed = {
-          title: "🔴 Servidor caído",
-          description: `El servidor **${serverName}** se ha detenido inesperadamente.`,
-          color: 15158332,
-          timestamp: new Date().toISOString(),
-        };
-
-        // Try configured crash channel first
-        const crashChannelRow = botSettingsQueries.get.get("crashes_channel_id");
-        const botToken = process.env.DISCORD_BOT_TOKEN;
-
-        if (crashChannelRow?.value && botToken) {
-          try {
-            await fetch(`https://discord.com/api/v10/channels/${crashChannelRow.value}/messages`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bot ${botToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ embeds: [embed] }),
-            });
-            return; // sent via bot API, skip webhook fallback
-          } catch (err) {
-            console.error("Failed to send crash notification via bot:", err);
-          }
-        }
-
-        // Fallback to webhook
-        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-        if (webhookUrl) {
-          try {
-            await fetch(webhookUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ embeds: [embed] }),
-            });
-          } catch (err) {
-            console.error("Failed to send crash webhook:", err);
-          }
-        }
-      });
-
-      return c.json({ ok: true, message: `${server.name} started` });
-    } catch (err) {
-      console.error("Start error:", err);
+    const result = await startServer(id);
+    if (!result.ok) {
+      if (result.code === "not_found") return c.json({ error: "Server not found" }, 404);
+      console.error("Start error:", result.error);
       return c.json({ error: "Failed to start server" }, 500);
     }
+
+    return c.json({ ok: true, message: `${server.name} started` });
   },
 );
 
@@ -382,26 +241,23 @@ servers.post(
     if (id === "active") {
       const active = await getActiveContainer();
       if (!active) return c.json({ ok: true, message: "No server running" });
-      stopJoinableWatcher(active.name);
-      markIntentionalStop(active.name);
-      await stopGameContainer(active.name);
-      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", active.name);
+      const result = await stopServer(active.name);
+      if (!result.ok) {
+        console.error("Stop error:", result.error);
+        return c.json({ error: "Failed to stop server" }, 500);
+      }
       return c.json({ ok: true, message: `${active.name} stopped` });
     }
 
     const server = serverQueries.getById.get(id);
     if (!server) return c.json({ error: "Server not found" }, 404);
 
-    try {
-      stopJoinableWatcher(id);
-      markIntentionalStop(id);
-      await stopGameContainer(id);
-      serverSessionQueries.stop.run(Math.floor(Date.now() / 1000), "user", id);
-      return c.json({ ok: true, message: `${server.name} stopped` });
-    } catch (err) {
-      console.error("Stop error:", err);
+    const result = await stopServer(id);
+    if (!result.ok) {
+      console.error("Stop error:", result.error);
       return c.json({ error: "Failed to stop server" }, 500);
     }
+    return c.json({ ok: true, message: `${server.name} stopped` });
   },
 );
 

@@ -121,6 +121,15 @@ try {
   /* column already exists */
 }
 
+// Migration: add is_admin column to mcp_tokens.
+// Admin-capable tokens may invoke the destructive container-control MCP tools
+// (start/stop/restart/update env/image) from remote clients like claude.ai.
+try {
+  db.exec(`ALTER TABLE mcp_tokens ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+} catch (_) {
+  /* column already exists */
+}
+
 // Auto-set role=admin for ALLOWED_DISCORD_IDS on startup, demote anyone removed
 {
   const allowedIds = (process.env.ALLOWED_DISCORD_IDS ?? "")
@@ -371,6 +380,7 @@ export type McpToken = {
   label: string;
   created_at: number;
   last_used_at: number | null;
+  is_admin: number; // 0 | 1 — admin tokens may use destructive container-control tools
 };
 
 export type PanelUser = {
@@ -463,8 +473,8 @@ export const mcpTokenQueries = {
     "SELECT * FROM mcp_tokens WHERE discord_id = ? ORDER BY created_at DESC",
   ),
   listAll: db.query<McpToken, []>("SELECT * FROM mcp_tokens ORDER BY created_at DESC"),
-  insert: db.query<void, [string, string, string, string, string]>(
-    "INSERT INTO mcp_tokens (token, discord_id, discord_username, player_name, label) VALUES (?, ?, ?, ?, ?)",
+  insert: db.query<void, [string, string, string, string, string, number]>(
+    "INSERT INTO mcp_tokens (token, discord_id, discord_username, player_name, label, is_admin) VALUES (?, ?, ?, ?, ?, ?)",
   ),
   deleteById: db.query<void, [number, string]>(
     "DELETE FROM mcp_tokens WHERE id = ? AND discord_id = ?",

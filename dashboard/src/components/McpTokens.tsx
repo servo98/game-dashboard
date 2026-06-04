@@ -10,6 +10,7 @@ export default function McpTokens() {
   const [showForm, setShowForm] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [label, setLabel] = useState("");
+  const [isAdminToken, setIsAdminToken] = useState(false);
   const [creating, setCreating] = useState(false);
 
   // Newly created token (show once)
@@ -40,11 +41,13 @@ export default function McpTokens() {
       const result = await api.createMcpToken({
         player_name: playerName.trim(),
         label: label.trim() || undefined,
+        is_admin: isAdminToken,
       });
       setNewToken(result.token);
       setShowForm(false);
       setPlayerName("");
       setLabel("");
+      setIsAdminToken(false);
       await fetchTokens();
     } catch (err) {
       setError((err as Error).message);
@@ -148,6 +151,19 @@ export default function McpTokens() {
                 className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
               />
             </div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAdminToken}
+                onChange={(e) => setIsAdminToken(e.target.checked)}
+                className="mt-0.5 accent-brand-500"
+              />
+              <span className="text-xs text-gray-400">
+                <span className="text-gray-200 font-medium">Admin token</span> — allows the
+                destructive server-control tools (start / stop / restart, edit env vars, update
+                Docker image). Only grant this to trusted clients.
+              </span>
+            </label>
             <div className="flex gap-2">
               <button
                 onClick={handleCreate}
@@ -182,6 +198,11 @@ export default function McpTokens() {
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-white font-medium">{t.player_name}</span>
                     {t.label && <span className="text-gray-500 truncate">({t.label})</span>}
+                    {t.is_admin && (
+                      <span className="px-1.5 py-0.5 bg-amber-950/50 border border-amber-700 text-amber-400 rounded text-[10px] font-medium uppercase tracking-wide">
+                        Admin
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-600">
                     <span className="font-mono">{t.token_preview}</span>

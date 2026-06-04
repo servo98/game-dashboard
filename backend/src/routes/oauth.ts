@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db, mcpTokenQueries, sessionQueries } from "../db";
-import { getCookie } from "../middleware/auth";
+import { getCookie, isAdminDiscordId } from "../middleware/auth";
 
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
@@ -374,12 +374,17 @@ oauth.post("/token", async (c) => {
   const existingTokens = mcpTokenQueries.listByDiscordId.all(authCode.discord_id);
   const playerName = existingTokens[0]?.player_name ?? authCode.discord_username;
 
+  // OAuth-generated tokens (e.g. claude.ai) inherit admin capability from the
+  // authenticating Discord user: a real admin gets a token that can drive the
+  // destructive container-control tools; everyone else gets a read-only token.
+  const tokenIsAdmin = isAdminDiscordId(authCode.discord_id) ? 1 : 0;
   mcpTokenQueries.insert.run(
     accessToken,
     authCode.discord_id,
     authCode.discord_username,
     playerName,
     "OAuth (auto-generated)",
+    tokenIsAdmin,
   );
 
   return c.json({

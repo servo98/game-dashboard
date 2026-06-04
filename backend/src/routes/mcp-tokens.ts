@@ -21,6 +21,7 @@ mcpTokens.get("/", requireAuth, requireApproved, requireAdmin, (c) => {
       token_preview: `${t.token.slice(0, 8)}...`,
       player_name: t.player_name,
       label: t.label,
+      is_admin: t.is_admin === 1,
       created_at: t.created_at,
       last_used_at: t.last_used_at,
     })),
@@ -33,6 +34,7 @@ mcpTokens.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   const body = await c.req.json<{
     player_name: string;
     label?: string;
+    is_admin?: boolean;
   }>();
 
   if (!body.player_name?.trim()) {
@@ -41,16 +43,19 @@ mcpTokens.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
 
   const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
 
+  // Admin tokens may invoke the destructive container-control MCP tools remotely.
+  // This route is already admin-only (requireAdmin), so only an admin can mint one.
   mcpTokenQueries.insert.run(
     token,
     session.discord_id,
     session.username,
     body.player_name.trim(),
     body.label?.trim() ?? "",
+    body.is_admin ? 1 : 0,
   );
 
   // Return the full token only once — client must copy it now
-  return c.json({ token, player_name: body.player_name.trim() });
+  return c.json({ token, player_name: body.player_name.trim(), is_admin: !!body.is_admin });
 });
 
 /** Revoke a token (admin only) */
