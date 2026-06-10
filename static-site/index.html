@@ -1,1177 +1,708 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aypapol</title>
-  <meta name="description" content="todos somos papol. musica, epepes, juegos y puro desmadre creativo." />
-  <meta name="theme-color" content="#0a0a0f" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0f;
-      --bg2: #0f0f18;
-      --green: #22c55e;
-      --lime: #a3e635;
-      --purple: #a855f7;
-      --blue: #4f6ef7;
-      --pink: #ec4899;
-      --orange: #f97316;
-      --text: #e2e8f0;
-      --muted: #64748b;
-      --card: #111119;
-      --border: #1e293b;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      scrollbar-width: thin;
-      scrollbar-color: var(--purple) var(--bg);
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Space Grotesk', -apple-system, sans-serif;
-      overflow-x: hidden;
-      line-height: 1.6;
-    }
-
-    /* ═══ CURSOR GLOW ═══ */
-    .cursor-glow {
-      position: fixed;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.06) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-      transform: translate(-50%, -50%);
-      transition: left 0.3s ease-out, top 0.3s ease-out;
-    }
-
-    /* ═══ PARTICLES CANVAS ═══ */
-    #particles {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* ═══ NAV ═══ */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      padding: 1rem 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      backdrop-filter: blur(12px);
-      background: rgba(10, 10, 15, 0.7);
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      transition: transform 0.3s;
-    }
-
-    nav.hidden { transform: translateY(-100%); }
-
-    .nav-logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 1.1rem;
-      color: var(--green);
-      text-decoration: none;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 1.5rem;
-      list-style: none;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.85rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover { color: var(--text); }
-
-    /* ═══ HERO ═══ */
-    .hero {
-      position: relative;
-      min-height: 100svh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 2rem;
-      z-index: 1;
-    }
-
-    /* Glitch title */
-    .glitch-wrap {
-      position: relative;
-      display: inline-block;
-    }
-
-    .glitch {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: clamp(3.5rem, 12vw, 9rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #fff 0%, var(--purple) 50%, var(--green) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      position: relative;
-      animation: glitchShift 8s ease-in-out infinite;
-    }
-
-    .glitch::before,
-    .glitch::after {
-      content: 'aypapol';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #fff 0%, var(--purple) 50%, var(--green) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .glitch::before {
-      animation: glitch1 3s infinite linear alternate-reverse;
-      clip-path: inset(0 0 65% 0);
-    }
-
-    .glitch::after {
-      animation: glitch2 3s infinite linear alternate-reverse;
-      clip-path: inset(65% 0 0 0);
-    }
-
-    @keyframes glitch1 {
-      0%, 90%  { transform: translate(0); }
-      92%      { transform: translate(-4px, 2px); }
-      94%      { transform: translate(4px, -1px); }
-      96%      { transform: translate(-2px, -2px); }
-      98%      { transform: translate(3px, 1px); }
-      100%     { transform: translate(0); }
-    }
-
-    @keyframes glitch2 {
-      0%, 90%  { transform: translate(0); }
-      91%      { transform: translate(3px, -2px); }
-      93%      { transform: translate(-3px, 1px); }
-      95%      { transform: translate(2px, 2px); }
-      97%      { transform: translate(-4px, -1px); }
-      100%     { transform: translate(0); }
-    }
-
-    @keyframes glitchShift {
-      0%, 100% { filter: hue-rotate(0deg); }
-      50%      { filter: hue-rotate(30deg); }
-    }
-
-    .hero-sub {
-      margin-top: 1.5rem;
-      font-size: clamp(1rem, 3vw, 1.4rem);
-      color: var(--muted);
-      max-width: 500px;
-      opacity: 0;
-      animation: fadeUp 1s 0.5s forwards;
-    }
-
-    .hero-sub span {
-      color: var(--green);
-      font-weight: 600;
-    }
-
-    /* Status pill */
-    .status-pill {
-      margin-top: 2rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1.2rem;
-      background: rgba(34, 197, 94, 0.08);
-      border: 1px solid rgba(34, 197, 94, 0.2);
-      border-radius: 999px;
-      font-size: 0.8rem;
-      color: var(--green);
-      font-family: 'JetBrains Mono', monospace;
-      opacity: 0;
-      animation: fadeUp 1s 0.8s forwards;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.5; transform: scale(0.8); }
-    }
-
-    /* Scroll indicator */
-    .scroll-indicator {
-      position: absolute;
-      bottom: 2rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      opacity: 0;
-      animation: fadeUp 1s 1.2s forwards;
-    }
-
-    .scroll-indicator span {
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-    }
-
-    .scroll-arrow {
-      width: 20px;
-      height: 20px;
-      border-right: 2px solid var(--muted);
-      border-bottom: 2px solid var(--muted);
-      transform: rotate(45deg);
-      animation: scrollBounce 2s infinite;
-    }
-
-    @keyframes scrollBounce {
-      0%, 100% { transform: rotate(45deg) translate(0, 0); opacity: 0.5; }
-      50%      { transform: rotate(45deg) translate(5px, 5px); opacity: 1; }
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ═══ SECTIONS ═══ */
-    section {
-      position: relative;
-      z-index: 1;
-      padding: 6rem 2rem;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      color: var(--purple);
-      margin-bottom: 1rem;
-    }
-
-    .section-title {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.1;
-      margin-bottom: 1.5rem;
-    }
-
-    .gradient-text {
-      background: linear-gradient(135deg, #fff 30%, var(--purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .gradient-green {
-      background: linear-gradient(135deg, var(--lime) 30%, var(--green));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .gradient-pink {
-      background: linear-gradient(135deg, var(--pink) 30%, var(--orange));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .section-text {
-      font-size: 1.1rem;
-      color: var(--muted);
-      max-width: 600px;
-      line-height: 1.7;
-    }
-
-    /* Reveal animation */
-    .reveal {
-      opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ═══ QUE ES PAPOL ═══ */
-    .papol-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-      align-items: center;
-    }
-
-    .papol-visual {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .floating-words {
-      position: relative;
-      width: 300px;
-      height: 300px;
-    }
-
-    .float-word {
-      position: absolute;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      padding: 0.5rem 1rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      white-space: nowrap;
-      animation: float 6s ease-in-out infinite;
-    }
-
-    .float-word:nth-child(1) {
-      top: 10%; left: 5%;
-      color: var(--green);
-      font-size: 1.5rem;
-      animation-delay: 0s;
-    }
-    .float-word:nth-child(2) {
-      top: 35%; right: 0;
-      color: var(--purple);
-      font-size: 1.1rem;
-      animation-delay: 1s;
-    }
-    .float-word:nth-child(3) {
-      bottom: 25%; left: 10%;
-      color: var(--pink);
-      font-size: 1.3rem;
-      animation-delay: 2s;
-    }
-    .float-word:nth-child(4) {
-      bottom: 5%; right: 10%;
-      color: var(--orange);
-      font-size: 0.9rem;
-      animation-delay: 0.5s;
-    }
-    .float-word:nth-child(5) {
-      top: 55%; left: 35%;
-      color: var(--lime);
-      font-size: 1.8rem;
-      animation-delay: 1.5s;
-      border-color: rgba(163, 230, 53, 0.3);
-      background: rgba(163, 230, 53, 0.05);
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      25%      { transform: translateY(-12px) rotate(1deg); }
-      50%      { transform: translateY(-6px) rotate(-1deg); }
-      75%      { transform: translateY(-15px) rotate(0.5deg); }
-    }
-
-    /* ═══ EPEPE SECTION ═══ */
-    .epepe-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
-      margin-top: 3rem;
-    }
-
-    .epepe-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .epepe-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--purple), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .epepe-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(168, 85, 247, 0.3);
-      box-shadow: 0 8px 30px rgba(168, 85, 247, 0.08);
-    }
-
-    .epepe-card:hover::before { opacity: 1; }
-
-    .epepe-icon {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-
-    .epepe-card h3 {
-      font-size: 1.1rem;
-      margin-bottom: 0.5rem;
-      color: var(--text);
-    }
-
-    .epepe-card p {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    /* ═══ SPOTIFY SECTION ═══ */
-    .spotify-section {
-      text-align: center;
-    }
-
-    .spotify-embed {
-      margin-top: 3rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    .spotify-embed iframe {
-      border-radius: 16px;
-      max-width: 100%;
-    }
-
-    .spotify-vibes {
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-top: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .vibe-tag {
-      padding: 0.4rem 1rem;
-      background: rgba(30, 215, 96, 0.08);
-      border: 1px solid rgba(30, 215, 96, 0.2);
-      border-radius: 999px;
-      font-size: 0.8rem;
-      color: #1ed760;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* ═══ GAME PANEL SECTION ═══ */
-    .game-section {
-      text-align: center;
-    }
-
-    .game-preview {
-      margin-top: 3rem;
-      position: relative;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: var(--card);
-      padding: 2rem;
-    }
-
-    .terminal-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .terminal-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-
-    .terminal-dot.red { background: #ef4444; }
-    .terminal-dot.yellow { background: #eab308; }
-    .terminal-dot.green { background: #22c55e; }
-
-    .terminal-title {
-      margin-left: 0.5rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-
-    .terminal-body {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      text-align: left;
-      line-height: 1.8;
-    }
-
-    .terminal-line {
-      opacity: 0;
-      animation: typeLine 0.5s forwards;
-    }
-
-    .terminal-line .prompt { color: var(--green); }
-    .terminal-line .cmd { color: var(--text); }
-    .terminal-line .output { color: var(--muted); }
-    .terminal-line .success { color: var(--green); }
-    .terminal-line .info { color: var(--blue); }
-
-    @keyframes typeLine {
-      from { opacity: 0; transform: translateX(-10px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
-
-    /* ═══ CTA SECTION ═══ */
-    .cta-section {
-      text-align: center;
-      padding: 8rem 2rem;
-    }
-
-    .cta-buttons {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      margin-top: 2.5rem;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.85rem 2rem;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      font-family: 'Space Grotesk', sans-serif;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--purple), var(--blue));
-      color: #fff;
-      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(168, 85, 247, 0.4);
-    }
-
-    .btn-spotify {
-      background: #1ed760;
-      color: #000;
-    }
-
-    .btn-spotify:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(30, 215, 96, 0.3);
-    }
-
-    /* ═══ MARQUEE ═══ */
-    .marquee-container {
-      overflow: hidden;
-      padding: 1rem 0;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      z-index: 1;
-    }
-
-    .marquee {
-      display: flex;
-      gap: 3rem;
-      animation: marquee 25s linear infinite;
-      width: max-content;
-    }
-
-    .marquee span {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      color: var(--muted);
-      white-space: nowrap;
-      opacity: 0.5;
-    }
-
-    @keyframes marquee {
-      from { transform: translateX(0); }
-      to   { transform: translateX(-50%); }
-    }
-
-    /* ═══ FOOTER ═══ */
-    footer {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      padding: 3rem 2rem;
-      border-top: 1px solid var(--border);
-    }
-
-    .footer-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: #1e293b;
-    }
-
-    .footer-links {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 1rem;
-    }
-
-    .footer-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.85rem;
-      transition: color 0.2s;
-    }
-
-    .footer-links a:hover { color: var(--text); }
-
-    /* ═══ HORIZONTAL RULE GLOW ═══ */
-    .glow-line {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--purple), var(--green), transparent);
-      border: none;
-      margin: 0;
-      opacity: 0.4;
-    }
-
-    /* ═══ RESPONSIVE ═══ */
-    @media (max-width: 768px) {
-      .papol-section {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-      }
-
-      .papol-visual { order: -1; }
-
-      .floating-words {
-        width: 250px;
-        height: 250px;
-      }
-
-      .epepe-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .nav-links { display: none; }
-
-      section { padding: 4rem 1.5rem; }
-
-      .cta-buttons { flex-direction: column; align-items: center; }
-    }
-
-    @media (max-width: 480px) {
-      .floating-words {
-        width: 200px;
-        height: 200px;
-      }
-
-      .float-word { font-size: 0.9rem !important; padding: 0.3rem 0.7rem; }
-      .float-word:nth-child(5) { font-size: 1.2rem !important; }
-    }
-
-    /* ═══ SELECTION ═══ */
-    ::selection {
-      background: rgba(168, 85, 247, 0.3);
-      color: #fff;
-    }
-
-    /* ═══ NOISE OVERLAY ═══ */
-    body::after {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 999;
-      opacity: 0.015;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aypapol — todos somos papol</title>
+<style>
+/* ===== tokens/fonts.css ===== */
+/* aypapol — webfonts
+ * Space Grotesk (display) + JetBrains Mono (mono / UI / code).
+ * Loaded from Google Fonts CDN. NOTE: not yet self-hosted — for the
+ * "todo autohospedado" ethos these should later be downloaded into
+ * assets/fonts/ and pointed at locally. See readme.md > Caveats.
+ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* ===== tokens/colors.css ===== */
+/* aypapol — color tokens
+ * Deep green-black terminal base, neon "papol green" accent.
+ * Cyan = links/info. Magenta = the Música project + rare pops.
+ * Per-product hues live at the bottom (used sparingly, as tags).
+ */
+:root {
+  /* ---- Raw palette ------------------------------------------------ */
+  /* Backgrounds: near-black with a faint green cast */
+  --void:        #06080a;   /* deepest, page void / letterbox */
+  --ink-900:     #0a0d0c;   /* page background */
+  --ink-850:     #0c1110;   /* alt section background */
+  --ink-800:     #0f1413;   /* card / surface */
+  --ink-750:     #131918;   /* raised / hover surface */
+  --ink-700:     #18201d;   /* strong raised */
+  --ink-inset:   #070a09;   /* code wells, inputs, terminals */
+
+  /* Borders / hairlines (green-tinted greys) */
+  --line-900:    #161d1a;
+  --line-800:    #1f2824;
+  --line-700:    #2a352f;
+  --line-600:    #3a473f;
+
+  /* Papol green ramp */
+  --green-050:   #eafff0;
+  --green-200:   #b6ffb0;
+  --green-400:   #5cff45;
+  --green-neon:  #39ff14;   /* THE accent */
+  --green-500:   #2ce60f;   /* toned fill / large text on dark */
+  --green-700:   #1f9f12;
+  --green-900:   #0c4a0a;
+  --green-ink:   #04140a;   /* text/icon ON green fills */
+
+  /* Cyan — links, info, secondary interactive */
+  --cyan-400:    #5bf0f5;
+  --cyan:        #22d3ee;
+  --cyan-600:    #0fa9c4;
+  --cyan-ink:    #03171b;
+
+  /* Magenta — Música project, rare emphasis */
+  --magenta-400: #ff6cc0;
+  --magenta:     #ff2e9a;
+  --magenta-600: #c41673;
+
+  /* Amber — warnings, "uptime", retro terminal warmth */
+  --amber:       #ffb627;
+  --amber-600:   #c98708;
+
+  /* Red — danger / errors / offline */
+  --red-400:     #ff6b6b;
+  --red:         #ff4d4d;
+  --red-600:     #c42b2b;
+
+  /* Foreground / text (green-tinted off-whites → dim comment grey) */
+  --fg-bright:   #e9f5ec;   /* headings, near-white */
+  --fg-1:        #cfdcd4;   /* body */
+  --fg-2:        #97a89e;   /* secondary / labels */
+  --fg-3:        #66786e;   /* dim, metadata */
+  --fg-comment:  #4d5f56;   /* CLI comments, placeholders */
+
+  /* ---- Semantic aliases ------------------------------------------ */
+  --bg-page:        var(--ink-900);
+  --bg-alt:         var(--ink-850);
+  --surface-card:   var(--ink-800);
+  --surface-raised: var(--ink-750);
+  --surface-inset:  var(--ink-inset);
+  --surface-terminal: var(--ink-inset);
+
+  --border-subtle:  var(--line-900);
+  --border-default: var(--line-800);
+  --border-strong:  var(--line-700);
+  --border-focus:   var(--green-neon);
+
+  --text-heading:   var(--fg-bright);
+  --text-body:      var(--fg-1);
+  --text-muted:     var(--fg-2);
+  --text-dim:       var(--fg-3);
+  --text-comment:   var(--fg-comment);
+  --text-on-accent: var(--green-ink);
+
+  --accent:         var(--green-neon);
+  --accent-fill:    var(--green-500);
+  --accent-quiet:   var(--green-700);
+  --link:           var(--cyan);
+  --link-hover:     var(--cyan-400);
+
+  --prompt:         var(--green-neon);   /* the $ / ❯ sign */
+  --cursor:         var(--green-neon);
+
+  --success:        var(--green-neon);
+  --info:           var(--cyan);
+  --warning:        var(--amber);
+  --danger:         var(--red);
+
+  /* Tinted wash backgrounds for badges / soft fills */
+  --wash-green:   rgba(57, 255, 20, 0.10);
+  --wash-cyan:    rgba(34, 211, 238, 0.12);
+  --wash-magenta: rgba(255, 46, 154, 0.12);
+  --wash-amber:   rgba(255, 182, 39, 0.12);
+  --wash-red:     rgba(255, 77, 77, 0.12);
+
+  /* ---- Per-product accent hues (used sparingly as tags) ---------- */
+  --p-game:        var(--green-neon);  /* Game Panel  */
+  --p-chat:        #7c8cff;            /* ChatPapol   */
+  --p-desglosa:    var(--amber);       /* Desglosador */
+  --p-facturas:    #38e0a6;            /* Facturas    */
+  --p-rolcito:     #b06cff;            /* Rolcito     */
+  --p-musica:      var(--magenta);     /* Música      */
+}
+
+/* ===== tokens/typography.css ===== */
+/* aypapol — typography tokens
+ * Display: Space Grotesk. Everything else: JetBrains Mono.
+ * The system leans mono — headings can be EITHER (display for marketing
+ * punch, mono for product/CLI surfaces).
+ */
+:root {
+  /* Families */
+  --font-display: 'Space Grotesk', 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-ui:      var(--font-mono);   /* UI defaults to mono */
+
+  /* Weights */
+  --fw-regular:  400; /* @kind font */
+  --fw-medium:   500; /* @kind font */
+  --fw-bold:     700; /* @kind font */
+  --fw-black:    800; /* @kind font */
+
+  /* Type scale (px-based, 1.25 majorish, tuned) */
+  --fs-2xs:   11px;
+  --fs-xs:    12px;
+  --fs-sm:    13px;
+  --fs-base:  15px;
+  --fs-md:    17px;
+  --fs-lg:    20px;
+  --fs-xl:    24px;
+  --fs-2xl:   30px;
+  --fs-3xl:   38px;
+  --fs-4xl:   50px;
+  --fs-5xl:   68px;
+  --fs-6xl:   92px;
+
+  /* Line heights */
+  --lh-tight:   1.05; /* @kind other */
+  --lh-snug:    1.2;  /* @kind other */
+  --lh-normal:  1.5;  /* @kind other */
+  --lh-relaxed: 1.65; /* @kind other */
+
+  /* Letter spacing */
+  --ls-tight:   -0.02em;
+  --ls-normal:  0em;
+  --ls-wide:    0.04em;
+  --ls-wider:   0.12em;   /* eyebrows / labels: UPPERCASE MONO */
+
+  /* Semantic roles */
+  --type-display:  var(--fw-bold) var(--fs-5xl)/var(--lh-tight) var(--font-display);
+  --type-h1:       var(--fw-bold) var(--fs-4xl)/var(--lh-tight) var(--font-display);
+  --type-h2:       var(--fw-bold) var(--fs-3xl)/var(--lh-snug) var(--font-display);
+  --type-h3:       var(--fw-bold) var(--fs-xl)/var(--lh-snug) var(--font-mono);
+  --type-body:     var(--fw-regular) var(--fs-base)/var(--lh-relaxed) var(--font-mono);
+  --type-small:    var(--fw-regular) var(--fs-sm)/var(--lh-normal) var(--font-mono);
+  --type-mono:     var(--fw-regular) var(--fs-sm)/var(--lh-normal) var(--font-mono);
+  --type-eyebrow:  var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
+}
+
+/* ===== tokens/spacing.css ===== */
+/* aypapol — spacing & layout tokens. 4px base grid. */
+:root {
+  --space-0:   0;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+
+  /* Layout */
+  --container:      1180px;
+  --container-wide: 1360px;
+  --gutter:         24px;
+  --section-y:      var(--space-24);
+
+  /* Control sizing */
+  --control-sm: 30px;
+  --control-md: 38px;
+  --control-lg: 46px;
+}
+
+/* ===== tokens/effects.css ===== */
+/* aypapol — effects: radius, borders, shadows, neon glow, grid texture,
+ * transitions. The "limpio" terminal vibe: hairline borders, soft neon
+ * glow on focus/hover, a faint background grid. No heavy scanlines.
+ */
+:root {
+  /* Radius — lightly rounded, terminal-adjacent */
+  --radius-xs:   3px;
+  --radius-sm:   5px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-pill: 999px;
+
+  /* Elevation shadows (dark, low spread) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 6px 20px -6px rgba(0,0,0,0.65);
+  --shadow-lg: 0 18px 50px -12px rgba(0,0,0,0.75);
+
+  /* Neon glow — the signature interaction state */
+  --glow-green:   0 0 0 1px rgba(57,255,20,0.55), 0 0 18px -2px rgba(57,255,20,0.45);
+  --glow-green-sm: 0 0 12px -2px rgba(57,255,20,0.55);
+  --glow-cyan:    0 0 0 1px rgba(34,211,238,0.55), 0 0 18px -2px rgba(34,211,238,0.40);
+  --glow-magenta: 0 0 0 1px rgba(255,46,154,0.55), 0 0 20px -2px rgba(255,46,154,0.40);
+  --glow-text-green: 0 0 14px rgba(57,255,20,0.55);
+
+  /* Focus ring */
+  --ring: 0 0 0 2px var(--ink-900), 0 0 0 4px rgba(57,255,20,0.65);
+
+  /* Background grid texture (faint green grid) */
+  --grid-line: rgba(57,255,20,0.045);
+  --grid-size: 28px;
+  --bg-grid:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size);
+
+  /* Transitions */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur:      180ms; /* @kind other */
+  --dur-slow: 320ms; /* @kind other */
+  --t-fast: var(--dur-fast) var(--ease);
+  --t:      var(--dur) var(--ease);
+  --t-slow: var(--dur-slow) var(--ease);
+}
+
+/* ===== tokens/base.css ===== */
+/* aypapol — base element styles & brand utilities.
+ * Imported after tokens. Sets the terminal canvas and a few reusable
+ * helpers (.eyebrow, .prompt, .terminal, .glow) used across cards/kits.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--bg-page);
+  color: var(--text-body);
+  font: var(--type-body);
+  font-feature-settings: "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* App/page canvas: deep void + faint green grid */
+.papol-canvas {
+  background-color: var(--bg-page);
+  background-image: var(--bg-grid);
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  color: var(--text-heading);
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  text-wrap: balance;
+}
+
+p { margin: 0; text-wrap: pretty; }
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color var(--t-fast);
+}
+a:hover { color: var(--link-hover); }
+
+code, kbd, samp { font-family: var(--font-mono); }
+
+::selection { background: var(--green-neon); color: var(--green-ink); }
+
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--radius-sm); }
+
+/* ---- Brand utilities ------------------------------------------- */
+
+/* UPPERCASE MONO eyebrow / kicker */
+.eyebrow {
+  font: var(--type-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wider);
+  color: var(--text-muted);
+}
+.eyebrow--green { color: var(--accent); }
+
+/* The shell prompt sign */
+.prompt::before {
+  content: "❯";
+  color: var(--prompt);
+  margin-right: 0.6ch;
+  font-weight: var(--fw-bold);
+}
+.dollar::before {
+  content: "$";
+  color: var(--prompt);
+  margin-right: 0.7ch;
+}
+
+/* Blinking block cursor */
+.cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.6ch;
+  height: 1.05em;
+  margin-left: 0.2ch;
+  background: var(--cursor);
+  vertical-align: text-bottom;
+  animation: papol-blink 1.05s steps(1) infinite;
+}
+@keyframes papol-blink { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cursor::after { animation: none; } }
+
+/* Neon text */
+.glow-text { color: var(--accent); text-shadow: var(--glow-text-green); }
+
+/* Terminal well */
+.terminal {
+  background: var(--surface-terminal);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+  padding: var(--space-4);
+  line-height: var(--lh-normal);
+}
+
+/* Container */
+.container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+
+</style>
+<style>
+  :root { --nav-h: 64px; }
+  html { scroll-behavior: smooth; }
+  body { color: var(--text-body); }
+  .page { background: var(--bg-page); background-image: var(--bg-grid); min-height: 100vh; }
+  a { color: inherit; }
+  .wrap { width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: 24px; }
+
+  /* ---- nav ---- */
+  .nav { position: sticky; top: 0; z-index: 50; height: var(--nav-h);
+    backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg-page) 78%, transparent);
+    border-bottom: 1px solid var(--border-subtle); }
+  .nav .wrap { height: 100%; display: flex; align-items: center; gap: 24px; }
+  .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+  .brand img { width: 30px; height: 30px; }
+  .brand .wm { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -0.03em; color: var(--text-heading); }
+  .brand .wm b { color: var(--green-neon); }
+  .nav nav { display: flex; gap: 4px; margin-left: auto; }
+  .nav nav a { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); padding: 8px 12px; border-radius: var(--radius-sm); transition: color var(--t), background var(--t); }
+  .nav nav a:hover { color: var(--text-heading); background: var(--surface-raised); }
+  .btn { display: inline-flex; align-items: center; gap: 0.6ch; height: 38px; padding: 0 16px;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500; border-radius: var(--radius-sm);
+    cursor: pointer; text-decoration: none; border: 1px solid transparent; transition: all var(--t); white-space: nowrap; }
+  .btn--primary { background: var(--green-500); color: var(--green-ink); border-color: var(--green-400); }
+  .btn--primary:hover { background: var(--green-neon); box-shadow: var(--glow-green-sm); }
+  .btn--ghost { color: var(--accent); border-color: var(--border-strong); }
+  .btn--ghost:hover { border-color: var(--green-neon); box-shadow: var(--glow-green); }
+  .btn .p { font-weight: 700; }
+  .nav .btn { height: 34px; }
+
+  /* ---- hero ---- */
+  .hero { padding: 84px 0 72px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(900px 480px at 78% 8%, rgba(57,255,20,.07), transparent 70%); }
+  .hero .wrap { position: relative; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+  .hero h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(44px, 6vw, 72px);
+    line-height: 1.0; letter-spacing: -0.035em; color: var(--text-heading); margin: 18px 0 0; }
+  .hero h1 b { color: var(--green-neon); text-shadow: var(--glow-text-green); }
+  .hero .sub { font-family: var(--font-mono); font-size: 16px; line-height: 1.7; color: var(--text-muted); max-width: 46ch; margin: 22px 0 30px; }
+  .hero .sub b { color: var(--text-body); font-weight: 500; }
+  .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero .meta { margin-top: 26px; display: flex; gap: 20px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+  .hero .meta span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-neon); box-shadow: var(--glow-green-sm); }
+
+  /* terminal */
+  .term { background: var(--surface-terminal); border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .term .bar { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .term .bar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .term .body { padding: 18px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; min-height: 280px; }
+  .term .body .pr { color: var(--green-neon); font-weight: 700; }
+  .term .body .cm { color: var(--text-comment); }
+  .term .body .ok { color: var(--green-neon); }
+  .term .body .wn { color: var(--amber); }
+  .term .body .mut { color: var(--text-muted); }
+
+  /* ---- sections ---- */
+  section { padding: 76px 0; }
+  .shead { margin-bottom: 40px; }
+  .eyebrow.k { color: var(--accent); margin-bottom: 14px; }
+  .shead h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 4vw, 42px); letter-spacing: -0.025em; color: var(--text-heading); }
+  .shead p { font-family: var(--font-mono); font-size: 15px; color: var(--text-muted); max-width: 60ch; margin-top: 12px; line-height: 1.7; }
+
+  /* product grid */
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .pcard { position: relative; display: flex; flex-direction: column; background: var(--surface-card);
+    border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 24px; text-decoration: none;
+    overflow: hidden; transition: transform var(--t), box-shadow var(--t); }
+  .pcard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--c); opacity: .55; transition: opacity var(--t); }
+  .pcard:hover { transform: translateY(-4px); box-shadow: 0 0 0 1px var(--c), 0 22px 48px -20px rgba(0,0,0,.8); }
+  .pcard:hover::before { opacity: 1; }
+  .pcard .top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+  .pcard .ico { width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm); color: var(--c);
+    background: color-mix(in srgb, var(--c) 13%, var(--surface-inset)); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+  .pcard .ico svg { width: 23px; height: 23px; }
+  .pcard .go { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); transition: color var(--t); }
+  .pcard:hover .go { color: var(--c); }
+  .pcard .go svg { width: 13px; height: 13px; transition: transform var(--t); }
+  .pcard:hover .go svg { transform: translate(2px, -2px); }
+  .pcard h3 { font-family: var(--font-mono); font-weight: 700; font-size: 19px; color: var(--text-heading); margin-bottom: 5px; letter-spacing: -0.01em; }
+  .pcard .sd { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-bottom: 13px; display: block; }
+  .pcard .bl { font-family: var(--font-mono); font-size: 13px; line-height: 1.65; color: var(--text-muted); margin-bottom: 18px; }
+  .pcard .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+  .pcard .tags span { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); padding: 3px 8px; border-radius: var(--radius-xs); background: var(--surface-inset); border: 1px solid var(--border-subtle); }
+  .pcard .status { font-family: var(--font-mono); font-size: 11px; color: var(--c); margin-left: 8px; }
+
+  /* ---- infra ---- */
+  .infra { background: var(--bg-alt); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+  .infra .wrap { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 48px; align-items: center; }
+  .infra .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+  .stat { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 16px 18px; }
+  .stat .n { font-family: var(--font-display); font-weight: 700; font-size: 28px; color: var(--green-neon); letter-spacing: -0.02em; }
+  .stat .l { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ---- musica ---- */
+  .musica { position: relative; overflow: hidden; }
+  .musica::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(700px 380px at 20% 50%, rgba(255,46,154,.10), transparent 70%); }
+  .mcard { position: relative; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: space-between;
+    background: var(--surface-card); border: 1px solid color-mix(in srgb, var(--magenta) 35%, var(--border-default)); border-radius: var(--radius-lg); padding: 36px; }
+  .mcard .ico { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; color: var(--magenta);
+    border-radius: var(--radius-md); background: var(--wash-magenta); border: 1px solid color-mix(in srgb, var(--magenta) 45%, transparent); flex: none; }
+  .mcard h3 { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1.12; color: var(--text-heading); letter-spacing: -0.02em; margin: 6px 0; }
+  .mcard p { font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); }
+  .btn--magenta { background: var(--magenta); color: #1a0010; border-color: var(--magenta-400); }
+  .btn--magenta:hover { box-shadow: var(--glow-magenta); }
+
+  /* ---- footer ---- */
+  footer { border-top: 1px solid var(--border-subtle); padding: 48px 0 56px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; align-items: flex-start; }
+  footer .cols { display: flex; gap: 56px; flex-wrap: wrap; }
+  footer .col h4 { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--text-dim); margin-bottom: 12px; }
+  footer .col a { display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); padding: 4px 0; transition: color var(--t); }
+  footer .col a:hover { color: var(--green-neon); }
+  footer .sig { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-top: 18px; }
+  footer .sig b { color: var(--green-neon); }
+
+  @media (max-width: 880px) {
+    .hero .wrap, .infra .wrap { grid-template-columns: 1fr; }
+    .pgrid { grid-template-columns: 1fr 1fr; }
+    .nav nav { display: none; }
+  }
+  @media (max-width: 560px) { .pgrid { grid-template-columns: 1fr; } }
+</style>
 </head>
 <body>
+<div class="page">
 
-  <!-- Cursor Glow -->
-  <div class="cursor-glow" id="cursorGlow"></div>
+  <!-- NAV -->
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="#top"><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9ImF5cGFwb2wiPgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI5MiIgaGVpZ2h0PSI5MiIgcng9IjE4IiBmaWxsPSIjMGEwZDBjIiBzdHJva2U9IiMxZjI4MjQiIHN0cm9rZS13aWR0aD0iMiI+PC9yZWN0PgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI5MiIgaGVpZ2h0PSI5MiIgcng9IjE4IiBmaWxsPSJub25lIiBzdHJva2U9IiMzOWZmMTQiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjI4Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTMwIDMyIEw0OCA0OCBMMzAgNjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM5ZmYxNCIgc3Ryb2tlLXdpZHRoPSI3IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvcGF0aD4KICA8cmVjdCB4PSI1NCIgeT0iNTgiIHdpZHRoPSIyMCIgaGVpZ2h0PSI3IiByeD0iMiIgZmlsbD0iIzM5ZmYxNCI+PC9yZWN0Pgo8L3N2Zz4=" alt=""><span class="wm">ay<b>papol</b></span></a>
+      <nav>
+        <a href="#productos">productos</a>
+        <a href="#infra">infra</a>
+        <a href="#musica">música</a>
+      </nav>
+      <a class="btn btn--ghost" href="https://chat.aypapol.com"><span class="p">❯</span> entrar</a>
+    </div>
+  </header>
 
-  <!-- Particles -->
-  <canvas id="particles"></canvas>
-
-  <!-- Nav -->
-  <nav id="nav">
-    <a href="#" class="nav-logo">&gt; aypapol_</a>
-    <ul class="nav-links">
-      <li><a href="#papol">que es papol</a></li>
-      <li><a href="#epepe">epepe</a></li>
-      <li><a href="#musica">musica</a></li>
-      <li><a href="#juegos">juegos</a></li>
-    </ul>
-  </nav>
-
-  <!-- Hero -->
+  <!-- HERO -->
+  <a id="top"></a>
   <section class="hero">
-    <div class="glitch-wrap">
-      <h1 class="glitch">aypapol</h1>
-    </div>
-
-    <p class="hero-sub">
-      todos somos <span>papol</span>. esto no se explica, se vive.
-    </p>
-
-    <div class="status-pill">
-      <div class="status-dot"></div>
-      sistema activo
-    </div>
-
-    <div class="scroll-indicator">
-      <span>scroll</span>
-      <div class="scroll-arrow"></div>
+    <div class="wrap">
+      <div>
+        <div class="eyebrow eyebrow--green">// ECOSISTEMA DIGITAL AUTOHOSPEDADO</div>
+        <h1>todos somos <b>papol</b></h1>
+        <p class="sub">un grupo de amigos construyendo sus propias herramientas y corriéndolas en su propio servidor. <b>juegos, chat, cine, facturas, rol y música</b> — todo bajo aypapol.com.</p>
+        <div class="cta">
+          <a class="btn btn--primary" href="#productos"><span class="p">❯</span> ver el ecosistema</a>
+          <a class="btn btn--ghost" href="#infra">cómo está montado</a>
+        </div>
+        <div class="meta">
+          <span><i class="dot"></i> 6 servicios online</span>
+          <span>1 servidor · Hetzner</span>
+          <span>CI/CD · GitHub Actions</span>
+        </div>
+      </div>
+      <div class="term" id="heroTerm">
+        <div class="bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:var(--green-neon)"></i><span style="margin-left:6px">papol@aypapol:~</span></div>
+        <div class="body" id="heroBody"></div>
+      </div>
     </div>
   </section>
 
-  <!-- Marquee -->
-  <div class="marquee-container">
-    <div class="marquee">
-      <span>papol</span>
-      <span>*</span>
-      <span>epepe</span>
-      <span>*</span>
-      <span>aypapol</span>
-      <span>*</span>
-      <span>puro desmadre</span>
-      <span>*</span>
-      <span>todos somos papol</span>
-      <span>*</span>
-      <span>la banda</span>
-      <span>*</span>
-      <span>ia + pepe = epepe</span>
-      <span>*</span>
-      <span>game panel</span>
-      <span>*</span>
-      <span>papol</span>
-      <span>*</span>
-      <span>epepe</span>
-      <span>*</span>
-      <span>aypapol</span>
-      <span>*</span>
-      <span>puro desmadre</span>
-      <span>*</span>
-      <span>todos somos papol</span>
-      <span>*</span>
-      <span>la banda</span>
-      <span>*</span>
-      <span>ia + pepe = epepe</span>
-      <span>*</span>
-      <span>game panel</span>
-      <span>*</span>
-    </div>
-  </div>
-
-  <!-- Que es papol -->
-  <section id="papol">
-    <div class="papol-section">
-      <div class="reveal">
-        <div class="section-label">// concepto</div>
-        <h2 class="section-title">
-          <span class="gradient-text">que es papol?</span>
-        </h2>
-        <p class="section-text">
-          papol es todo. es como decir "wey" pero elevado al infinito.
-          es tu compa, es el saludo, es el insulto carinyoso, es la identidad.
-          <br><br>
-          no hay una definicion real porque <strong style="color: var(--green);">todos somos papol</strong>.
-          si estas aqui, ya eres papol. no hay vuelta atras.
-        </p>
+  <!-- PRODUCTOS -->
+  <section id="productos">
+    <div class="wrap">
+      <div class="shead">
+        <div class="eyebrow k">// EL ECOSISTEMA</div>
+        <h2>seis herramientas, un colectivo</h2>
+        <p>cada cosa que necesitábamos y no encontrábamos, la construimos. cada una vive en su propio subdominio.</p>
       </div>
-      <div class="papol-visual reveal">
-        <div class="floating-words">
-          <div class="float-word">papol</div>
-          <div class="float-word">ay papol</div>
-          <div class="float-word">que onda</div>
-          <div class="float-word">eres papol</div>
-          <div class="float-word">PAPOL</div>
+      <div class="pgrid" id="pgrid"></div>
+    </div>
+  </section>
+
+  <!-- INFRA -->
+  <section class="infra" id="infra">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow k">// INFRAESTRUCTURA</div>
+        <h2 style="font-family:var(--font-display);font-weight:700;font-size:clamp(28px,4vw,40px);letter-spacing:-.025em;color:var(--text-heading)">un servidor. todo el ecosistema.</h2>
+        <p style="font-family:var(--font-mono);font-size:15px;color:var(--text-muted);max-width:52ch;margin-top:14px;line-height:1.7">todo autohospedado en una sola máquina. despliegues automáticos con GitHub Actions, contenedores por servicio, backups y un bot que avisa por Discord cuando algo se mueve.</p>
+        <div class="stats">
+          <div class="stat"><div class="n">100%</div><div class="l">autohospedado</div></div>
+          <div class="stat"><div class="n">14d</div><div class="l">uptime medio</div></div>
+          <div class="stat"><div class="n">~30</div><div class="l">contenedores</div></div>
+          <div class="stat"><div class="n">0€</div><div class="l">de nube ajena</div></div>
+        </div>
+      </div>
+      <div class="term">
+        <div class="bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:var(--green-neon)"></i><span style="margin-left:6px">papol@hetzner:~</span></div>
+        <div class="body"><span class="cm"># estado del nodo</span>
+<span class="pr">❯</span> papol status
+<span class="mut">SERVICIO            ESTADO      UPTIME</span>
+game-panel          <span class="ok">● online</span>     14d
+chatpapol           <span class="ok">● online</span>     14d
+desglosador3000     <span class="ok">● online</span>      9d
+facturas            <span class="ok">● online</span>     21d
+rolcito (foundry)   <span class="ok">● online</span>     14d
+<span class="cm"># despliegue automático</span>
+<span class="pr">❯</span> git push → <span class="ok">actions ✔</span> → <span class="ok">deploy ✔</span>
+<span class="wn">! backup nocturno → 03:00 CET</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MUSICA -->
+  <section class="musica" id="musica">
+    <div class="wrap">
+      <div class="mcard">
+        <div style="display:flex;align-items:flex-start;gap:22px;min-width:280px;flex:1">
+          <span class="ico"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+          <div style="min-width:0">
+            <div class="eyebrow" style="color:var(--magenta);margin-bottom:8px">// TAMBIÉN HACEMOS RUIDO</div>
+            <h3>aypapol, el proyecto musical</h3>
+            <p>porque el colectivo no sólo escribe código.</p>
+          </div>
+        </div>
+        <a class="btn btn--magenta" href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2" target="_blank" rel="noreferrer">escuchar en Spotify
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div>
+        <a class="brand" href="#top"><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTYiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5NiA5NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9ImF5cGFwb2wiPgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI5MiIgaGVpZ2h0PSI5MiIgcng9IjE4IiBmaWxsPSIjMGEwZDBjIiBzdHJva2U9IiMxZjI4MjQiIHN0cm9rZS13aWR0aD0iMiI+PC9yZWN0PgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI5MiIgaGVpZ2h0PSI5MiIgcng9IjE4IiBmaWxsPSJub25lIiBzdHJva2U9IiMzOWZmMTQiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjI4Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTMwIDMyIEw0OCA0OCBMMzAgNjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM5ZmYxNCIgc3Ryb2tlLXdpZHRoPSI3IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvcGF0aD4KICA8cmVjdCB4PSI1NCIgeT0iNTgiIHdpZHRoPSIyMCIgaGVpZ2h0PSI3IiByeD0iMiIgZmlsbD0iIzM5ZmYxNCI+PC9yZWN0Pgo8L3N2Zz4=" alt="" style="width:26px;height:26px"><span class="wm" style="font-size:18px">ay<b>papol</b></span></a>
+        <div class="sig">todos somos <b>papol</b> · hecho por el colectivo, en su servidor.</div>
+      </div>
+      <div class="cols">
+        <div class="col">
+          <h4>productos</h4>
+          <a href="https://game.aypapol.com">Game Panel</a>
+          <a href="https://chat.aypapol.com">ChatPapol</a>
+          <a href="https://desglosador3000.aypapol.com">Desglosador 3000</a>
+          <a href="https://facturas.aypapol.com">Facturas</a>
+          <a href="https://rolcito.aypapol.com">Rolcito</a>
+        </div>
+        <div class="col">
+          <h4>colectivo</h4>
+          <a href="#infra">infraestructura</a>
+          <a href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2">música</a>
         </div>
       </div>
     </div>
-  </section>
-
-  <hr class="glow-line" />
-
-  <!-- Epepe -->
-  <section id="epepe">
-    <div class="reveal" style="text-align: center; margin-bottom: 2rem;">
-      <div class="section-label">// creaciones</div>
-      <h2 class="section-title">
-        <span class="gradient-pink">epepe</span>
-      </h2>
-      <p class="section-text" style="margin: 0 auto;">
-        pepe + ia = epepe. tomamos al icono, lo pasamos por inteligencia artificial,
-        y salen obras de arte que no pediste pero necesitabas.
-      </p>
-    </div>
-    <div class="epepe-grid">
-      <div class="epepe-card reveal">
-        <span class="epepe-icon">🐸</span>
-        <h3>arte generativo</h3>
-        <p>pepes generados con ia en situaciones que nadie pidio pero todos disfrutamos.</p>
-      </div>
-      <div class="epepe-card reveal">
-        <span class="epepe-icon">🎭</span>
-        <h3>memes nivel dios</h3>
-        <p>bromas internas tan profundas que si no eres papol no las vas a entender. y esta bien.</p>
-      </div>
-      <div class="epepe-card reveal">
-        <span class="epepe-icon">🤖</span>
-        <h3>ia x creatividad</h3>
-        <p>herramientas de ia para crear contenido ridiculo a velocidades absurdas.</p>
-      </div>
-    </div>
-  </section>
-
-  <hr class="glow-line" />
-
-  <!-- Musica -->
-  <section id="musica" class="spotify-section">
-    <div class="reveal">
-      <div class="section-label">// sonido</div>
-      <h2 class="section-title">
-        <span class="gradient-green">la banda suena</span>
-      </h2>
-      <p class="section-text" style="margin: 0 auto;">
-        aypapol no solo es un concepto, es un proyecto musical.
-        escuchanos en spotify y entenderas todo. o nada. pero vas a vibrar.
-      </p>
-    </div>
-    <div class="spotify-embed reveal">
-      <iframe
-        src="https://open.spotify.com/embed/artist/3qqovZFveEf7VCQexRmLQ2?utm_source=generator&theme=0"
-        width="100%"
-        height="352"
-        style="max-width: 660px;"
-        frameBorder="0"
-        allowfullscreen=""
-        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        loading="lazy"
-      ></iframe>
-    </div>
-    <div class="spotify-vibes reveal">
-      <span class="vibe-tag"># experimental</span>
-      <span class="vibe-tag"># papol-core</span>
-      <span class="vibe-tag"># desmadre-sonoro</span>
-      <span class="vibe-tag"># aypapol</span>
-    </div>
-  </section>
-
-  <hr class="glow-line" />
-
-  <!-- Juegos -->
-  <section id="juegos" class="game-section">
-    <div class="reveal">
-      <div class="section-label">// infraestructura</div>
-      <h2 class="section-title">
-        <span class="gradient-text">game panel</span>
-      </h2>
-      <p class="section-text" style="margin: 0 auto;">
-        servidores de juegos para la banda. minecraft, valheim, terraria y lo que se nos ocurra.
-        todo controlado desde un panel custom hecho por papoles, para papoles.
-      </p>
-    </div>
-    <div class="game-preview reveal">
-      <div class="terminal-header">
-        <div class="terminal-dot red"></div>
-        <div class="terminal-dot yellow"></div>
-        <div class="terminal-dot green"></div>
-        <span class="terminal-title">game-panel@aypapol ~</span>
-      </div>
-      <div class="terminal-body" id="terminal">
-        <!-- Lines injected by JS -->
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="reveal">
-      <h2 class="section-title">
-        <span class="gradient-text">unete al desmadre</span>
-      </h2>
-      <p class="section-text" style="margin: 0 auto;">
-        si llegaste hasta aqui, ya eres papol. ahora elige tu camino.
-      </p>
-      <div class="cta-buttons">
-        <a href="https://game.aypapol.com" class="btn btn-primary">
-          🎮 Game Panel
-        </a>
-        <a href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2?si=BLyTzDz9Q8Clcty2IsTAXA" target="_blank" rel="noopener" class="btn btn-spotify">
-          🎵 Spotify
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Marquee bottom -->
-  <div class="marquee-container">
-    <div class="marquee" style="animation-direction: reverse;">
-      <span>papol</span>
-      <span>*</span>
-      <span>esto no se explica</span>
-      <span>*</span>
-      <span>se vive</span>
-      <span>*</span>
-      <span>aypapol.com</span>
-      <span>*</span>
-      <span>todos somos papol</span>
-      <span>*</span>
-      <span>epepe</span>
-      <span>*</span>
-      <span>la banda</span>
-      <span>*</span>
-      <span>papol</span>
-      <span>*</span>
-      <span>esto no se explica</span>
-      <span>*</span>
-      <span>se vive</span>
-      <span>*</span>
-      <span>aypapol.com</span>
-      <span>*</span>
-      <span>todos somos papol</span>
-      <span>*</span>
-      <span>epepe</span>
-      <span>*</span>
-      <span>la banda</span>
-      <span>*</span>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <footer>
-    <div class="footer-links">
-      <a href="https://game.aypapol.com">game panel</a>
-      <a href="https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2" target="_blank" rel="noopener">spotify</a>
-    </div>
-    <p class="footer-text">aypapol.com &mdash; todos somos papol</p>
   </footer>
 
-  <script>
-    // ═══ PARTICLES ═══
-    (() => {
-      const canvas = document.getElementById('particles');
-      const ctx = canvas.getContext('2d');
-      let particles = [];
-      let w, h;
+</div>
 
-      function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-      }
+<script>
+  // ---- product data ----
+  const PRODUCTS = [
+    { name:'Game Panel', sd:'game.aypapol.com', href:'https://game.aypapol.com', c:'var(--p-game)', status:'estable',
+      bl:'Despliega y administra servidores de juego desde un panel, con bot de Discord, backups y stats en vivo.',
+      tags:['minecraft','valheim','foundry','arma 3'],
+      icon:'<line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="2"/>' },
+    { name:'ChatPapol', sd:'chat.aypapol.com', href:'https://chat.aypapol.com', c:'var(--p-chat)', status:'estable',
+      bl:'Nuestro Discord propio: texto, voz, vídeo y screenshare. Bots, webhooks, roles y automod. Con cliente de escritorio.',
+      tags:['voz/vídeo','bots','roles','desktop'],
+      icon:'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>' },
+    { name:'Desglosador 3000', sd:'desglosador3000.aypapol.com', href:'https://desglosador3000.aypapol.com', c:'var(--p-desglosa)', status:'beta',
+      bl:'Desglose de guion y planificación de rodaje: stripboard, call sheets, presupuesto y desglose por IA. Tiempo real + offline.',
+      tags:['stripboard','call sheets','IA','ES/EN'],
+      icon:'<path d="M2 3h20v14H2z"/><path d="m7 21 5-5 5 5"/>' },
+    { name:'Facturas', sd:'facturas.aypapol.com', href:'https://facturas.aypapol.com', c:'var(--p-facturas)', status:'estable',
+      bl:'Facturación para freelance: tu perfil, y subida y gestión de facturas. Simple, sin fricción.',
+      tags:['freelance','perfil','gestión'],
+      icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>' },
+    { name:'Rolcito', sd:'rolcito.aypapol.com', href:'https://rolcito.aypapol.com', c:'var(--p-rolcito)', status:'estable',
+      bl:'Mesa de rol virtual sobre Foundry VTT para jugar TTRPG con la pandilla. Mapas, fichas y dados.',
+      tags:['foundry vtt','ttrpg','mapas'],
+      icon:'<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>' },
+    { name:'Música', sd:'aypapol · spotify', href:'https://open.spotify.com/intl-es/artist/3qqovZFveEf7VCQexRmLQ2', c:'var(--p-musica)', status:'live',
+      bl:'aypapol es también un proyecto musical. Dale al play — todos somos papol también en los altavoces.',
+      tags:['spotify','colectivo'],
+      icon:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>' },
+  ];
 
-      class Particle {
-        constructor() { this.reset(); }
-        reset() {
-          this.x = Math.random() * w;
-          this.y = Math.random() * h;
-          this.size = Math.random() * 2 + 0.5;
-          this.speedX = (Math.random() - 0.5) * 0.3;
-          this.speedY = (Math.random() - 0.5) * 0.3;
-          this.opacity = Math.random() * 0.4 + 0.1;
-          const colors = ['168,85,247', '79,110,247', '34,197,94', '236,72,153'];
-          this.color = colors[Math.floor(Math.random() * colors.length)];
-        }
-        update() {
-          this.x += this.speedX;
-          this.y += this.speedY;
-          if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
-        }
-        draw() {
-          ctx.beginPath();
-          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(${this.color},${this.opacity})`;
-          ctx.fill();
-        }
-      }
+  const grid = document.getElementById('pgrid');
+  grid.innerHTML = PRODUCTS.map(p => `
+    <a class="pcard" href="${p.href}" target="_blank" rel="noreferrer" style="--c:${p.c}">
+      <div class="top">
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p.icon}</svg></span>
+        <span class="go">ir <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></span>
+      </div>
+      <h3>${p.name}<span class="status">● ${p.status}</span></h3>
+      <span class="sd">${p.sd}</span>
+      <p class="bl">${p.bl}</p>
+      <div class="tags">${p.tags.map(t=>`<span>${t}</span>`).join('')}</div>
+    </a>`).join('');
 
-      function init() {
-        resize();
-        const count = Math.min(80, Math.floor((w * h) / 15000));
-        particles = Array.from({ length: count }, () => new Particle());
-      }
+  // ---- hero terminal typing ----
+  const SCRIPT = [
+    { t:'cm',  s:'# bienvenido al ecosistema papol' },
+    { t:'pr',  s:'papol deploy valheim --name bosque' },
+    { t:'mut', s:'→ pulling ghcr.io/aypapol/valheim:latest' },
+    { t:'mut', s:'→ allocating 4 vCPU · 6GB RAM' },
+    { t:'ok',  s:'✔ online en valheim.aypapol.com:2456' },
+    { t:'cm',  s:'# avisar al canal de Discord' },
+    { t:'pr',  s:'papol notify #avisos "servidor listo 🌲"' },
+    { t:'ok',  s:'✔ enviado · 7 papols conectados' },
+  ];
+  const body = document.getElementById('heroBody');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function lineHTML(l, cursor) {
+    const pre = l.t === 'pr' ? '<span class="pr">❯</span> ' : '';
+    const cls = l.t === 'pr' ? '' : l.t;
+    return `<div class="${cls}">${pre}<span>${l.s}</span>${cursor?'<span class="cur">▮</span>':''}</div>`;
+  }
+  if (reduce) {
+    body.innerHTML = SCRIPT.map(l => lineHTML(l,false)).join('');
+  } else {
+    let i = 0;
+    function step() {
+      if (i >= SCRIPT.length) { setTimeout(()=>{ body.innerHTML=''; i=0; step(); }, 4200); return; }
+      const done = SCRIPT.slice(0, i).map(l=>lineHTML(l,false)).join('');
+      const cur = SCRIPT[i];
+      let j = 0;
+      const full = cur.s;
+      (function type(){
+        const partial = { t:cur.t, s: full.slice(0,j) };
+        body.innerHTML = done + lineHTML(partial, true);
+        if (j < full.length) { j++; setTimeout(type, 18 + Math.random()*26); }
+        else { i++; setTimeout(step, cur.t==='pr'?420:240); }
+      })();
+    }
+    step();
+  }
 
-      function animate() {
-        ctx.clearRect(0, 0, w, h);
-        particles.forEach(p => { p.update(); p.draw(); });
-
-        for (let i = 0; i < particles.length; i++) {
-          for (let j = i + 1; j < particles.length; j++) {
-            const dx = particles[i].x - particles[j].x;
-            const dy = particles[i].y - particles[j].y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 120) {
-              ctx.beginPath();
-              ctx.moveTo(particles[i].x, particles[i].y);
-              ctx.lineTo(particles[j].x, particles[j].y);
-              ctx.strokeStyle = `rgba(168,85,247,${0.06 * (1 - dist / 120)})`;
-              ctx.lineWidth = 0.5;
-              ctx.stroke();
-            }
-          }
-        }
-
-        requestAnimationFrame(animate);
-      }
-
-      init();
-      animate();
-      window.addEventListener('resize', () => { resize(); init(); });
-    })();
-
-    // ═══ CURSOR GLOW ═══
-    (() => {
-      const glow = document.getElementById('cursorGlow');
-      let mouseX = -300, mouseY = -300;
-
-      document.addEventListener('mousemove', e => {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-      });
-
-      function update() {
-        glow.style.left = mouseX + 'px';
-        glow.style.top = mouseY + 'px';
-        requestAnimationFrame(update);
-      }
-      update();
-    })();
-
-    // ═══ NAV HIDE ON SCROLL ═══
-    (() => {
-      const nav = document.getElementById('nav');
-      let lastY = 0;
-
-      window.addEventListener('scroll', () => {
-        const y = window.scrollY;
-        nav.classList.toggle('hidden', y > lastY && y > 100);
-        lastY = y;
-      });
-    })();
-
-    // ═══ SCROLL REVEAL ═══
-    (() => {
-      const observer = new IntersectionObserver(
-        entries => {
-          entries.forEach(e => {
-            if (e.isIntersecting) e.target.classList.add('visible');
-          });
-        },
-        { threshold: 0.15, rootMargin: '0px 0px -50px 0px' }
-      );
-
-      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-    })();
-
-    // ═══ TERMINAL ANIMATION ═══
-    (() => {
-      const lines = [
-        { prompt: '$ ', cmd: 'ssh papol@aypapol.com' },
-        { output: 'Connected to aypapol game infrastructure' },
-        { prompt: '$ ', cmd: 'panel status' },
-        { success: '  minecraft    ● running    4 players online' },
-        { info: '  valheim      ○ stopped' },
-        { info: '  terraria     ○ stopped' },
-        { prompt: '$ ', cmd: 'panel start valheim' },
-        { success: '  ✓ valheim server started — waiting for papoles...' },
-      ];
-
-      const terminal = document.getElementById('terminal');
-      let revealed = false;
-
-      const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-          if (e.isIntersecting && !revealed) {
-            revealed = true;
-            lines.forEach((line, i) => {
-              setTimeout(() => {
-                const div = document.createElement('div');
-                div.className = 'terminal-line';
-
-                if (line.prompt) {
-                  div.innerHTML = `<span class="prompt">${line.prompt}</span><span class="cmd">${line.cmd}</span>`;
-                } else if (line.output) {
-                  div.innerHTML = `<span class="output">${line.output}</span>`;
-                } else if (line.success) {
-                  div.innerHTML = `<span class="success">${line.success}</span>`;
-                } else if (line.info) {
-                  div.innerHTML = `<span class="info">${line.info}</span>`;
-                }
-
-                terminal.appendChild(div);
-              }, i * 400);
-            });
-          }
-        });
-      }, { threshold: 0.3 });
-
-      observer.observe(terminal);
-    })();
-
-    // ═══ SMOOTH SCROLL NAV ═══
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-      a.addEventListener('click', e => {
-        e.preventDefault();
-        const target = document.querySelector(a.getAttribute('href'));
-        if (target) target.scrollIntoView({ behavior: 'smooth' });
-      });
-    });
-  </script>
-
+  // nav active anchor highlight
+  const links = [...document.querySelectorAll('.nav nav a')];
+  const obs = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(a=>a.style.color = a.getAttribute('href')==='#'+e.target.id ? 'var(--green-neon)' : ''); } });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  ['productos','infra','musica'].forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el); });
+</script>
+<style>.cur{color:var(--green-neon);animation:papol-blink 1.05s steps(1) infinite}@media (prefers-reduced-motion:reduce){.cur{animation:none}}</style>
 </body>
 </html>
