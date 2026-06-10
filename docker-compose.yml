@@ -99,7 +99,8 @@ services:
     command: --config /etc/livekit.yaml
     environment:
       # Keys vía env (formato "APIkey: secret") para no escribirlas en el yaml.
-      - LIVEKIT_KEYS=${LIVEKIT_KEY}: ${LIVEKIT_SECRET}
+      # Comillas obligatorias: el ": " del valor haría que YAML lo lea como mapa.
+      - "LIVEKIT_KEYS=${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
     restart: unless-stopped
