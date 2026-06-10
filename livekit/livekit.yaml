@@ -1,0 +1,12 @@
+# LiveKit SFU — config de producción para ChatPapol (chat.aypapol.com).
+# Las API keys NO van aquí: se inyectan por la env var LIVEKIT_KEYS desde el
+# .env del server (repo público → sin secretos en git). Ver docker-compose.yml.
+port: 7880
+rtc:
+  # Rango UDP del media WebRTC. DEBE estar abierto en ufw (50000:50100/udp).
+  port_range_start: 50000
+  port_range_end: 50100
+  # Anuncia la IP pública del VPS a los clientes (necesario tras NAT/host net).
+  use_external_ip: true
+logging:
+  level: info

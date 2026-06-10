@@ -4,7 +4,7 @@ import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
 
 const services = new Hono();
 
-const ALLOWED_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
+const ALLOWED_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 type ServiceName = (typeof ALLOWED_SERVICES)[number];
 
 function isAllowed(name: string): name is ServiceName {

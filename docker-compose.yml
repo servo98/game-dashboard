@@ -67,8 +67,48 @@ services:
     networks:
       - panel
 
+  # ─── ChatPapol (chat.aypapol.com) ────────────────────────────────────────
+  # Discord propio: backend Bun + LiveKit (SFU voz/video). Servicios always-on
+  # como backend/dashboard/bot — NO un "game". Imagen pre-buildeada en GHCR.
+  # Repo: github.com/servo98/chatAyPapol
+  chatpapol:
+    image: ghcr.io/servo98/chatpapol-server:latest
+    environment:
+      # URL pública del SFU que se entrega a LOS CLIENTES (nginx wss → 7880).
+      - LIVEKIT_URL=wss://livekit.aypapol.com
+      # Keys reales en .env (repo público → NO commitear secretos).
+      - LIVEKIT_KEY=${LIVEKIT_KEY}
+      - LIVEKIT_SECRET=${LIVEKIT_SECRET}
+      - GITHUB_REPO=servo98/chatAyPapol
+    ports:
+      - "127.0.0.1:3210:3210"  # nginx (host net) proxya chat.aypapol.com aquí
+    volumes:
+      - chatpapol-data:/app/data  # SQLite + uploads/stickers/releases
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *default-logging
+    networks:
+      - panel
+
+  livekit:
+    image: livekit/livekit-server:latest
+    # host networking: WebRTC usa el rango UDP 50000-50100 sin mapear puerto a
+    # puerto. Hay que abrir ese rango en ufw. nginx proxya la señalización
+    # (wss livekit.aypapol.com → 127.0.0.1:7880); el media va directo por UDP.
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    environment:
+      # Keys vía env (formato "APIkey: secret") para no escribirlas en el yaml.
+      - LIVEKIT_KEYS=${LIVEKIT_KEY}: ${LIVEKIT_SECRET}
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *default-logging
+
 volumes:
   backend-data:
+  chatpapol-data:
 
 networks:
   panel:
