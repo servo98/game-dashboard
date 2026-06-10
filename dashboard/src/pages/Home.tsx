@@ -29,7 +29,9 @@ import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
 
 type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users" | "facturas";
 
-const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
+const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
+// nginx/dashboard sirven el propio panel → reiniciarlos cortaría esta sesión; sin botón.
+const RESTARTABLE_SERVICES = ["backend", "bot", "chatpapol", "livekit"] as const;
 
 export default function Home() {
   const navigate = useNavigate();
@@ -193,7 +195,7 @@ export default function Home() {
     navigate("/login", { replace: true });
   };
 
-  const handleRestartService = async (name: "backend" | "bot") => {
+  const handleRestartService = async (name: (typeof RESTARTABLE_SERVICES)[number]) => {
     setRestartingService(name);
     setRestartMsg(null);
     setError(null);
@@ -444,9 +446,11 @@ export default function Home() {
                           >
                             Logs
                           </button>
-                          {(svc === "backend" || svc === "bot") && (
+                          {(RESTARTABLE_SERVICES as readonly string[]).includes(svc) && (
                             <button
-                              onClick={() => handleRestartService(svc)}
+                              onClick={() =>
+                                handleRestartService(svc as (typeof RESTARTABLE_SERVICES)[number])
+                              }
                               disabled={restartingService === svc}
                               className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >

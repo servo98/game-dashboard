@@ -52,6 +52,8 @@ const SERVICE_LABELS: Record<string, string> = {
   bot: "Discord Bot",
   dashboard: "Dashboard",
   nginx: "Reverse Proxy",
+  chatpapol: "ChatPapol",
+  livekit: "LiveKit (voz/video)",
 };
 
 export default function Status() {

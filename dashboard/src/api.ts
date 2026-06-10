@@ -307,7 +307,7 @@ export const api = {
     }),
 
   /** Infrastructure */
-  restartService: (name: "backend" | "bot") =>
+  restartService: (name: "backend" | "bot" | "chatpapol" | "livekit") =>
     request<{ ok: boolean; message: string }>(`/services/${name}/restart`, {
       method: "POST",
     }),

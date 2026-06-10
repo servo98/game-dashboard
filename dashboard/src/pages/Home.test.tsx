@@ -116,7 +116,7 @@ describe("Home page", () => {
     expect(statusBtn.closest("header")).not.toBeNull();
   });
 
-  it("renders Infrastructure section with 4 services", async () => {
+  it("renders Infrastructure section with 6 services", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
       expect(screen.getByText("Infrastructure")).toBeInTheDocument();
@@ -125,6 +125,8 @@ describe("Home page", () => {
     expect(screen.getByText("bot")).toBeInTheDocument();
     expect(screen.getByText("dashboard")).toBeInTheDocument();
     expect(screen.getByText("nginx")).toBeInTheDocument();
+    expect(screen.getByText("chatpapol")).toBeInTheDocument();
+    expect(screen.getByText("livekit")).toBeInTheDocument();
   });
 
   it("shows error banner when API fails", async () => {

@@ -42,7 +42,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 // Detailed health/status — public, no auth
 const BOOT_TIME = Date.now();
-const COMPOSE_SERVICES = ["backend", "bot", "dashboard", "nginx"] as const;
+const COMPOSE_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 
 app.get("/api/health/status", async (c) => {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
