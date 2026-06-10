@@ -241,6 +241,9 @@ export const GAME_CATALOG: GameTemplate[] = [
       FOUNDRY_USERNAME: "",
       FOUNDRY_PASSWORD: "",
       FOUNDRY_ADMIN_KEY: "",
+      // Sin esto, el entrypoint de felddy reescribe license.json en cada restart,
+      // borra la firma de la EULA y el navegador queda en bucle en /license.
+      CONTAINER_PRESERVE_CONFIG: "true",
     },
     default_volumes: { "/data/foundryvtt": "/data" },
   },
