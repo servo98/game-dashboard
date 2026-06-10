@@ -8,5 +8,12 @@ rtc:
   port_range_end: 50100
   # Anuncia la IP pública del VPS a los clientes (necesario tras NAT/host net).
   use_external_ip: true
+audio:
+  # aro de "hablando": -25 dBFS evita que el ruido bajito lo encienda (el
+  # default -30 era muy sensible) y updates cada 150ms para quitar el delay
+  active_level: 25
+  min_percentile: 40
+  update_interval: 150
+  smooth_intervals: 2
 logging:
   level: info
