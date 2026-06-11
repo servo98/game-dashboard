@@ -74,9 +74,16 @@ services:
   # Repo: github.com/servo98/chatAyPapol
   chatpapol:
     image: ghcr.io/servo98/chatpapol-server:latest
+    # El backend (red bridge `panel`) alcanza a LiveKit (red host) vía el host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # URL pública del SFU que se entrega a LOS CLIENTES (nginx wss → 7880).
       - LIVEKIT_URL=wss://livekit.aypapol.com
+      # API HTTP del SFU para el reconciliador de presencia server-side (RoomService).
+      # bridge → host:7880 (livekit corre en host-networking). Si Docker es viejo y
+      # host.docker.internal no resuelve, usar http://172.17.0.1:7880 vía .env.
+      - LIVEKIT_API_URL=http://host.docker.internal:7880
       # Keys reales en .env (repo público → NO commitear secretos).
       - LIVEKIT_KEY=${LIVEKIT_KEY}
       - LIVEKIT_SECRET=${LIVEKIT_SECRET}
