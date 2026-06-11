@@ -786,7 +786,7 @@ code, kbd, samp { font-family: var(--font-mono); }
   // nav active anchor highlight
   const links = [...document.querySelectorAll('.nav nav a')];
   const obs = new IntersectionObserver((es)=>{
-    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(a=>a.style.color = a.getAttribute('href')==='#'+e.target.id ? 'var(--green-neon)' : ''); } });
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(a=>a.style.color = a.getAttribute('href')===`#${e.target.id}` ? 'var(--green-neon)' : ''); } });
   }, { rootMargin: '-45% 0px -50% 0px' });
   ['features','voz','bots','descargar'].forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el); });
 
@@ -802,10 +802,10 @@ code, kbd, samp { font-family: var(--font-mono); }
       const dl = (latest && latest.downloads) || {};
       btns.forEach(a => {
         const p = a.dataset.plat;
-        if (dl[p]) { a.href = '/api/download/' + p; a.classList.remove('is-disabled'); a.removeAttribute('aria-disabled'); }
+        if (dl[p]) { a.href = `/api/download/${p}`; a.classList.remove('is-disabled'); a.removeAttribute('aria-disabled'); }
         else { a.href = '#'; a.classList.add('is-disabled'); a.setAttribute('aria-disabled', 'true'); }
       });
-      if (latest && latest.version) document.querySelectorAll('[data-ver]').forEach(e => { e.textContent = 'v' + latest.version; });
+      if (latest && latest.version) document.querySelectorAll('[data-ver]').forEach(e => { e.textContent = `v${latest.version}`; });
     } catch (_) { /* endpoint aún no desplegado — se conservan los fallbacks estáticos */ }
   })();
 </script>

@@ -57,6 +57,7 @@
       "!**/node_modules",
       "!**/dist",
       "!**/static-site",
+      "!**/chat-landing",
       "!**/games",
       "!**/nginx",
       "!**/coverage",
