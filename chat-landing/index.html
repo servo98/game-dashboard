@@ -543,6 +543,10 @@ code, kbd, samp { font-family: var(--font-mono); }
   .dcard h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.025em; color: var(--text-heading); }
   .dcard h2 b { color: var(--green-neon); text-shadow: var(--glow-text-green); }
   .dcard p { font-family: var(--font-mono); font-size: 15px; color: var(--text-muted); margin: 14px auto 30px; max-width: 52ch; line-height: 1.7; }
+  .dcard .dmeta { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin: 24px 0 0; }
+  .dcard .dmeta b { color: var(--green-neon); font-weight: 700; }
+  .dcard .dmeta a { color: var(--link); text-decoration: none; }
+  .dcard .dmeta a:hover { color: var(--link-hover); }
   .dcard .plats { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .dcard .plats .btn { height: 46px; padding: 0 22px; font-size: 14px; }
 
@@ -592,7 +596,7 @@ code, kbd, samp { font-family: var(--font-mono); }
   <section class="hero">
     <div class="wrap">
       <div>
-        <span class="badge"><span class="d"></span> chat.aypapol.com · autohospedado</span>
+        <span class="badge"><span class="d"></span> chat.aypapol.com · autohospedado<span data-rel hidden> · <b data-ver></b></span></span>
         <h1>el chat del <b>colectivo</b></h1>
         <p class="sub">nuestro Discord propio, corriendo en nuestro servidor. <b>texto, voz, vídeo y screenshare</b> — con bots, webhooks, roles y automod. sin anuncios, sin nitro, sin nadie mirando.</p>
         <div class="cta">
@@ -727,6 +731,7 @@ code, kbd, samp { font-family: var(--font-mono); }
             <a class="btn btn--ghost" data-plat="linux" href="/api/download/linux"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Linux</a>
             <a class="btn btn--chat" href="#descargar"><span class="p">❯</span> abrir en navegador</a>
           </div>
+          <p class="dmeta" data-rel hidden>última versión <b data-ver></b> · publicada el <span data-date></span> · <a data-notes href="#" target="_blank" rel="noopener noreferrer">ver notas</a></p>
         </div>
       </div>
     </div>
@@ -799,14 +804,29 @@ code, kbd, samp { font-family: var(--font-mono); }
       if (!res.ok) throw 0;
       const data = await res.json();
       const latest = Array.isArray(data) ? data[0] : data;
-      const dl = (latest && latest.downloads) || {};
+      if (!latest) throw 0;
+      const dl = latest.downloads || {};
       btns.forEach(a => {
         const p = a.dataset.plat;
         if (dl[p]) { a.href = `/api/download/${p}`; a.classList.remove('is-disabled'); a.removeAttribute('aria-disabled'); }
         else { a.href = '#'; a.classList.add('is-disabled'); a.setAttribute('aria-disabled', 'true'); }
       });
-      if (latest && latest.version) document.querySelectorAll('[data-ver]').forEach(e => { e.textContent = `v${latest.version}`; });
-    } catch (_) { /* endpoint aún no desplegado — se conservan los fallbacks estáticos */ }
+      // versión
+      if (latest.version) document.querySelectorAll('[data-ver]').forEach(e => { e.textContent = `v${latest.version}`; });
+      // fecha de publicación (formato local)
+      if (latest.published_at) {
+        const fecha = new Date(latest.published_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+        document.querySelectorAll('[data-date]').forEach(e => { e.textContent = fecha; });
+      }
+      // link a las notas del release (derivado de una URL de descarga, sin hardcodear el repo)
+      const anyUrl = Object.values(dl).find(Boolean);
+      if (anyUrl && latest.version) {
+        const base = String(anyUrl).split('/releases/')[0];
+        document.querySelectorAll('a[data-notes]').forEach(a => { a.href = `${base}/releases/tag/v${latest.version}`; });
+      }
+      // revela los bloques que dependen de datos del release
+      document.querySelectorAll('[data-rel]').forEach(e => e.removeAttribute('hidden'));
+    } catch (_) { /* endpoint no disponible — se conservan los fallbacks estáticos */ }
   })();
 </script>
 </body>
