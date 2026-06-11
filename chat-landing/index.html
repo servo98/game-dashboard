@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChatPapol — el chat del colectivo</title>
+<style>
+/* ===== fonts.css ===== */
+/* aypapol — webfonts
+ * Space Grotesk (display) + JetBrains Mono (mono / UI / code).
+ * Loaded from Google Fonts CDN. NOTE: not yet self-hosted — for the
+ * "todo autohospedado" ethos these should later be downloaded into
+ * assets/fonts/ and pointed at locally. See readme.md > Caveats.
+ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* ===== colors.css ===== */
+/* aypapol — color tokens
+ * Deep green-black terminal base, neon "papol green" accent.
+ * Cyan = links/info. Magenta = the Música project + rare pops.
+ * Per-product hues live at the bottom (used sparingly, as tags).
+ */
+:root {
+  /* ---- Raw palette ------------------------------------------------ */
+  /* Backgrounds: near-black with a faint green cast */
+  --void:        #06080a;   /* deepest, page void / letterbox */
+  --ink-900:     #0a0d0c;   /* page background */
+  --ink-850:     #0c1110;   /* alt section background */
+  --ink-800:     #0f1413;   /* card / surface */
+  --ink-750:     #131918;   /* raised / hover surface */
+  --ink-700:     #18201d;   /* strong raised */
+  --ink-inset:   #070a09;   /* code wells, inputs, terminals */
+
+  /* Borders / hairlines (green-tinted greys) */
+  --line-900:    #161d1a;
+  --line-800:    #1f2824;
+  --line-700:    #2a352f;
+  --line-600:    #3a473f;
+
+  /* Papol green ramp */
+  --green-050:   #eafff0;
+  --green-200:   #b6ffb0;
+  --green-400:   #5cff45;
+  --green-neon:  #39ff14;   /* THE accent */
+  --green-500:   #2ce60f;   /* toned fill / large text on dark */
+  --green-700:   #1f9f12;
+  --green-900:   #0c4a0a;
+  --green-ink:   #04140a;   /* text/icon ON green fills */
+
+  /* Cyan — links, info, secondary interactive */
+  --cyan-400:    #5bf0f5;
+  --cyan:        #22d3ee;
+  --cyan-600:    #0fa9c4;
+  --cyan-ink:    #03171b;
+
+  /* Magenta — Música project, rare emphasis */
+  --magenta-400: #ff6cc0;
+  --magenta:     #ff2e9a;
+  --magenta-600: #c41673;
+
+  /* Amber — warnings, "uptime", retro terminal warmth */
+  --amber:       #ffb627;
+  --amber-600:   #c98708;
+
+  /* Red — danger / errors / offline */
+  --red-400:     #ff6b6b;
+  --red:         #ff4d4d;
+  --red-600:     #c42b2b;
+
+  /* Foreground / text (green-tinted off-whites → dim comment grey) */
+  --fg-bright:   #e9f5ec;   /* headings, near-white */
+  --fg-1:        #cfdcd4;   /* body */
+  --fg-2:        #97a89e;   /* secondary / labels */
+  --fg-3:        #66786e;   /* dim, metadata */
+  --fg-comment:  #4d5f56;   /* CLI comments, placeholders */
+
+  /* ---- Semantic aliases ------------------------------------------ */
+  --bg-page:        var(--ink-900);
+  --bg-alt:         var(--ink-850);
+  --surface-card:   var(--ink-800);
+  --surface-raised: var(--ink-750);
+  --surface-inset:  var(--ink-inset);
+  --surface-terminal: var(--ink-inset);
+
+  --border-subtle:  var(--line-900);
+  --border-default: var(--line-800);
+  --border-strong:  var(--line-700);
+  --border-focus:   var(--green-neon);
+
+  --text-heading:   var(--fg-bright);
+  --text-body:      var(--fg-1);
+  --text-muted:     var(--fg-2);
+  --text-dim:       var(--fg-3);
+  --text-comment:   var(--fg-comment);
+  --text-on-accent: var(--green-ink);
+
+  --accent:         var(--green-neon);
+  --accent-fill:    var(--green-500);
+  --accent-quiet:   var(--green-700);
+  --link:           var(--cyan);
+  --link-hover:     var(--cyan-400);
+
+  --prompt:         var(--green-neon);   /* the $ / ❯ sign */
+  --cursor:         var(--green-neon);
+
+  --success:        var(--green-neon);
+  --info:           var(--cyan);
+  --warning:        var(--amber);
+  --danger:         var(--red);
+
+  /* Tinted wash backgrounds for badges / soft fills */
+  --wash-green:   rgba(57, 255, 20, 0.10);
+  --wash-cyan:    rgba(34, 211, 238, 0.12);
+  --wash-magenta: rgba(255, 46, 154, 0.12);
+  --wash-amber:   rgba(255, 182, 39, 0.12);
+  --wash-red:     rgba(255, 77, 77, 0.12);
+
+  /* ---- Per-product accent hues (used sparingly as tags) ---------- */
+  --p-game:        var(--green-neon);  /* Game Panel  */
+  --p-chat:        #7c8cff;            /* ChatPapol   */
+  --p-desglosa:    var(--amber);       /* Desglosador */
+  --p-facturas:    #38e0a6;            /* Facturas    */
+  --p-rolcito:     #b06cff;            /* Rolcito     */
+  --p-musica:      var(--magenta);     /* Música      */
+}
+
+/* ===== typography.css ===== */
+/* aypapol — typography tokens
+ * Display: Space Grotesk. Everything else: JetBrains Mono.
+ * The system leans mono — headings can be EITHER (display for marketing
+ * punch, mono for product/CLI surfaces).
+ */
+:root {
+  /* Families */
+  --font-display: 'Space Grotesk', 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-ui:      var(--font-mono);   /* UI defaults to mono */
+
+  /* Weights */
+  --fw-regular:  400; /* @kind font */
+  --fw-medium:   500; /* @kind font */
+  --fw-bold:     700; /* @kind font */
+  --fw-black:    800; /* @kind font */
+
+  /* Type scale (px-based, 1.25 majorish, tuned) */
+  --fs-2xs:   11px;
+  --fs-xs:    12px;
+  --fs-sm:    13px;
+  --fs-base:  15px;
+  --fs-md:    17px;
+  --fs-lg:    20px;
+  --fs-xl:    24px;
+  --fs-2xl:   30px;
+  --fs-3xl:   38px;
+  --fs-4xl:   50px;
+  --fs-5xl:   68px;
+  --fs-6xl:   92px;
+
+  /* Line heights */
+  --lh-tight:   1.05; /* @kind other */
+  --lh-snug:    1.2;  /* @kind other */
+  --lh-normal:  1.5;  /* @kind other */
+  --lh-relaxed: 1.65; /* @kind other */
+
+  /* Letter spacing */
+  --ls-tight:   -0.02em;
+  --ls-normal:  0em;
+  --ls-wide:    0.04em;
+  --ls-wider:   0.12em;   /* eyebrows / labels: UPPERCASE MONO */
+
+  /* Semantic roles */
+  --type-display:  var(--fw-bold) var(--fs-5xl)/var(--lh-tight) var(--font-display);
+  --type-h1:       var(--fw-bold) var(--fs-4xl)/var(--lh-tight) var(--font-display);
+  --type-h2:       var(--fw-bold) var(--fs-3xl)/var(--lh-snug) var(--font-display);
+  --type-h3:       var(--fw-bold) var(--fs-xl)/var(--lh-snug) var(--font-mono);
+  --type-body:     var(--fw-regular) var(--fs-base)/var(--lh-relaxed) var(--font-mono);
+  --type-small:    var(--fw-regular) var(--fs-sm)/var(--lh-normal) var(--font-mono);
+  --type-mono:     var(--fw-regular) var(--fs-sm)/var(--lh-normal) var(--font-mono);
+  --type-eyebrow:  var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
+}
+
+/* ===== spacing.css ===== */
+/* aypapol — spacing & layout tokens. 4px base grid. */
+:root {
+  --space-0:   0;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+
+  /* Layout */
+  --container:      1180px;
+  --container-wide: 1360px;
+  --gutter:         24px;
+  --section-y:      var(--space-24);
+
+  /* Control sizing */
+  --control-sm: 30px;
+  --control-md: 38px;
+  --control-lg: 46px;
+}
+
+/* ===== effects.css ===== */
+/* aypapol — effects: radius, borders, shadows, neon glow, grid texture,
+ * transitions. The "limpio" terminal vibe: hairline borders, soft neon
+ * glow on focus/hover, a faint background grid. No heavy scanlines.
+ */
+:root {
+  /* Radius — lightly rounded, terminal-adjacent */
+  --radius-xs:   3px;
+  --radius-sm:   5px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-pill: 999px;
+
+  /* Elevation shadows (dark, low spread) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 6px 20px -6px rgba(0,0,0,0.65);
+  --shadow-lg: 0 18px 50px -12px rgba(0,0,0,0.75);
+
+  /* Neon glow — the signature interaction state */
+  --glow-green:   0 0 0 1px rgba(57,255,20,0.55), 0 0 18px -2px rgba(57,255,20,0.45);
+  --glow-green-sm: 0 0 12px -2px rgba(57,255,20,0.55);
+  --glow-cyan:    0 0 0 1px rgba(34,211,238,0.55), 0 0 18px -2px rgba(34,211,238,0.40);
+  --glow-magenta: 0 0 0 1px rgba(255,46,154,0.55), 0 0 20px -2px rgba(255,46,154,0.40);
+  --glow-text-green: 0 0 14px rgba(57,255,20,0.55);
+
+  /* Focus ring */
+  --ring: 0 0 0 2px var(--ink-900), 0 0 0 4px rgba(57,255,20,0.65);
+
+  /* Background grid texture (faint green grid) */
+  --grid-line: rgba(57,255,20,0.045);
+  --grid-size: 28px;
+  --bg-grid:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size);
+
+  /* Transitions */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur:      180ms; /* @kind other */
+  --dur-slow: 320ms; /* @kind other */
+  --t-fast: var(--dur-fast) var(--ease);
+  --t:      var(--dur) var(--ease);
+  --t-slow: var(--dur-slow) var(--ease);
+}
+
+/* ===== base.css ===== */
+/* aypapol — base element styles & brand utilities.
+ * Imported after tokens. Sets the terminal canvas and a few reusable
+ * helpers (.eyebrow, .prompt, .terminal, .glow) used across cards/kits.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--bg-page);
+  color: var(--text-body);
+  font: var(--type-body);
+  font-feature-settings: "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* App/page canvas: deep void + faint green grid */
+.papol-canvas {
+  background-color: var(--bg-page);
+  background-image: var(--bg-grid);
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  color: var(--text-heading);
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  text-wrap: balance;
+}
+
+p { margin: 0; text-wrap: pretty; }
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color var(--t-fast);
+}
+a:hover { color: var(--link-hover); }
+
+code, kbd, samp { font-family: var(--font-mono); }
+
+::selection { background: var(--green-neon); color: var(--green-ink); }
+
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--radius-sm); }
+
+/* ---- Brand utilities ------------------------------------------- */
+
+/* UPPERCASE MONO eyebrow / kicker */
+.eyebrow {
+  font: var(--type-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wider);
+  color: var(--text-muted);
+}
+.eyebrow--green { color: var(--accent); }
+
+/* The shell prompt sign */
+.prompt::before {
+  content: "❯";
+  color: var(--prompt);
+  margin-right: 0.6ch;
+  font-weight: var(--fw-bold);
+}
+.dollar::before {
+  content: "$";
+  color: var(--prompt);
+  margin-right: 0.7ch;
+}
+
+/* Blinking block cursor */
+.cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.6ch;
+  height: 1.05em;
+  margin-left: 0.2ch;
+  background: var(--cursor);
+  vertical-align: text-bottom;
+  animation: papol-blink 1.05s steps(1) infinite;
+}
+@keyframes papol-blink { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cursor::after { animation: none; } }
+
+/* Neon text */
+.glow-text { color: var(--accent); text-shadow: var(--glow-text-green); }
+
+/* Terminal well */
+.terminal {
+  background: var(--surface-terminal);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+  padding: var(--space-4);
+  line-height: var(--lh-normal);
+}
+
+/* Container */
+.container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+
+/* ---- landing en producción ---- */
+.btn.is-disabled { opacity: .45; pointer-events: none; cursor: not-allowed; }
+</style>
+<style>
+  :root { --nav-h: 64px; --chat: var(--p-chat); }
+  html { scroll-behavior: smooth; }
+  body { color: var(--text-body); }
+  .page { background: var(--bg-page); background-image: var(--bg-grid); min-height: 100vh; overflow-x: hidden; }
+  a { color: inherit; }
+  .wrap { width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: 24px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 0.6ch; height: 38px; padding: 0 16px;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500; border-radius: var(--radius-sm);
+    cursor: pointer; text-decoration: none; border: 1px solid transparent; transition: all var(--t); white-space: nowrap; }
+  .btn--primary { background: var(--green-500); color: var(--green-ink); border-color: var(--green-400); }
+  .btn--primary:hover { background: var(--green-neon); box-shadow: var(--glow-green-sm); }
+  .btn--ghost { color: var(--accent); border-color: var(--border-strong); }
+  .btn--ghost:hover { border-color: var(--green-neon); box-shadow: var(--glow-green); }
+  .btn--chat { background: color-mix(in srgb, var(--chat) 14%, var(--surface-inset)); color: var(--chat); border-color: color-mix(in srgb, var(--chat) 45%, transparent); }
+  .btn--chat:hover { border-color: var(--chat); box-shadow: 0 0 0 1px var(--chat), 0 0 24px -6px var(--chat); }
+  .btn .p { font-weight: 700; }
+  .btn .ico { width: 15px; height: 15px; }
+
+  /* ---- nav ---- */
+  .nav { position: sticky; top: 0; z-index: 50; height: var(--nav-h);
+    backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg-page) 78%, transparent);
+    border-bottom: 1px solid var(--border-subtle); }
+  .nav .wrap { height: 100%; display: flex; align-items: center; gap: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand .mk { width: 30px; height: 30px; border-radius: var(--radius-sm); display: grid; place-items: center;
+    background: color-mix(in srgb, var(--chat) 16%, var(--surface-inset)); border: 1px solid color-mix(in srgb, var(--chat) 45%, transparent); color: var(--chat); }
+  .brand .mk svg { width: 17px; height: 17px; }
+  .brand .wm { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.03em; color: var(--text-heading); }
+  .brand .wm b { color: var(--green-neon); }
+  .nav nav { display: flex; gap: 4px; margin-left: auto; }
+  .nav nav a { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); padding: 8px 12px; border-radius: var(--radius-sm); transition: color var(--t), background var(--t); }
+  .nav nav a:hover { color: var(--text-heading); background: var(--surface-raised); }
+  .nav .home { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); padding: 8px 10px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 6px; transition: color var(--t); }
+  .nav .home:hover { color: var(--green-neon); }
+  .nav .home svg { width: 13px; height: 13px; }
+  .nav .btn { height: 34px; }
+
+  /* ---- hero ---- */
+  .hero { padding: 80px 0 70px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(820px 460px at 80% 4%, color-mix(in srgb, var(--chat) 14%, transparent), transparent 68%); }
+  .hero .wrap { position: relative; display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 52px; align-items: center; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
+    color: var(--chat); padding: 5px 12px 5px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--chat) 11%, var(--surface-inset)); border: 1px solid color-mix(in srgb, var(--chat) 38%, transparent); }
+  .badge .d { width: 6px; height: 6px; border-radius: 50%; background: var(--chat); box-shadow: 0 0 8px var(--chat); }
+  .hero h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(42px, 5.6vw, 68px);
+    line-height: 1.02; letter-spacing: -0.035em; color: var(--text-heading); margin: 18px 0 0; }
+  .hero h1 b { color: var(--green-neon); text-shadow: var(--glow-text-green); }
+  .hero .sub { font-family: var(--font-mono); font-size: 16px; line-height: 1.7; color: var(--text-muted); max-width: 47ch; margin: 22px 0 30px; }
+  .hero .sub b { color: var(--text-body); font-weight: 500; }
+  .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero .meta { margin-top: 26px; display: flex; gap: 20px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+  .hero .meta span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-neon); box-shadow: var(--glow-green-sm); }
+
+  /* ---- chat preview mock ---- */
+  .mock { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+    overflow: hidden; box-shadow: var(--shadow-lg); }
+  .mock .bar { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border-bottom: 1px solid var(--border-subtle);
+    background: var(--void); font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .mock .bar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .mock .bar .ch { margin-left: 6px; color: var(--text-muted); }
+  .mock .bar .ch b { color: var(--green-neon); }
+  .mock .win { display: grid; grid-template-columns: 128px 1fr; min-height: 318px; }
+  .mock .side { background: var(--ink-850); border-right: 1px solid var(--border-subtle); padding: 12px 8px; }
+  .mock .scat { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-dim); padding: 6px 8px 5px; }
+  .mock .sch { display: flex; align-items: center; gap: 7px; height: 27px; padding: 0 8px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+  .mock .sch .g { color: var(--text-dim); font-weight: 700; }
+  .mock .sch.on { background: var(--surface-raised); color: var(--text-heading); }
+  .mock .sch.on .g { color: var(--green-neon); }
+  .mock .conv { padding: 14px 14px 0; display: flex; flex-direction: column; gap: 13px; }
+  .mock .m { display: flex; gap: 10px; }
+  .mock .m .av { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 11px; color: var(--green-ink); }
+  .mock .m .l1 { display: flex; align-items: baseline; gap: 7px; }
+  .mock .m .un { font-family: var(--font-mono); font-weight: 700; font-size: 12.5px; }
+  .mock .m .ts { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim); }
+  .mock .m .tx { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; color: var(--text-body); margin-top: 1px; }
+  .mock .m .tx .lk { color: var(--link); }
+  .mock .typing { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); padding: 2px 0 0 38px; }
+  .mock .typing i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-dim); animation: papol-bounce 1.2s infinite; }
+  .mock .typing i:nth-child(2){ animation-delay: .18s; } .mock .typing i:nth-child(3){ animation-delay: .36s; }
+  @keyframes papol-bounce { 0%,60%,100%{ transform: translateY(0); opacity:.4 } 30%{ transform: translateY(-4px); opacity:1 } }
+  .mock .cmp { margin: 12px 14px 14px; display: flex; align-items: center; gap: 8px; background: var(--surface-inset);
+    border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 7px 10px; }
+  .mock .cmp .pr { color: var(--green-neon); font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
+  .mock .cmp .ph { font-family: var(--font-mono); font-size: 12px; color: var(--text-comment); flex: 1; }
+  .mock .cmp .cur { color: var(--green-neon); animation: papol-blink 1.05s steps(1) infinite; }
+  @media (prefers-reduced-motion: reduce) { .mock .typing i, .mock .cmp .cur { animation: none; } }
+
+  /* ---- sections ---- */
+  section { padding: 74px 0; }
+  .shead { margin-bottom: 40px; max-width: 720px; }
+  .shead.center { margin-inline: auto; text-align: center; }
+  .eyebrow.k { color: var(--accent); margin-bottom: 14px; }
+  .eyebrow.chat { color: var(--chat); margin-bottom: 14px; }
+  .shead h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 4vw, 42px); line-height: 1.12; letter-spacing: -0.025em; color: var(--text-heading); text-wrap: balance; }
+  .shead p { font-family: var(--font-mono); font-size: 15px; color: var(--text-muted); max-width: 62ch; margin-top: 16px; line-height: 1.7; }
+  .voz h2, .bots h2 { line-height: 1.12; text-wrap: balance; }
+  .shead.center p { margin-inline: auto; }
+
+  /* ---- features grid ---- */
+  .fgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .fcard { position: relative; display: flex; flex-direction: column; background: var(--surface-card);
+    border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 24px; overflow: hidden;
+    transition: transform var(--t), box-shadow var(--t), border-color var(--t); }
+  .fcard:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--c) 55%, var(--border-default)); box-shadow: 0 22px 48px -22px rgba(0,0,0,.85); }
+  .fcard .ico { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm); color: var(--c); margin-bottom: 18px;
+    background: color-mix(in srgb, var(--c) 13%, var(--surface-inset)); border: 1px solid color-mix(in srgb, var(--c) 38%, transparent); }
+  .fcard .ico svg { width: 22px; height: 22px; }
+  .fcard h3 { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--text-heading); margin-bottom: 7px; letter-spacing: -0.01em; }
+  .fcard p { font-family: var(--font-mono); font-size: 13px; line-height: 1.65; color: var(--text-muted); }
+
+  /* ---- voz / split feature ---- */
+  .voz { background: var(--bg-alt); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); position: relative; overflow: hidden; }
+  .voz::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(640px 340px at 82% 50%, var(--wash-green), transparent 70%); }
+  .voz .wrap { position: relative; display: grid; grid-template-columns: 1fr 0.92fr; gap: 52px; align-items: center; }
+  .voz .pts { margin-top: 26px; display: flex; flex-direction: column; gap: 14px; }
+  .voz .pt { display: flex; gap: 13px; align-items: flex-start; }
+  .voz .pt .ck { width: 22px; height: 22px; border-radius: 50%; flex: none; margin-top: 1px; display: grid; place-items: center;
+    color: var(--green-neon); background: var(--wash-green); border: 1px solid color-mix(in srgb, var(--green-neon) 40%, transparent); }
+  .voz .pt .ck svg { width: 12px; height: 12px; }
+  .voz .pt b { font-family: var(--font-mono); font-size: 14px; color: var(--text-heading); display: block; }
+  .voz .pt span { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+  /* voice room card */
+  .vroom { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .vroom .vhd { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
+  .vroom .vhd .vt { font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--green-neon); display: flex; align-items: center; gap: 8px; }
+  .vroom .vhd .ct { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .vroom .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 18px; }
+  .vtile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 22px 12px;
+    background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md); position: relative; }
+  .vtile.spk { border-color: color-mix(in srgb, var(--green-neon) 55%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--green-neon) 35%, transparent); }
+  .vtile .av { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 18px; color: var(--green-ink); }
+  .vtile .nm { font-family: var(--font-mono); font-size: 12px; }
+  .vtile .mic { position: absolute; top: 10px; right: 10px; color: var(--text-dim); }
+  .vtile .mic.off { color: var(--red); }
+  .vtile .mic svg { width: 14px; height: 14px; }
+  .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+  .bars i { width: 2.5px; background: var(--green-neon); border-radius: 1px; animation: papol-eq 1s ease-in-out infinite; }
+  .bars i:nth-child(1){ height: 40%; } .bars i:nth-child(2){ height: 100%; animation-delay:.15s; }
+  .bars i:nth-child(3){ height: 60%; animation-delay:.3s; } .bars i:nth-child(4){ height: 85%; animation-delay:.45s; }
+  @keyframes papol-eq { 0%,100%{ transform: scaleY(.5) } 50%{ transform: scaleY(1) } }
+  @media (prefers-reduced-motion: reduce) { .bars i { animation: none; } }
+
+  /* ---- bots / terminal feature ---- */
+  .bots .wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 52px; align-items: center; }
+  .term { background: var(--surface-terminal); border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .term .tbar { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .term .tbar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .term .tbody { padding: 18px; font-family: var(--font-mono); font-size: 13px; line-height: 1.8; white-space: pre-wrap; }
+  .term .tbody .pr { color: var(--green-neon); font-weight: 700; }
+  .term .tbody .cm { color: var(--text-comment); }
+  .term .tbody .ok { color: var(--green-neon); }
+  .term .tbody .wn { color: var(--amber); }
+  .term .tbody .mut { color: var(--text-muted); }
+  .term .tbody .bot { color: var(--chat); }
+
+  /* ---- self-hosted strip ---- */
+  .selfhost { text-align: center; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 40px; }
+  .stat { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 22px 18px; }
+  .stat .n { font-family: var(--font-display); font-weight: 700; font-size: 30px; color: var(--green-neon); letter-spacing: -0.02em; }
+  .stat .l { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+  /* ---- download CTA ---- */
+  .down { padding-bottom: 90px; }
+  .dcard { position: relative; overflow: hidden; background: var(--surface-card);
+    border: 1px solid color-mix(in srgb, var(--green-neon) 28%, var(--border-default)); border-radius: var(--radius-lg); padding: 48px; text-align: center; }
+  .dcard::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(680px 320px at 50% -10%, var(--wash-green), transparent 70%); }
+  .dcard .inner { position: relative; }
+  .dcard h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.025em; color: var(--text-heading); }
+  .dcard h2 b { color: var(--green-neon); text-shadow: var(--glow-text-green); }
+  .dcard p { font-family: var(--font-mono); font-size: 15px; color: var(--text-muted); margin: 14px auto 30px; max-width: 52ch; line-height: 1.7; }
+  .dcard .plats { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .dcard .plats .btn { height: 46px; padding: 0 22px; font-size: 14px; }
+
+  /* ---- footer ---- */
+  footer { border-top: 1px solid var(--border-subtle); padding: 44px 0 56px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; align-items: flex-start; }
+  footer .col h4 { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--text-dim); margin-bottom: 12px; }
+  footer .col a { display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); padding: 4px 0; transition: color var(--t); }
+  footer .col a:hover { color: var(--green-neon); }
+  footer .cols { display: flex; gap: 56px; flex-wrap: wrap; }
+  footer .sig { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-top: 18px; }
+  footer .sig b { color: var(--green-neon); }
+
+  @media (max-width: 880px) {
+    .hero .wrap, .voz .wrap, .bots .wrap { grid-template-columns: 1fr; }
+    .fgrid { grid-template-columns: 1fr 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .nav nav { display: none; }
+    .down { padding-bottom: 64px; }
+  }
+  @media (max-width: 560px) { .fgrid { grid-template-columns: 1fr; } .dcard { padding: 32px 22px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- NAV -->
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="#top">
+        <span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 7 11 12 6 17"/><line x1="13" y1="17" x2="18" y2="17"/></svg></span>
+        <span class="wm">Chat<b>Papol</b></span>
+      </a>
+      <nav>
+        <a href="#features">qué hace</a>
+        <a href="#voz">voz y vídeo</a>
+        <a href="#bots">bots</a>
+        <a href="#descargar">descargar</a>
+      </nav>
+      <a class="home" href="https://aypapol.com"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> aypapol.com</a>
+      <a class="btn btn--ghost" href="#descargar"><span class="p">❯</span> abrir app</a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <a id="top"></a>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="badge"><span class="d"></span> chat.aypapol.com · autohospedado</span>
+        <h1>el chat del <b>colectivo</b></h1>
+        <p class="sub">nuestro Discord propio, corriendo en nuestro servidor. <b>texto, voz, vídeo y screenshare</b> — con bots, webhooks, roles y automod. sin anuncios, sin nitro, sin nadie mirando.</p>
+        <div class="cta">
+          <a class="btn btn--primary" href="#descargar"><span class="p">❯</span> abrir en el navegador</a>
+          <a class="btn btn--ghost" href="#descargar">descargar la app</a>
+        </div>
+        <div class="meta">
+          <span><i class="dot"></i> server online · 14d uptime</span>
+          <span>5 papols conectados</span>
+          <span>100% autohospedado</span>
+        </div>
+      </div>
+
+      <!-- chat preview -->
+      <div class="mock">
+        <div class="bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:var(--green-neon)"></i><span class="ch">ChatPapol — <b>#general</b></span></div>
+        <div class="win">
+          <div class="side">
+            <div class="scat">▾ general</div>
+            <div class="sch on"><span class="g">#</span> general</div>
+            <div class="sch"><span class="g">#</span> avisos</div>
+            <div class="sch"><span class="g">#</span> memes</div>
+            <div class="scat" style="padding-top:10px">▾ voz</div>
+            <div class="sch"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--green-neon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg> <span style="color:var(--green-500)">voz general</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;min-width:0">
+            <div class="conv">
+              <div class="m"><span class="av" style="background:var(--green-500)">F</span><div><div class="l1"><span class="un" style="color:var(--green-neon)">ferservo98</span><span class="ts">14:28</span></div><div class="tx">arrancó el server de valheim 🌲</div></div></div>
+              <div class="m"><span class="av" style="background:var(--cyan);color:var(--cyan-ink)">P</span><div><div class="l1"><span class="un" style="color:var(--cyan)">PepewichoxD</span><span class="ts">14:29</span></div><div class="tx">vamos, paso la ip: <span class="lk">valheim.aypapol.com:2456</span></div></div></div>
+              <div class="m"><span class="av" style="background:var(--amber);color:#1a1200">R</span><div><div class="l1"><span class="un" style="color:var(--amber)">Rubas</span><span class="ts">14:31</span></div><div class="tx">me conecto a la voz, dame 2 ❯</div></div></div>
+            </div>
+            <div class="typing"><i></i><i></i><i></i> LaLizzys está escribiendo…</div>
+            <div class="cmp"><span class="pr">❯</span><span class="ph">mensaje a #general<span class="cur">▮</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="shead">
+        <div class="eyebrow chat">// TODO LO QUE ESPERAS, EN CASA</div>
+        <h2>un chat completo, sin alquilar nada</h2>
+        <p>las mismas cosas que usabas en Discord, pero corriendo en el servidor del colectivo. tus datos, tus reglas.</p>
+      </div>
+      <div class="fgrid" id="fgrid"></div>
+    </div>
+  </section>
+
+  <!-- VOZ -->
+  <section class="voz" id="voz">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow k">// VOZ · VÍDEO · SCREENSHARE</div>
+        <h2 style="font-family:var(--font-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.12;letter-spacing:-.025em;color:var(--text-heading)">salas de voz que aguantan la partida</h2>
+        <p style="font-family:var(--font-mono);font-size:15px;color:var(--text-muted);max-width:50ch;margin-top:14px;line-height:1.7">entra a una sala con un clic, comparte pantalla en 1080p y deja la voz abierta toda la noche. baja latencia porque el servidor está aquí al lado.</p>
+        <div class="pts">
+          <div class="pt"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>screenshare a 1080p · 60fps</b><span>para enseñar la partida, el código o la peli sin que se pixele.</span></div></div>
+          <div class="pt"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>supresión de ruido y eco</b><span>el mecánico del teclado y el ventilador se quedan fuera.</span></div></div>
+          <div class="pt"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>push-to-talk o voz por actividad</b><span>tú decides cómo abres el micro. sin sorpresas.</span></div></div>
+        </div>
+      </div>
+
+      <div class="vroom">
+        <div class="vhd"><span class="vt"><span class="bars"><i></i><i></i><i></i><i></i></span> voz general</span><span class="ct">/ 4 conectados</span></div>
+        <div class="grid">
+          <div class="vtile spk"><span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span><span class="av" style="background:var(--green-500)">F</span><span class="nm" style="color:var(--green-neon)">ferservo98</span></div>
+          <div class="vtile"><span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span><span class="av" style="background:var(--cyan);color:var(--cyan-ink)">P</span><span class="nm" style="color:var(--cyan)">PepewichoxD</span></div>
+          <div class="vtile"><span class="mic off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span><span class="av" style="background:var(--amber);color:#1a1200">R</span><span class="nm" style="color:var(--amber)">Rubas</span></div>
+          <div class="vtile"><span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span><span class="av" style="background:var(--magenta);color:#1a0010">L</span><span class="nm" style="color:var(--magenta)">LaLizzys</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTS -->
+  <section class="bots" id="bots">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow chat">// BOTS · WEBHOOKS · AUTOMOD</div>
+        <h2 style="font-family:var(--font-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.12;letter-spacing:-.025em;color:var(--text-heading)">automatiza el server como te dé la gana</h2>
+        <p style="font-family:var(--font-mono);font-size:15px;color:var(--text-muted);max-width:50ch;margin-top:14px;line-height:1.7">ChatPapol habla con el resto del ecosistema. cuando despliegas un server de juego o se cae un contenedor, el canal se entera solo. webhooks abiertos, slash-commands propios y automod a tu medida.</p>
+        <div class="cta" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:24px">
+          <a class="btn btn--chat" href="#descargar">ver ajustes de bots <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></a>
+        </div>
+      </div>
+      <div class="term">
+        <div class="tbar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:var(--green-neon)"></i><span style="margin-left:6px">papolbot@chatpapol:~</span></div>
+        <div class="tbody"><span class="cm"># webhook desde el game panel</span>
+<span class="pr">❯</span> game.aypapol.com → POST /hook/avisos
+<span class="bot">[papolbot]</span> <span class="ok">● valheim</span> está <span class="ok">online</span> en :2456
+<span class="cm"># slash-command propio</span>
+<span class="pr">❯</span> /estado infra
+<span class="bot">[papolbot]</span> 5 servicios <span class="ok">● online</span> · backup <span class="wn">03:00 CET</span>
+<span class="cm"># automod en acción</span>
+<span class="pr">❯</span> mensaje con spam detectado
+<span class="bot">[automod]</span> <span class="wn">! silenciado 10m</span> · log en #mod</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SELF-HOSTED -->
+  <section class="selfhost">
+    <div class="wrap">
+      <div class="shead center">
+        <div class="eyebrow k">// EN NUESTRO SERVIDOR, NO EN EL DE OTROS</div>
+        <h2>autohospedado de principio a fin</h2>
+        <p>ChatPapol corre en la misma máquina que el resto de aypapol. cero nube ajena, cero suscripciones, cero telemetría que no controlemos.</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="n">100%</div><div class="l">autohospedado</div></div>
+        <div class="stat"><div class="n">0€</div><div class="l">de nube ajena</div></div>
+        <div class="stat"><div class="n">14d</div><div class="l">uptime medio</div></div>
+        <div class="stat"><div class="n">∞</div><div class="l">historial sin borrar</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DESCARGAR -->
+  <section class="down" id="descargar">
+    <div class="wrap">
+      <div class="dcard">
+        <div class="inner">
+          <div class="eyebrow eyebrow--green" style="justify-content:center;display:flex">// LISTO PARA ENTRAR</div>
+          <h2 style="margin-top:12px">descárgalo o ábrelo en el <b>navegador</b></h2>
+          <p>cliente de escritorio para Windows, macOS y Linux — o entra directo desde la web. todos somos papol, en todas las pantallas.</p>
+          <div class="plats">
+            <a class="btn btn--primary" data-plat="windows" href="/api/download/windows"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg> Windows</a>
+            <a class="btn btn--ghost is-disabled" data-plat="macos" aria-disabled="true" href="#"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06z"/><path d="M10 2c1 .5 2 2 2 5"/></svg> macOS</a>
+            <a class="btn btn--ghost" data-plat="linux" href="/api/download/linux"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Linux</a>
+            <a class="btn btn--chat" href="#descargar"><span class="p">❯</span> abrir en navegador</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div>
+        <a class="brand" href="#top">
+          <span class="mk" style="width:26px;height:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><polyline points="6 7 11 12 6 17"/><line x1="13" y1="17" x2="18" y2="17"/></svg></span>
+          <span class="wm" style="font-size:18px">Chat<b>Papol</b></span>
+        </a>
+        <div class="sig">parte del ecosistema <b>aypapol</b> · todos somos papol.</div>
+      </div>
+      <div class="cols">
+        <div class="col">
+          <h4>chatpapol</h4>
+          <a href="#descargar">abrir la app</a>
+          <a href="#features">funciones</a>
+          <a href="#descargar">descargar</a>
+        </div>
+        <div class="col">
+          <h4>ecosistema</h4>
+          <a href="https://aypapol.com">aypapol.com</a>
+          <a href="https://game.aypapol.com">Game Panel</a>
+          <a href="https://github.com">github</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  const FEATURES = [
+    { c:'var(--green-neon)', t:'canales de texto', d:'organiza por temas, hilos, fijados y búsqueda. markdown, bloques de código y adjuntos sin límite tonto.',
+      icon:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
+    { c:'var(--green-neon)', t:'voz y vídeo', d:'salas siempre abiertas, vídeo y screenshare a 1080p. baja latencia porque el servidor está en casa.',
+      icon:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>' },
+    { c:'var(--chat)', t:'roles y permisos', d:'colorea a la pandilla, define quién toca qué y monta jerarquías sin pelearte con menús.',
+      icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+    { c:'var(--chat)', t:'bots y webhooks', d:'slash-commands propios y webhooks abiertos. el resto del ecosistema avisa solo por el canal.',
+      icon:'<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>' },
+    { c:'var(--amber)', t:'automod', d:'reglas anti-spam y anti-flood que tú escribes. silencia, registra y avisa sin que estés mirando.',
+      icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>' },
+    { c:'var(--green-neon)', t:'cliente de escritorio', d:'app nativa para Windows, macOS y Linux, más la web. notificaciones, atajos y arranque al inicio.',
+      icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' },
+  ];
+  document.getElementById('fgrid').innerHTML = FEATURES.map(f => `
+    <div class="fcard" style="--c:${f.c}">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.icon}</svg></span>
+      <h3>${f.t}</h3>
+      <p>${f.d}</p>
+    </div>`).join('');
+
+  // nav active anchor highlight
+  const links = [...document.querySelectorAll('.nav nav a')];
+  const obs = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(a=>a.style.color = a.getAttribute('href')==='#'+e.target.id ? 'var(--green-neon)' : ''); } });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  ['features','voz','bots','descargar'].forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el); });
+
+  // Live release wiring (progressive enhancement). Sin JS, los href estáticos
+  // ya funcionan para windows/linux; macOS queda deshabilitado hasta que exista build.
+  (async () => {
+    const btns = document.querySelectorAll('a[data-plat]');
+    try {
+      const res = await fetch('/api/releases', { headers: { accept: 'application/json' } });
+      if (!res.ok) throw 0;
+      const data = await res.json();
+      const latest = Array.isArray(data) ? data[0] : data;
+      const dl = (latest && latest.downloads) || {};
+      btns.forEach(a => {
+        const p = a.dataset.plat;
+        if (dl[p]) { a.href = '/api/download/' + p; a.classList.remove('is-disabled'); a.removeAttribute('aria-disabled'); }
+        else { a.href = '#'; a.classList.add('is-disabled'); a.setAttribute('aria-disabled', 'true'); }
+      });
+      if (latest && latest.version) document.querySelectorAll('[data-ver]').forEach(e => { e.textContent = 'v' + latest.version; });
+    } catch (_) { /* endpoint aún no desplegado — se conservan los fallbacks estáticos */ }
+  })();
+</script>
+</body>
+</html>

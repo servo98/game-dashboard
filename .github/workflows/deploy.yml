@@ -82,6 +82,7 @@ jobs:
               - 'docker-compose.yml'
             static:
               - 'static-site/**'
+              - 'chat-landing/**'
             games:
               - 'games/**'
 
