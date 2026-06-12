@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Session } from "../db";
 import { panelUserQueries, sessionQueries, userServerAccessQueries } from "../db";
-import { getCookie, requireAuth } from "../middleware/auth";
+import { getCookie, requireAuth, SESSION_COOKIE } from "../middleware/auth";
 
 const auth = new Hono<{ Variables: { session: Session } }>();
 
@@ -129,7 +129,7 @@ auth.get("/callback", async (c) => {
           ["Location", returnPath],
           [
             "Set-Cookie",
-            `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
+            `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
           ],
           ["Set-Cookie", "oauth_return=; Path=/; HttpOnly; Max-Age=0"],
         ],
@@ -147,7 +147,7 @@ auth.get("/callback", async (c) => {
     status: 302,
     headers: {
       Location: `${publicUrl}${redirectPath}`,
-      "Set-Cookie": `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
+      "Set-Cookie": `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION}${cookieDomain}`,
     },
   });
 });
@@ -178,16 +178,19 @@ auth.get("/me", requireAuth, (c) => {
 
 auth.post("/logout", requireAuth, (c) => {
   const token =
-    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
+    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, SESSION_COOKIE);
   if (token) {
     sessionQueries.delete.run(token);
   }
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": `session=; Path=/; HttpOnly; Max-Age=0${cookieDomain}`,
-    },
+    headers: [
+      ["Content-Type", "application/json"],
+      ["Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0${cookieDomain}`],
+      // Also expire the legacy "session" cookie — it collided with Foundry's own
+      // "session" cookie on rolcito.aypapol.com and caused an infinite reload loop.
+      ["Set-Cookie", `session=; Path=/; HttpOnly; Max-Age=0${cookieDomain}`],
+    ],
   });
 });
 

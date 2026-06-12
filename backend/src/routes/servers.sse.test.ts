@@ -144,7 +144,7 @@ describe("GET /:id/logs", () => {
   it("returns 404 for missing server", async () => {
     mockServerGetById.mockReturnValue(undefined);
     const res = await servers.request("/minecraft/logs", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(404);
   });
@@ -152,7 +152,7 @@ describe("GET /:id/logs", () => {
   it("returns 400 when server is not running", async () => {
     mockGetContainerStatus.mockResolvedValue("stopped");
     const res = await servers.request("/minecraft/logs", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
   });
@@ -160,7 +160,7 @@ describe("GET /:id/logs", () => {
   it("returns SSE stream with correct headers when running", async () => {
     mockGetContainerStatus.mockResolvedValue("running");
     const res = await servers.request("/minecraft/logs", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
@@ -184,7 +184,7 @@ describe("GET /:id/stats", () => {
   it("returns 404 for missing server", async () => {
     mockServerGetById.mockReturnValue(undefined);
     const res = await servers.request("/minecraft/stats", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(404);
   });
@@ -192,7 +192,7 @@ describe("GET /:id/stats", () => {
   it("returns 400 when server is not running", async () => {
     mockGetContainerStatus.mockResolvedValue("stopped");
     const res = await servers.request("/minecraft/stats", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
   });
@@ -200,7 +200,7 @@ describe("GET /:id/stats", () => {
   it("returns SSE stream with correct headers when running", async () => {
     mockGetContainerStatus.mockResolvedValue("running");
     const res = await servers.request("/minecraft/stats", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");

@@ -2,6 +2,15 @@ import type { Context, Next } from "hono";
 import { panelUserQueries, sessionQueries, userServerAccessQueries } from "../db";
 
 /**
+ * Name of the panel's auth cookie. Deliberately NOT "session": the panel scopes its
+ * cookie to `Domain=.aypapol.com` (shared across game/facturas), so a cookie named
+ * "session" leaks to every subdomain — including rolcito.aypapol.com, where Foundry
+ * VTT also uses a cookie named "session". The two collided and Foundry's socket
+ * handshake returned no sessionId, triggering an infinite `debouncedReload()` loop.
+ */
+export const SESSION_COOKIE = "panel_session";
+
+/**
  * True if the given Discord user is an admin: present in ALLOWED_DISCORD_IDS (promoted to
  * role=admin on startup) or an approved panel_user with role=admin (manual promotion).
  * Shared source of truth for admin checks outside the middleware chain (MCP, OAuth).
@@ -19,7 +28,7 @@ export function isAdminDiscordId(discordId: string): boolean {
 
 export async function requireAuth(c: Context, next: Next) {
   const token =
-    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, "session");
+    c.req.header("Authorization")?.replace("Bearer ", "") ?? getCookie(c.req.raw, SESSION_COOKIE);
 
   if (!token) {
     return c.json({ error: "Unauthorized" }, 401);

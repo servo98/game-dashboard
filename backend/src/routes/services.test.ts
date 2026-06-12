@@ -126,7 +126,7 @@ describe("POST /:name/restart", () => {
   it("rejects unknown service names", async () => {
     const res = await services.request("/unknown/restart", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/Unknown service/);
@@ -135,7 +135,7 @@ describe("POST /:name/restart", () => {
   it("restarts valid service", async () => {
     const res = await services.request("/backend/restart", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
@@ -147,7 +147,7 @@ describe("POST /:name/restart", () => {
     for (const name of ["backend", "bot", "dashboard", "nginx"]) {
       const res = await services.request(`/${name}/restart`, {
         method: "POST",
-        headers: { cookie: "session=valid-token" },
+        headers: { cookie: "panel_session=valid-token" },
       });
       expect(res.status).toBe(200);
     }
@@ -167,14 +167,14 @@ describe("GET /:name/logs", () => {
 
   it("rejects unknown service names", async () => {
     const res = await services.request("/badname/logs", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
   });
 
   it("returns SSE for valid service", async () => {
     const res = await services.request("/backend/logs", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");

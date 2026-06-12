@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db, mcpTokenQueries, sessionQueries } from "../db";
-import { getCookie, isAdminDiscordId } from "../middleware/auth";
+import { getCookie, isAdminDiscordId, SESSION_COOKIE } from "../middleware/auth";
 
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
@@ -213,7 +213,7 @@ oauth.get("/authorize", async (c) => {
   }
 
   // Check if user has a dashboard session
-  const sessionToken = getCookie(c.req.raw, "session");
+  const sessionToken = getCookie(c.req.raw, SESSION_COOKIE);
   const session = sessionToken ? sessionQueries.get.get(sessionToken) : null;
 
   if (!session) {
@@ -273,7 +273,7 @@ oauth.post("/authorize", async (c) => {
   }
 
   // Verify session
-  const sessionToken = getCookie(c.req.raw, "session");
+  const sessionToken = getCookie(c.req.raw, SESSION_COOKIE);
   const session = sessionToken ? sessionQueries.get.get(sessionToken) : null;
   if (!session) return c.text("Session expired. Please try again.", 401);
 

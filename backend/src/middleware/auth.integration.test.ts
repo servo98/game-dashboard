@@ -99,7 +99,7 @@ describe("requireAuth middleware", () => {
   it("returns 401 with invalid session token", async () => {
     (sessionQueries.get.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const res = await app.request("/auth-only", {
-      headers: { cookie: "session=bad-token" },
+      headers: { cookie: "panel_session=bad-token" },
     });
     expect(res.status).toBe(401);
   });
@@ -113,7 +113,7 @@ describe("requireAuth middleware", () => {
       expires_at: Math.floor(Date.now() / 1000) + 3600,
     });
     const res = await app.request("/auth-only", {
-      headers: { cookie: "session=good" },
+      headers: { cookie: "panel_session=good" },
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });

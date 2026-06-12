@@ -178,7 +178,7 @@ describe("POST /:id/start", () => {
     mockServerGetById.mockReturnValue(undefined);
     const res = await servers.request("/nonexistent/start", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(404);
   });
@@ -186,7 +186,7 @@ describe("POST /:id/start", () => {
   it("starts server with valid session cookie", async () => {
     const res = await servers.request("/minecraft/start", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -218,7 +218,7 @@ describe("POST /:id/start", () => {
     );
     const res = await servers.request("/minecraft/start", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(mockMarkIntentionalStop).not.toHaveBeenCalled();
@@ -234,7 +234,7 @@ describe("POST /:id/start", () => {
     );
     const res = await servers.request("/minecraft/start", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(409);
   });
@@ -257,7 +257,7 @@ describe("POST /:id/stop", () => {
   it("stops server with session cookie", async () => {
     const res = await servers.request("/minecraft/stop", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(mockMarkIntentionalStop).toHaveBeenCalledWith("minecraft");
@@ -277,7 +277,7 @@ describe("POST /:id/stop", () => {
     mockGetRunningGameServers.mockResolvedValue([{ id: "abc", name: "minecraft", memoryBytes: 0 }]);
     const res = await servers.request("/active/stop", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(mockMarkIntentionalStop).toHaveBeenCalledWith("minecraft");
@@ -291,7 +291,7 @@ describe("POST /:id/stop", () => {
     ]);
     const res = await servers.request("/active/stop", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
     expect(mockStopGameContainer).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe("POST /:id/stop", () => {
     mockGetRunningGameServers.mockResolvedValue([]);
     const res = await servers.request("/active/stop", {
       method: "POST",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     const body = await res.json();

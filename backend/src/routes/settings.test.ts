@@ -116,7 +116,7 @@ describe("GET /", () => {
 
   it("returns settings with valid session", async () => {
     const res = await settings.request("/", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -149,7 +149,7 @@ describe("PUT /", () => {
   it("saves allowed keys", async () => {
     const res = await settings.request("/", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({
         host_domain: "new.com",
         game_memory_limit_gb: "8",
@@ -166,7 +166,7 @@ describe("PUT /", () => {
   it("ignores unknown keys", async () => {
     const res = await settings.request("/", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({ host_domain: "ok.com", evil_key: "hack" }),
     });
     expect(res.status).toBe(200);

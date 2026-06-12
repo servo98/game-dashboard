@@ -135,7 +135,7 @@ describe("GET /", () => {
     mockServerGetAll.mockReturnValue([server]);
     mockGetContainerStatus.mockResolvedValue("stopped");
     const res = await servers.request("/", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -148,7 +148,7 @@ describe("GET /", () => {
     mockSessionGet.mockReturnValue(session);
     mockServerGetAll.mockReturnValue([]);
     const res = await servers.request("/", {
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
@@ -175,7 +175,7 @@ describe("POST /", () => {
   it("validates ID format — rejects uppercase", async () => {
     const res = await servers.request("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({ id: "BadId", name: "Test", docker_image: "img", port: 8080 }),
     });
     expect(res.status).toBe(400);
@@ -186,7 +186,7 @@ describe("POST /", () => {
   it("requires all fields for custom server (no template)", async () => {
     const res = await servers.request("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({ id: "test", name: "Test" }),
     });
     expect(res.status).toBe(400);
@@ -197,7 +197,7 @@ describe("POST /", () => {
     mockServerGetAll.mockReturnValue([server]); // minecraft uses port 25565
     const res = await servers.request("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({ id: "test", name: "Test", docker_image: "img", port: 25565 }),
     });
     expect(res.status).toBe(200);
@@ -207,7 +207,7 @@ describe("POST /", () => {
   it("creates server successfully", async () => {
     const res = await servers.request("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({
         id: "test-srv",
         name: "Test",
@@ -224,7 +224,7 @@ describe("POST /", () => {
     mockServerGetById.mockReturnValue(server); // already exists
     const res = await servers.request("/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie: "session=valid-token" },
+      headers: { "Content-Type": "application/json", cookie: "panel_session=valid-token" },
       body: JSON.stringify({ id: "minecraft", name: "MC2", docker_image: "img", port: 9999 }),
     });
     expect(res.status).toBe(409);
@@ -241,7 +241,7 @@ describe("DELETE /:id", () => {
     mockServerGetById.mockReturnValue(undefined);
     const res = await servers.request("/nonexistent", {
       method: "DELETE",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(404);
   });
@@ -251,7 +251,7 @@ describe("DELETE /:id", () => {
     mockGetContainerStatus.mockResolvedValue("running");
     const res = await servers.request("/minecraft", {
       method: "DELETE",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/Stop it first/);
@@ -262,7 +262,7 @@ describe("DELETE /:id", () => {
     mockGetContainerStatus.mockResolvedValue("stopped");
     const res = await servers.request("/minecraft", {
       method: "DELETE",
-      headers: { cookie: "session=valid-token" },
+      headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
