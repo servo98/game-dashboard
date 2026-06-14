@@ -8,6 +8,11 @@ rtc:
   port_range_end: 50100
   # Anuncia la IP pública del VPS a los clientes (necesario tras NAT/host net).
   use_external_ip: true
+  # Fallback ICE por TCP: cuando la red del cliente bloquea el UDP a puertos
+  # altos (NAT restrictiva / firewall corporativo), ICE no encuentra camino por
+  # UDP y da "Timed out waiting for PeerConnection". Con este puerto LiveKit
+  # ofrece un candidato TCP. DEBE estar abierto en ufw (7881/tcp, a internet).
+  tcp_port: 7881
 audio:
   # aro de "hablando" remoto: -30 dBFS (default) — debe prender en cuanto
   # alguien sea audible; el aro local lo calcula el cliente desde v0.1.13.
