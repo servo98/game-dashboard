@@ -1,0 +1,27 @@
+# Config de Filebrowser Quantum (gtsteffaniak) para rubas.aypapol.com/admin/
+# Montado :ro en /home/filebrowser/data/config.yaml. SIN SECRETOS (repo público):
+# el password del admin va por la env FILEBROWSER_ADMIN_PASSWORD (docker-compose).
+server:
+  port: 80
+  # Servido detrás de nginx bajo /admin/. nginx hace proxy_pass SIN reescribir
+  # el path, así que el app debe generar sus assets bajo /admin/.
+  baseURL: "/admin/"
+  logging:
+    - levels: "info|warning|error"
+  # Único source: el árbol de sitios. Rubas solo ve /srv (= /srv/rubas/sites del
+  # host) con sus subcarpetas publico/ y oculto/.
+  sources:
+    - path: "/srv"
+
+auth:
+  # Usuario admin inicial = "rubas". Su password lo fija FILEBROWSER_ADMIN_PASSWORD
+  # al arrancar (no se escribe aquí). Verificar el nombre tras el primer arranque
+  # (ver DEPLOY-RUBAS.md): si el fork crea "admin" en su lugar, ajustar ahí.
+  adminUsername: rubas
+  methods:
+    password:
+      enabled: true
+      minLength: 8
+      signup: false   # nadie se registra solo; solo Rubas (admin) gestiona usuarios
+    passkey:
+      enabled: false

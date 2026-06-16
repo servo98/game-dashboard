@@ -1,0 +1,8 @@
+# Regenera /srv/rubas/sites/index.html una vez. Lo dispara rubas-index.path.
+# Instalar en /etc/systemd/system/ (ver DEPLOY-RUBAS.md).
+[Unit]
+Description=Regenerate Rubas homepage index
+
+[Service]
+Type=oneshot
+ExecStart=/srv/rubas/gen-index.sh

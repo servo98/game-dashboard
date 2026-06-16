@@ -1,0 +1,13 @@
+# Vigila publico/ y regenera la home cuando Rubas añade/quita una carpeta.
+# Instalar en /etc/systemd/system/ (ver DEPLOY-RUBAS.md). Evita el cron-cada-minuto:
+# solo regenera al cambiar el árbol, no en bucle.
+[Unit]
+Description=Watch Rubas publico/ and regenerate the homepage index
+
+[Path]
+# PathModified en el directorio dispara al crear/borrar/renombrar carpetas dentro.
+PathModified=/srv/rubas/sites/publico
+Unit=rubas-index.service
+
+[Install]
+WantedBy=multi-user.target

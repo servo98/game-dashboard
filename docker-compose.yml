@@ -12,6 +12,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static-site:/var/www/aypapol:ro
       - ./chat-landing:/var/www/chat-landing:ro  # landing de chat.aypapol.com (raíz)
+      - /srv/rubas/sites:/var/www/rubas:ro  # sitios estáticos de Rubas (rubas.aypapol.com)
       - /etc/letsencrypt:/etc/letsencrypt:ro  # certificados SSL
     restart: unless-stopped
     mem_limit: 128m
@@ -115,9 +116,35 @@ services:
     mem_limit: 512m
     logging: *default-logging
 
+  # ─── Filebrowser (rubas.aypapol.com/admin/) ──────────────────────────────
+  # Panel web para que Rubas suba carpetas de sitios estáticos (drag-and-drop,
+  # login). Fork gtsteffaniak ("Quantum"): puerto interno 80, config en
+  # /home/filebrowser/data/config.yaml, corre como uid 1000. Monta el MISMO
+  # dir que nginx (/srv/rubas/sites) pero en :rw; nginx lo sirve en :ro.
+  # nginx (red host) lo alcanza vía el puerto publicado 127.0.0.1:3290.
+  # OJO: la CI NO arranca servicios nuevos → primer `up -d filebrowser` manual
+  # (ver DEPLOY-RUBAS.md), igual que chatpapol/livekit.
+  filebrowser:
+    image: gtstef/filebrowser:stable
+    environment:
+      # Password del admin (usuario `rubas`) vía env — repo público, NO en config.
+      - FILEBROWSER_ADMIN_PASSWORD=${RUBAS_FB_PASSWORD}
+    ports:
+      - "127.0.0.1:3290:80"  # nginx (host net) proxya rubas.aypapol.com/admin/ aquí
+    volumes:
+      - ./rubas/filebrowser.yaml:/home/filebrowser/data/config.yaml:ro  # config (sin secretos)
+      - filebrowser-data:/home/filebrowser/data  # database.db + cache (estado)
+      - /srv/rubas/sites:/srv:rw  # árbol de sitios: publico/ y oculto/
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
+    networks:
+      - panel
+
 volumes:
   backend-data:
   chatpapol-data:
+  filebrowser-data:
 
 networks:
   panel:
