@@ -239,8 +239,9 @@ files.post("/:id/files/upload", requireAuth, requireApproved, requireAdmin, asyn
       // Recreate parent folders (for nested uploads from dropped directories)
       mkdirSync(dirname(targetPath), { recursive: true });
 
-      const buffer = await file.arrayBuffer();
-      await Bun.write(targetPath, buffer);
+      // Escribir el File directamente: Bun.write hace streaming del blob a
+      // disco sin materializar otra copia completa en memoria (evita OOM).
+      await Bun.write(targetPath, file);
       uploaded.push(safeRel);
     }
 

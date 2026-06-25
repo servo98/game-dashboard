@@ -31,7 +31,9 @@ services:
       - ./games:/app/games:ro
       - /data:/host-data  # game volumes for backup/restore
     restart: unless-stopped
-    mem_limit: 512m
+    # Las subidas se bufferizan en memoria al parsear el multipart (Bun formData),
+    # así que el límite debe superar el tamaño máximo de subida (1GB) con holgura.
+    mem_limit: 1536m
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/servers').then(r=>{if(!r.ok)process.exit(1)})"]
       interval: 30s
