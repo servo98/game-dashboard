@@ -211,9 +211,9 @@ files.post("/:id/files/upload", requireAuth, requireApproved, requireAdmin, asyn
       if (typeof value === "string") continue;
       const file = value as unknown as File;
 
-      // 100MB per file limit
-      if (file.size > 100 * 1024 * 1024) {
-        return c.json({ error: `File ${file.name} exceeds 100MB limit` }, 400);
+      // 1GB per file limit
+      if (file.size > 1024 * 1024 * 1024) {
+        return c.json({ error: `File ${file.name} exceeds 1GB limit` }, 400);
       }
 
       // Use the relative path (folder structure) when provided, else just the file name

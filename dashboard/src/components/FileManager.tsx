@@ -28,7 +28,7 @@ const MAX_CONCURRENT_UPLOADS = 4;
 // Auto-retry transient failures (network blips) before giving up on a file.
 const MAX_UPLOAD_ATTEMPTS = 3;
 // Errors that are deterministic — retrying won't help, so fail fast.
-const NON_RETRYABLE = /exceeds|Invalid file name|Invalid path|Expected multipart|No volumes/i;
+const NON_RETRYABLE = /exceeds|Invalid file name|Invalid path|Expected multipart|No volumes|413/i;
 
 type DroppedFile = { file: File; relativePath: string };
 
