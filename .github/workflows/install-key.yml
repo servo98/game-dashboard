@@ -1,0 +1,27 @@
+name: Install SSH Key (one-off)
+
+# Workflow temporal para autorizar una clave SSH de administracion en prod.
+# Se dispara manualmente y usa el mismo canal SSH que el deploy. Se borra tras usarlo.
+on:
+  workflow_dispatch:
+
+jobs:
+  install-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Append authorized key on prod
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            mkdir -p /root/.ssh
+            chmod 700 /root/.ssh
+            touch /root/.ssh/authorized_keys
+            KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHeanBTvkdGVIBwsw01TkwbOFiqHKnnIbi5ApLYgcilD dbg"
+            grep -qF "$KEY" /root/.ssh/authorized_keys || echo "$KEY" >> /root/.ssh/authorized_keys
+            chmod 600 /root/.ssh/authorized_keys
+            echo "OK. Claves ed25519 autorizadas:"
+            grep -c "ssh-ed25519" /root/.ssh/authorized_keys
