@@ -180,10 +180,10 @@ export async function startGameContainer(
     }
   }
 
-  // Pull image if not present locally. Registries privados (p. ej. GHCR) exigen
-  // auth explícita: el daemon NO usa las credenciales de `docker login` del host,
-  // así que pasamos authconfig cuando la imagen es de ghcr.io y hay token (GHCR_TOKEN
-  // en .env, un PAT de GitHub con scope read:packages).
+  // Auth para el pull. Registries privados (p. ej. GHCR) exigen auth explícita:
+  // el daemon NO usa las credenciales de `docker login` del host, así que pasamos
+  // authconfig cuando la imagen es de ghcr.io y hay token (GHCR_TOKEN en .env, un
+  // PAT de GitHub con scope read:packages).
   const pullOpts: {
     authconfig?: { username: string; password: string; serveraddress: string };
   } = {};
@@ -194,15 +194,39 @@ export async function startGameContainer(
       serveraddress: "ghcr.io",
     };
   }
-  await new Promise<void>((resolve, reject) => {
-    docker.pull(image, pullOpts, (err: Error | null, stream?: NodeJS.ReadableStream) => {
-      if (err) return reject(err);
-      docker.modem.followProgress(stream as NodeJS.ReadableStream, (err: Error | null) => {
+  // Intentamos traer la última imagen, pero un fallo de registry/auth (p. ej.
+  // GHCR_TOKEN caducado) NO debe tumbar un server cuya imagen ya está cacheada
+  // en local: en ese caso seguimos con la cacheada y solo avisamos. Solo
+  // abortamos si además no hay imagen local con la que arrancar.
+  const imageExistsLocally = async () => {
+    try {
+      await docker.getImage(image).inspect();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      docker.pull(image, pullOpts, (err: Error | null, stream?: NodeJS.ReadableStream) => {
         if (err) return reject(err);
-        resolve();
+        docker.modem.followProgress(stream as NodeJS.ReadableStream, (err: Error | null) => {
+          if (err) return reject(err);
+          resolve();
+        });
       });
     });
-  });
+  } catch (pullErr) {
+    if (await imageExistsLocally()) {
+      console.warn(
+        `[docker] pull de ${image} falló (${(pullErr as Error).message}); ` +
+          `arranco con la imagen cacheada en local.`,
+      );
+    } else {
+      throw pullErr;
+    }
+  }
 
   const container = await docker.createContainer({
     name: containerName,
