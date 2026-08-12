@@ -1,0 +1,13 @@
+{
+  "id": "mapache",
+  "name": "Mapache",
+  "game_type": "other",
+  "docker_image": "ghcr.io/servo98/mapache-server:latest",
+  "port": 7777,
+  "env_vars": {
+    "MAPACHE_PORT": "7777",
+    "MAPACHE_EXPECT": "2",
+    "MAPACHE_LEVEL": ""
+  },
+  "volumes": {}
+}
