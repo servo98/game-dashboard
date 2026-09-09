@@ -34,6 +34,14 @@ describe("joinable-status", () => {
     expect(isJoinableLine("[api] escuchando en http://localhost:3001 (IA: heurístico)")).toBe(true);
   });
 
+  it("isJoinableLine matches valheim ready line", () => {
+    expect(isJoinableLine("09/09/2026 16:53:55: Game server connected")).toBe(true);
+  });
+
+  it("isJoinableLine rejects valheim steam-init line", () => {
+    expect(isJoinableLine("09/09/2026 16:52:02: Steam game server initialized")).toBe(false);
+  });
+
   it("setStarting → status is 'starting'", () => {
     setStarting("test-server");
     expect(getJoinableStatus("test-server")).toBe("starting");

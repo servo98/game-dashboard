@@ -11,8 +11,14 @@ const watcherAborts = new Map<string, AbortController>();
  * - Minecraft: la línea "Done (..s)!".
  * - Desglosador 3000 (web app): el api imprime "[api] escuchando en http..." al
  *   bindear; en ese momento la web ya queda servible por el nginx interno.
+ * - Valheim: "Game server connected", que sale tras cargar el mundo y conectar
+ *   con Steam; hasta esa línea el server no acepta jugadores.
  */
-const READY_REGEXES = [/Done \(\d+[.,]\d+s\)! For help, type "help"/, /\[api\] escuchando en http/];
+const READY_REGEXES = [
+  /Done \(\d+[.,]\d+s\)! For help, type "help"/,
+  /\[api\] escuchando en http/,
+  /Game server connected/,
+];
 
 export function isJoinableLine(line: string): boolean {
   return READY_REGEXES.some((re) => re.test(line));
