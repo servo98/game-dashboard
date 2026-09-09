@@ -23,6 +23,11 @@ services:
     env_file: .env
     environment:
       - DB_PATH=/data/game-panel.db
+    # El contenedor de Valheim corre en red host; el backend vive en la red del
+    # compose, así que para consultarle el puerto A2S tiene que salir por la
+    # gateway. host-gateway la resuelve sin hardcodear la IP del bridge.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:3000:3000"  # exposed to host for nginx (host network)
     volumes:

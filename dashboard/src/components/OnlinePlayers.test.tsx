@@ -17,11 +17,11 @@ describe("OnlinePlayers", () => {
     vi.useFakeTimers();
   });
 
-  it("returns null for non-Minecraft servers", () => {
+  it("returns null for games without a player list", () => {
     const { container } = render(
       <OnlinePlayers
-        serverId="valheim"
-        dockerImage="lloesche/valheim-server"
+        serverId="foundryvtt"
+        dockerImage="felddy/foundryvtt:release"
         joinable="joinable"
       />,
     );
@@ -55,6 +55,18 @@ describe("OnlinePlayers", () => {
 
   it("does not poll when joinable is undefined", () => {
     render(<OnlinePlayers serverId="minecraft" dockerImage="itzg/minecraft-server:java21" />);
+    vi.advanceTimersByTime(20_000);
+    expect(mockGetPlayers).not.toHaveBeenCalled();
+  });
+
+  it("does not poll a Valheim server that is still starting", () => {
+    render(
+      <OnlinePlayers
+        serverId="valheim"
+        dockerImage="lloesche/valheim-server:latest"
+        joinable="starting"
+      />,
+    );
     vi.advanceTimersByTime(20_000);
     expect(mockGetPlayers).not.toHaveBeenCalled();
   });
@@ -100,5 +112,48 @@ describe("OnlinePlayers", () => {
     expect(avatars).toHaveLength(2);
     expect(avatars[0]).toHaveAttribute("alt", "Steve");
     expect(avatars[1]).toHaveAttribute("alt", "Alex");
+  });
+
+  it("renders Valheim players as names, not avatars", async () => {
+    mockGetPlayers.mockResolvedValue({
+      online: ["Jevus", "Chuchin"],
+      count: 2,
+      max: 10,
+    });
+    vi.useRealTimers();
+
+    render(
+      <OnlinePlayers
+        serverId="valheim"
+        dockerImage="lloesche/valheim-server:latest"
+        joinable="joinable"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("2/10 Players")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Jevus")).toBeInTheDocument();
+    expect(screen.getByText("Chuchin")).toBeInTheDocument();
+    // mc-heads no sirve caras de Valheim, así que no debe pintar imágenes
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+  });
+
+  it("omits the max when A2S did not report it", async () => {
+    mockGetPlayers.mockResolvedValue({ online: ["Jevus"], count: 1, max: 0 });
+    vi.useRealTimers();
+
+    render(
+      <OnlinePlayers
+        serverId="valheim"
+        dockerImage="lloesche/valheim-server:latest"
+        joinable="joinable"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("1 Players")).toBeInTheDocument();
+    });
   });
 });

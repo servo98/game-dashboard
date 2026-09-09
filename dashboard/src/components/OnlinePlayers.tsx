@@ -10,11 +10,15 @@ type Props = {
 export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props) {
   const [data, setData] = useState<PlayersResponse | null>(null);
 
+  // Minecraft pinta avatares (mc-heads los sirve por nombre); Valheim no tiene
+  // equivalente, así que los nombres van como etiquetas de texto.
   const isMinecraft = dockerImage?.includes("itzg/minecraft-server") ?? false;
+  const isValheim = dockerImage?.includes("valheim-server") ?? false;
+  const isSupported = isMinecraft || isValheim;
   const isReady = joinable === "joinable";
 
   useEffect(() => {
-    if (!isMinecraft || !isReady) return;
+    if (!isSupported || !isReady) return;
 
     let mounted = true;
 
@@ -33,28 +37,42 @@ export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props
       mounted = false;
       clearInterval(interval);
     };
-  }, [serverId, isMinecraft, isReady]);
+  }, [serverId, isSupported, isReady]);
 
-  if (!isMinecraft || !isReady || !data) return null;
+  if (!isSupported || !isReady || !data) return null;
 
   return (
     <div className="flex items-center gap-2 text-xs text-gray-400">
       <span className="font-medium text-gray-300">
-        {data.count}/{data.max} Players
+        {/* max 0 = no pudimos leer el máximo (A2S mudo): mejor "3 Players" que "3/0" */}
+        {data.max > 0 ? `${data.count}/${data.max}` : data.count} Players
       </span>
-      {data.online.length > 0 && (
-        <div className="flex -space-x-1">
-          {data.online.map((name) => (
-            <img
-              key={name}
-              src={`https://mc-heads.net/avatar/${name}/20`}
-              alt={name}
-              title={name}
-              className="w-5 h-5 rounded-sm border border-gray-700"
-            />
-          ))}
-        </div>
-      )}
+      {data.online.length > 0 &&
+        (isMinecraft ? (
+          <div className="flex -space-x-1">
+            {data.online.map((name) => (
+              <img
+                key={name}
+                src={`https://mc-heads.net/avatar/${name}/20`}
+                alt={name}
+                title={name}
+                className="w-5 h-5 rounded-sm border border-gray-700"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {data.online.map((name) => (
+              <span
+                key={name}
+                title={name}
+                className="px-1.5 py-0.5 rounded-sm bg-gray-800 border border-gray-700 text-gray-300"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        ))}
     </div>
   );
 }
