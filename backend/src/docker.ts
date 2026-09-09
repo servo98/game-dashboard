@@ -504,6 +504,43 @@ async function* _streamStats(
 
 // --- Public stream functions ---
 
+/**
+ * Los logs de un contenedor sin TTY vienen multiplexados: cada frame lleva 8
+ * bytes de cabecera (1 de stream, 3 reservados, 4 de tamaño int32 BE) delante
+ * del texto. Sin quitarlos el contenido sale con basura binaria intercalada.
+ */
+function demuxDockerStream(buf: Buffer): string {
+  const parts: string[] = [];
+  let i = 0;
+  while (i + 8 <= buf.length) {
+    const len = buf.readUInt32BE(i + 4);
+    parts.push(buf.toString("utf8", i + 8, i + 8 + len));
+    i += 8 + len;
+  }
+  return parts.join("");
+}
+
+/**
+ * Lee las últimas `tail` líneas del log de un contenedor de juego, de una vez y
+ * sin seguir el stream. Para inspección puntual (p. ej. reconstruir quién está
+ * conectado); si necesitas seguimiento continuo usa streamContainerLogs.
+ */
+export async function getContainerLogTail(serverId: string, tail: number): Promise<string[]> {
+  const container = docker.getContainer(gameContainerName(serverId));
+  const info = await container.inspect();
+  const buf = (await container.logs({
+    stdout: true,
+    stderr: true,
+    tail,
+    follow: false,
+  })) as unknown as Buffer;
+  const text = info.Config.Tty ? buf.toString("utf8") : demuxDockerStream(buf);
+  return text
+    .split("\n")
+    .map((line) => stripAnsi(line).trim())
+    .filter(Boolean);
+}
+
 /** Stream logs from a game container */
 export async function* streamContainerLogs(
   serverId: string,

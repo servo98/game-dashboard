@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from "fs";
 import { Hono } from "hono";
 import { execRconCommand } from "../adapters/minecraft/rcon";
+import { getValheimPlayers } from "../adapters/valheim";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
@@ -537,19 +538,30 @@ servers.get("/:id/history", requireAuth, requireApproved, requireServerAccess(),
   return c.json(formatted);
 });
 
-// Online players (Minecraft only, via RCON "list")
+// Online players — Minecraft via RCON "list", Valheim via A2S + logs
 servers.get("/:id/players", requireAuth, requireApproved, requireServerAccess(), async (c) => {
   const { id } = c.req.param();
   const server = serverQueries.getById.get(id);
   if (!server) return c.json({ error: "Server not found" }, 404);
 
-  if (!server.docker_image.includes("itzg/minecraft-server")) {
-    return c.json({ error: "Player list is only available for Minecraft servers" }, 400);
+  const isMinecraft = server.docker_image.includes("itzg/minecraft-server");
+  const isValheim = server.docker_image.includes("valheim-server");
+  if (!isMinecraft && !isValheim) {
+    return c.json({ error: "Player list is not available for this game" }, 400);
   }
 
   const status = await getContainerStatus(id);
   if (status !== "running") {
     return c.json({ error: "Server is not running" }, 400);
+  }
+
+  if (isValheim) {
+    try {
+      return c.json(await getValheimPlayers(id, server.port));
+    } catch (err) {
+      console.error("Players error (valheim):", err);
+      return c.json({ error: "Failed to get player list" }, 500);
+    }
   }
 
   try {
