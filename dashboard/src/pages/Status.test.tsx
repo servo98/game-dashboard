@@ -65,6 +65,21 @@ describe("Status page", () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * REGRESIÓN: la página es pública y durante la primera carga anunciaba
+   * "Degradado", porque no distinguía "no operativo" de "todavía no lo sé".
+   */
+  it("no anuncia avería mientras espera la primera respuesta", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    render(<Status />);
+
+    expect(screen.getByText("Comprobando")).toBeInTheDocument();
+    expect(screen.queryByText("Degradado")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Algún servicio no está respondiendo como debería."),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders All Systems Operational when all services healthy", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

@@ -103,23 +103,34 @@ export default function Status() {
   const allHealthy = data?.status === "operational";
   // La marca da el estado en una palabra; la frase explica. Decir lo mismo dos
   // veces seguidas es lo que hacía la versión anterior con el titular.
+  //
+  // Mientras no ha llegado la primera respuesta no hay veredicto que dar:
+  // "no operativo" y "todavía no lo sé" no son lo mismo, y esta página es
+  // pública, así que anunciar una avería inexistente durante la carga cuesta
+  // caro.
   const overall = error
     ? {
         tone: "danger" as const,
         mark: "Sin respuesta",
         line: "No se puede contactar con la API del panel.",
       }
-    : allHealthy
+    : !data
       ? {
-          tone: "ok" as const,
-          mark: "Operativo",
-          line: "Todos los servicios responden con normalidad.",
+          tone: "idle" as const,
+          mark: "Comprobando",
+          line: "Consultando el estado de los servicios.",
         }
-      : {
-          tone: "warn" as const,
-          mark: "Degradado",
-          line: "Algún servicio no está respondiendo como debería.",
-        };
+      : allHealthy
+        ? {
+            tone: "ok" as const,
+            mark: "Operativo",
+            line: "Todos los servicios responden con normalidad.",
+          }
+        : {
+            tone: "warn" as const,
+            mark: "Degradado",
+            line: "Algún servicio no está respondiendo como debería.",
+          };
 
   return (
     <div className="min-h-screen">
