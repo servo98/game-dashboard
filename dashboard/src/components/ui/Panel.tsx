@@ -23,10 +23,13 @@ export function Panel({
         rail ? "border-line-strong" : "border-line"
       } ${className}`}
     >
+      {/* El carril va por encima de los hijos posicionados: si la banda de arte
+          de un servidor lo tapa a medias, deja de leerse como "esto está vivo"
+          y parece un adorno suelto. */}
       {rail && (
         <span
           aria-hidden
-          className="absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-accent"
+          className="absolute left-0 top-3 bottom-3 z-10 w-[2px] rounded-full bg-accent"
         />
       )}
       {children}

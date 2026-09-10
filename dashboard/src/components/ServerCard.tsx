@@ -179,44 +179,51 @@ export default memo(function ServerCard({
 
   return (
     <Panel rail={isActive} className="flex flex-col" as="article">
-      {/* Identidad y estado. El arte del juego vive aquí, recortado y al fondo:
-          da carácter a la tarjeta sin robarle sitio a los datos. */}
-      <div className="relative overflow-hidden rounded-t-lg">
-        {banner && (
-          <>
-            <img
-              src={banner}
-              alt=""
-              aria-hidden
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.14]"
-            />
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-surface/40 via-surface/70 to-surface"
-            />
-          </>
-        )}
-        <div className="relative flex items-start gap-3 px-4 py-3">
-          {iconUrl ? (
-            <img src={iconUrl} alt="" className="h-8 w-8 shrink-0 rounded-sm object-cover" />
-          ) : (
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-line bg-raised text-faint">
-              <GamepadIcon className="h-4 w-4" />
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-title font-semibold text-ink">{server.name}</h3>
-            <p className="num mt-0.5 truncate text-micro uppercase text-faint">
-              {server.game_type} · puerto {server.port}
-            </p>
-          </div>
-          <StatusMark
-            tone={status.tone}
-            label={status.label}
-            live={status.live}
-            className="mt-0.5"
+      {/* El arte del juego tiene banda propia. Como textura de fondo al 14% no
+          se veía, y una opción que se configura pero no se nota no vale nada.
+          El icono monta sobre el borde inferior para coser arte e identidad. */}
+      {banner && (
+        <div className="relative h-14 overflow-hidden rounded-t-lg">
+          <img
+            src={banner}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* Velo hacia abajo: el nombre y el estado caen sobre superficie
+              opaca, así que nunca hay texto peleándose con la imagen. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-surface via-surface/45 to-transparent"
           />
         </div>
+      )}
+
+      {/* Identidad y estado */}
+      <div className={`flex items-start gap-3 px-4 pb-3 ${banner ? "-mt-4" : "pt-3"}`}>
+        {iconUrl ? (
+          <img
+            src={iconUrl}
+            alt=""
+            className="relative z-10 h-9 w-9 shrink-0 rounded-sm border border-line object-cover"
+          />
+        ) : (
+          <span className="relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-sm border border-line bg-raised text-faint">
+            <GamepadIcon className="h-4 w-4" />
+          </span>
+        )}
+        <div className={`min-w-0 flex-1 ${banner ? "pt-4" : ""}`}>
+          <h3 className="truncate text-title font-semibold text-ink">{server.name}</h3>
+          <p className="num mt-0.5 truncate text-micro uppercase text-faint">
+            {server.game_type} · puerto {server.port}
+          </p>
+        </div>
+        <StatusMark
+          tone={status.tone}
+          label={status.label}
+          live={status.live}
+          className={banner ? "pt-4" : "mt-0.5"}
+        />
       </div>
 
       {/* Dirección de conexión: lo primero que alguien viene a buscar */}
