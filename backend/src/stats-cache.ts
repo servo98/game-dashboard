@@ -1,4 +1,4 @@
-import { docker } from "./docker";
+import { containerMemUsageBytes, docker } from "./docker";
 
 const COMPOSE_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 
@@ -27,9 +27,7 @@ async function refreshStats(): Promise<void> {
         const container = docker.getContainer(containerName);
         const stats = await container.stats({ stream: false });
 
-        const memUsage = stats.memory_stats?.usage ?? 0;
-        const memCache = stats.memory_stats?.stats?.cache ?? 0;
-        const memUsageMB = Math.round((memUsage - memCache) / 1024 / 1024);
+        const memUsageMB = Math.round(containerMemUsageBytes(stats.memory_stats) / 1024 / 1024);
         const memLimitMB = Math.round((stats.memory_stats?.limit ?? 0) / 1024 / 1024);
 
         const cpuDelta =

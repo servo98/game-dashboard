@@ -31,6 +31,28 @@ export async function getActiveContainer(): Promise<{ id: string; name: string }
   return { id: game[0].Id, name: serverId };
 }
 
+/**
+ * Memoria de trabajo de un contenedor: lo que ocupa de verdad, sin page cache.
+ *
+ * Docker nombra el caché distinto según la versión de cgroup del host: en v1 es
+ * `stats.cache`, y en v2 ese campo no viene y el equivalente reclamable es
+ * `stats.inactive_file`. Mirar solo `cache` hace que en un host cgroup v2 no se
+ * reste nada y se pinte `usage` crudo. Se nota en cuanto algo lee mucho disco:
+ * tras un backup con tar la tarjeta del backend marcaba 1490 MB de 1536 MB
+ * (97%, en rojo) mientras `docker stats` decía 279 MB para el mismo contenedor.
+ * No había riesgo de OOM en ningún momento: el kernel reclama inactive_file
+ * antes de matar nada.
+ */
+export function containerMemUsageBytes(memoryStats?: {
+  usage?: number;
+  stats?: Record<string, number | undefined>;
+}): number {
+  const usage = memoryStats?.usage ?? 0;
+  const s = memoryStats?.stats ?? {};
+  const cache = s.cache ?? s.inactive_file ?? 0;
+  return Math.max(0, usage - cache);
+}
+
 /** Return ALL currently running game servers, with each container's reserved
  * memory (HostConfig.Memory in bytes) — used to enforce the global RAM guard. */
 export async function getRunningGameServers(): Promise<
@@ -484,7 +506,7 @@ async function* _streamStats(
           const numCpus =
             s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
           const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
-          const memUsageMB = (s.memory_stats.usage ?? 0) / 1024 / 1024;
+          const memUsageMB = containerMemUsageBytes(s.memory_stats) / 1024 / 1024;
           const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
 
           yield {
