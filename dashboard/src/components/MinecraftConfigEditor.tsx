@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CurseForgeModpack } from "../api";
 import { SliderField } from "./game-config/Fields";
+import { PlusIcon } from "./Icons";
 import {
   getAllKnownKeys,
   getModpackEnvKeys,
@@ -12,16 +13,22 @@ import {
   type ModpackPlatform,
   SECTIONS,
 } from "./minecraft-config";
-import { Loading } from "./ui";
+import { Button, Loading } from "./ui";
 
 type Props = {
   envVars: Record<string, string>;
   onChange: (vars: Record<string, string>) => void;
+  /** A false cuando la pantalla ya tiene su propio panel de variables. */
+  allowCustomVars?: boolean;
 };
 
 type Mode = "vanilla" | "modpack";
 
-export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
+export default function MinecraftConfigEditor({
+  envVars,
+  onChange,
+  allowCustomVars = true,
+}: Props) {
   const initialMode: Mode = isModpackType(envVars.TYPE ?? "") ? "modpack" : "vanilla";
   const [mode, setMode] = useState<Mode>(initialMode);
   const [selectedPlatform, setSelectedPlatform] = useState<string>(() => {
@@ -428,7 +435,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="label">Other Variables</h3>
+          <h3 className="label">Otras variables</h3>
         </div>
         <div className="flex flex-col gap-2">
           {unknownPairs.map((pair) => (
@@ -489,14 +496,15 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       {/* Unknown/custom env vars */}
       {renderOtherVars()}
 
-      {/* Add custom variable */}
-      <button
-        type="button"
-        onClick={addCustomPair}
-        className="text-meta text-accent hover:text-accent transition-colors self-start"
-      >
-        + Add Custom Variable
-      </button>
+      {/* Añadir variable suelta. Solo donde no hay un panel dedicado a las
+          variables de entorno: en el editor de configuración sí lo hay, y dos
+          puertas a lo mismo es peor que una bien puesta. */}
+      {allowCustomVars && (
+        <Button size="sm" onClick={addCustomPair} className="self-start">
+          <PlusIcon className="h-3.5 w-3.5" />
+          Añadir variable
+        </Button>
+      )}
     </div>
   );
 }

@@ -155,6 +155,55 @@
   }
 }
 
+@layer base {
+  /*
+    Los deslizadores eran el único control que seguía con el aspecto del
+    sistema: en oscuro la parte no rellenada salía blanca y cantaba muchísimo.
+    `accent-color` colorea el relleno pero no la pista, así que se toma el
+    control entero y el relleno lo pinta un degradado que calcula el
+    componente, que es lo único que funciona igual en todos los navegadores.
+  */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* El componente pasa el degradado del relleno en --track. */
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track, rgb(var(--line)));
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track, rgb(var(--line)));
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 999px;
+    background: rgb(var(--accent));
+    border: 2px solid rgb(var(--surface));
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: rgb(var(--accent));
+    border: 2px solid rgb(var(--surface));
+  }
+}
+
 @layer components {
   /*
     Un solo gesto táctil para todo lo pulsable: sube 1px al pasar por encima,

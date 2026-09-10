@@ -649,7 +649,13 @@ export default function ConfigEditor({
     if (panelId === "theme") return renderTheme();
     if (panelId === "env") return renderEnvPairs();
     if (panelId === "game:minecraft") {
-      return <MinecraftConfigEditor envVars={envRecord} onChange={setEnvRecord} />;
+      return (
+        <MinecraftConfigEditor
+          envVars={envRecord}
+          onChange={setEnvRecord}
+          allowCustomVars={false}
+        />
+      );
     }
     if (panelId === "game:world") {
       return <ValheimWorldSection envVars={envRecord} onChange={setEnvRecord} />;

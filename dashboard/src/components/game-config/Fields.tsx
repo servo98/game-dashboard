@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { EyeIcon, EyeOffIcon } from "../Icons";
 
 /** Controles compartidos por el editor guiado y por el de ficheros .cfg. */
@@ -121,6 +121,10 @@ export function SliderField({
 }) {
   const numeric = Number(value);
   const safe = Number.isFinite(numeric) ? Math.min(Math.max(numeric, min), max) : min;
+  // El relleno va como degradado porque es la única forma de pintarlo igual en
+  // todos los navegadores una vez se le quita el aspecto nativo al control.
+  const filled = max > min ? ((safe - min) / (max - min)) * 100 : 0;
+  const track = `linear-gradient(to right, rgb(var(--accent)) 0 ${filled}%, rgb(var(--line)) ${filled}% 100%)`;
 
   return (
     <div className="flex items-center gap-3">
@@ -131,7 +135,8 @@ export function SliderField({
         step={step}
         value={safe}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 min-w-0 accent-accent cursor-pointer"
+        style={{ "--track": track } as CSSProperties}
+        className="min-w-0 flex-1 cursor-pointer"
       />
       <div className="flex items-center gap-1 shrink-0">
         <input

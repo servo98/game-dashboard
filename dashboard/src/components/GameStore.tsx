@@ -330,7 +330,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                   onClick={() => setFormVolumes([...formVolumes, { host: "", container: "" }])}
                   className="text-meta text-accent hover:text-accent"
                 >
-                  + Add
+                  Añadir
                 </button>
               </div>
               {formVolumes.map((vol, i) => (
@@ -387,7 +387,7 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                   onClick={() => setFormEnv([...formEnv, { key: "", value: "" }])}
                   className="text-meta text-accent hover:text-accent"
                 >
-                  + Add
+                  Añadir
                 </button>
               </div>
               {formEnv.map((env, i) => (
