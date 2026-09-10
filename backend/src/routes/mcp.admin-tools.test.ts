@@ -6,12 +6,20 @@ const mockStartServer = vi.fn();
 const mockStopServer = vi.fn();
 const mockRestartServer = vi.fn();
 const mockUpdateServerConfig = vi.fn();
+const mockCreateServer = vi.fn();
+const mockRunningOnPort = vi.fn().mockResolvedValue([]);
 
 vi.mock("../server-actions", () => ({
   startServer: (...a: unknown[]) => mockStartServer(...a),
   stopServer: (...a: unknown[]) => mockStopServer(...a),
   restartServer: (...a: unknown[]) => mockRestartServer(...a),
   updateServerConfig: (...a: unknown[]) => mockUpdateServerConfig(...a),
+  createServer: (...a: unknown[]) => mockCreateServer(...a),
+  runningOnPort: (...a: unknown[]) => mockRunningOnPort(...a),
+  // La ruta valida referencias de imagen con esta constante. Si el mock la
+  // omite llega undefined y el `.test()` revienta en vez de rechazar el valor.
+  IMAGE_REF_RE:
+    /^([a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?\/)?[a-z0-9]+([._-][a-z0-9]+)*(\/[a-z0-9]+([._-][a-z0-9]+)*)*(:[a-zA-Z0-9._-]+)?(@sha256:[a-f0-9]{64})?$/,
 }));
 
 // ─── Mock db ────────────────────────────────────────────────────────────────
@@ -85,15 +93,17 @@ const ADMIN_TOOLS = [
   "restart_server",
   "update_server_env",
   "update_server_image",
+  "create_server",
 ];
 
 describe("MCP admin tools — gating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetContainerStatus.mockResolvedValue("running");
+    mockRunningOnPort.mockResolvedValue([]);
   });
 
-  it("lists the five admin tools with a valid ADMIN session bearer token", async () => {
+  it("lista las tools de admin con una sesión de administrador", async () => {
     mockSessionGet.mockReturnValue(session);
     mockTokenGetByToken.mockReturnValue(undefined);
     mockPanelUserGet.mockReturnValue(ADMIN_USER);
@@ -193,6 +203,9 @@ describe("MCP admin tools — behavior (admin session)", () => {
     mockPanelUserGet.mockReturnValue(ADMIN_USER);
     mockServerGetById.mockReturnValue(makeServer());
     mockGetContainerStatus.mockResolvedValue("running");
+    // clearAllMocks borra llamadas, no implementaciones: sin esto el
+    // ["minecraft"] de la prueba de puerto ocupado se cuela en las siguientes.
+    mockRunningOnPort.mockResolvedValue([]);
   });
 
   async function callTool(name: string, args: Record<string, unknown>) {
@@ -205,6 +218,108 @@ describe("MCP admin tools — behavior (admin session)", () => {
     const text = json.result.content[0].text as string;
     return JSON.parse(text);
   }
+
+  // ─── create_server ────────────────────────────────────────────────────────
+
+  const CREATED = {
+    id: "mi-app",
+    name: "Mi App",
+    game_type: "other",
+    docker_image: "ghcr.io/servo98/mi-app:latest",
+    port: 8095,
+    volumes: { "/data/mi-app": "/data" },
+    port_shared_with: [] as string[],
+  };
+
+  const NEW_ARGS = {
+    id: "mi-app",
+    name: "Mi App",
+    image: "ghcr.io/servo98/mi-app:latest",
+    port: 8095,
+  };
+
+  it("create_server da de alta el servidor sin arrancarlo por defecto", async () => {
+    mockCreateServer.mockReturnValue({ ok: true, data: CREATED });
+
+    const payload = await callTool("create_server", NEW_ARGS);
+
+    expect(mockCreateServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "mi-app",
+        docker_image: "ghcr.io/servo98/mi-app:latest",
+        port: 8095,
+      }),
+    );
+    expect(mockStartServer).not.toHaveBeenCalled();
+    expect(payload.success).toBe(true);
+    expect(payload.data.started).toBe(false);
+  });
+
+  it("create_server arranca el servidor con start=true", async () => {
+    mockCreateServer.mockReturnValue({ ok: true, data: CREATED });
+    mockStartServer.mockResolvedValue({
+      ok: true,
+      data: { serverId: "mi-app", image: "ghcr.io/servo98/mi-app:latest" },
+    });
+
+    const payload = await callTool("create_server", { ...NEW_ARGS, start: true });
+
+    expect(mockStartServer).toHaveBeenCalledWith("mi-app");
+    expect(payload.success).toBe(true);
+    expect(payload.data.started).toBe(true);
+  });
+
+  it("create_server no da de alta nada si el puerto lo ocupa un server en marcha", async () => {
+    mockRunningOnPort.mockResolvedValue(["minecraft"]);
+
+    const payload = await callTool("create_server", { ...NEW_ARGS, start: true });
+
+    expect(mockCreateServer).not.toHaveBeenCalled();
+    expect(mockStartServer).not.toHaveBeenCalled();
+    expect(payload.success).toBe(false);
+    expect(payload.error).toMatch(/minecraft/);
+  });
+
+  /**
+   * Compartir puerto es legítimo mientras no coincidan en marcha: el panel
+   * tiene dos Minecraft en el 25565. Sin start solo se avisa.
+   */
+  it("create_server avisa del puerto compartido pero da de alta igual", async () => {
+    mockCreateServer.mockReturnValue({
+      ok: true,
+      data: { ...CREATED, port: 25565, port_shared_with: ["minecraft"] },
+    });
+
+    const payload = await callTool("create_server", { ...NEW_ARGS, port: 25565 });
+
+    expect(payload.success).toBe(true);
+    expect(payload.data.warnings[0]).toMatch(/minecraft/);
+  });
+
+  it("create_server propaga el error de validación sin arrancar nada", async () => {
+    mockCreateServer.mockReturnValue({
+      ok: false,
+      code: "invalid",
+      error: 'Ya existe un servidor con el id "mi-app".',
+    });
+
+    const payload = await callTool("create_server", NEW_ARGS);
+
+    expect(mockStartServer).not.toHaveBeenCalled();
+    expect(payload.success).toBe(false);
+    expect(payload.error).toMatch(/Ya existe/);
+  });
+
+  it("create_server informa si el alta fue bien pero el arranque falló", async () => {
+    mockCreateServer.mockReturnValue({ ok: true, data: CREATED });
+    mockStartServer.mockResolvedValue({ ok: false, code: "docker", error: "no such image" });
+
+    const payload = await callTool("create_server", { ...NEW_ARGS, start: true });
+
+    expect(payload.success).toBe(true);
+    expect(payload.data.started).toBe(false);
+    expect(payload.data.warnings.join(" ")).toMatch(/no such image/);
+  });
 
   it("start_server forwards to startServer and returns success", async () => {
     mockStartServer.mockResolvedValue({

@@ -8,7 +8,15 @@ import { sanitize } from "../adapters/minecraft/sanitize";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
 import { getContainerStatus, getRunningGameServers } from "../docker";
 import { isAdminDiscordId } from "../middleware/auth";
-import { restartServer, startServer, stopServer, updateServerConfig } from "../server-actions";
+import {
+  createServer as createServerRow,
+  IMAGE_REF_RE,
+  restartServer,
+  runningOnPort,
+  startServer,
+  stopServer,
+  updateServerConfig,
+} from "../server-actions";
 
 const mcpRoute = new Hono();
 
@@ -687,13 +695,10 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
           ),
       },
       async ({ server_id, image, restart }) => {
-        // Valida la referencia de imagen antes de tocar la DB o hacer backup.
-        // Admite un prefijo de registry opcional con puerto (p. ej. localhost:5000/img:tag,
-        // registry.example.com:5000/owner/img), repo multi-segmento, tag y digest opcionales.
-        const IMAGE_RE =
-          /^([a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?\/)?[a-z0-9]+([._-][a-z0-9]+)*(\/[a-z0-9]+([._-][a-z0-9]+)*)*(:[a-zA-Z0-9._-]+)?(@sha256:[a-f0-9]{64})?$/;
+        // Valida la referencia antes de tocar la DB o hacer backup. La expresión
+        // es la misma que usa el alta de servidores, importada de server-actions.
         const trimmed = image.trim();
-        if (!trimmed || !IMAGE_RE.test(trimmed)) {
+        if (!trimmed || !IMAGE_REF_RE.test(trimmed)) {
           return errorResult(`Invalid image reference: ${image}`);
         }
 
@@ -718,6 +723,105 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
           docker_image: r.data.docker_image,
           restarted: false,
           message: "Image updated. Takes effect on next start.",
+        });
+      },
+    );
+
+    // Admin-only: provision a brand new server from any Docker image
+    server.tool(
+      "create_server",
+      "Create a new server in the panel from a Docker image, e.g. one published to GHCR (admin only). Only registers it; pass start=true to bring it up right away.",
+      {
+        id: z
+          .string()
+          .describe(
+            "Short identifier: lowercase letters, numbers, hyphens and underscores. Becomes the container name and the /data directory, so it cannot be changed later.",
+          ),
+        name: z.string().describe("Display name shown on the panel card."),
+        image: z
+          .string()
+          .describe(
+            "Full image ref, e.g. 'ghcr.io/owner/app:latest' or 'itzg/minecraft-server:java21'.",
+          ),
+        port: z
+          .number()
+          .int()
+          .describe(
+            "Host port to publish. Ask the user if unknown: the panel cannot tell which host ports are already taken by things outside it.",
+          ),
+        game_type: z
+          .string()
+          .optional()
+          .describe("Category shown on the card, e.g. 'survival', 'tools'. Defaults to 'other'."),
+        env: z.record(z.string(), z.string()).optional().describe("Environment variables."),
+        volumes: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe(
+            "Host path → container path. Defaults to the catalog volumes when the image is known, else /data/<id> mounted at /data.",
+          ),
+        icon: z.string().optional().describe("URL of an icon for the card."),
+        start: z
+          .boolean()
+          .optional()
+          .describe("Start the server right after creating it. Default false."),
+      },
+      async ({ id, name, image, port, game_type, env, volumes, icon, start }) => {
+        // Con start=true el puerto sí es excluyente: dos contenedores no pueden
+        // publicar el mismo. Sin start solo se avisa, porque el panel tiene a
+        // propósito servidores que comparten puerto y nunca coinciden.
+        if (start) {
+          const busy = await runningOnPort(port);
+          if (busy.length > 0) {
+            return errorResult(
+              `El puerto ${port} lo está usando ahora mismo: ${busy.join(", ")}. Párralo antes o elige otro puerto.`,
+            );
+          }
+        }
+
+        const created = createServerRow({
+          id,
+          name,
+          docker_image: image,
+          port,
+          game_type,
+          env_vars: env,
+          volumes,
+          icon: icon ?? null,
+        });
+        if (!created.ok) return errorResult(created.error);
+
+        const warnings =
+          created.data.port_shared_with.length > 0
+            ? [
+                `Otros servidores usan el puerto ${port}: ${created.data.port_shared_with.join(", ")}. No podrán estar en marcha a la vez.`,
+              ]
+            : [];
+
+        if (!start) {
+          return successResult({
+            ...created.data,
+            started: false,
+            warnings,
+            message: `Servidor "${id}" creado. Arráncalo cuando quieras.`,
+          });
+        }
+
+        const started = await startServer(id);
+        if (!started.ok) {
+          return successResult({
+            ...created.data,
+            started: false,
+            warnings: [...warnings, `Creado, pero no arrancó: ${started.error}`],
+            message: `Servidor "${id}" creado, pero el arranque falló.`,
+          });
+        }
+
+        return successResult({
+          ...created.data,
+          started: true,
+          warnings,
+          message: `Servidor "${id}" creado y en marcha como "${started.data.image}".`,
         });
       },
     );

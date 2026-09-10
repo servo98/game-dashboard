@@ -156,7 +156,7 @@ export async function startServer(
     serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));
 
     // Observa los logs buscando la línea "Done" para detectar cuándo el servidor es joinable
-    beginLogWatching(server.id);
+    beginLogWatching(server.id, image);
 
     // Observa paradas inesperadas (caídas)
     const serverName = server.name;
@@ -336,4 +336,136 @@ export async function restartServer(
 
   // Arranca (= start si estaba parado)
   return startServer(id);
+}
+
+// ─── Alta de servidores ─────────────────────────────────────────────────────
+
+/**
+ * Referencia de imagen Docker. Admite registry opcional con puerto
+ * (localhost:5000/img, ghcr.io/owner/img), repo multi-segmento, y tag o digest.
+ */
+export const IMAGE_REF_RE =
+  /^([a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?\/)?[a-z0-9]+([._-][a-z0-9]+)*(\/[a-z0-9]+([._-][a-z0-9]+)*)*(:[a-zA-Z0-9._-]+)?(@sha256:[a-f0-9]{64})?$/;
+
+/** El ID acaba siendo nombre de contenedor y ruta en disco. */
+const SERVER_ID_RE = /^[a-z0-9_-]+$/;
+
+export type CreateServerInput = {
+  id: string;
+  name: string;
+  docker_image: string;
+  port: number;
+  game_type?: string;
+  env_vars?: Record<string, string>;
+  volumes?: Record<string, string>;
+  icon?: string | null;
+};
+
+export type CreatedServer = {
+  id: string;
+  name: string;
+  game_type: string;
+  docker_image: string;
+  port: number;
+  volumes: Record<string, string>;
+  /**
+   * Otros servidores configurados con el mismo puerto. No es un error: el panel
+   * tiene a propósito dos Minecraft en el 25565 que nunca corren a la vez. Se
+   * informa para que quien crea el servidor sepa que no podrán convivir.
+   */
+  port_shared_with: string[];
+};
+
+/**
+ * Da de alta un servidor en el panel. No toca Docker: deja la fila lista para
+ * que startServer haga el resto.
+ *
+ * Vive aquí y no en la ruta HTTP porque el MCP necesita exactamente las mismas
+ * validaciones; duplicarlas es la forma más rápida de que se separen.
+ */
+export function createServer(input: CreateServerInput): ActionResult<CreatedServer> {
+  const id = input.id.trim();
+  const name = input.name.trim();
+  const image = input.docker_image.trim();
+
+  if (!id || !SERVER_ID_RE.test(id)) {
+    return {
+      ok: false,
+      code: "invalid",
+      error: "El identificador solo admite minúsculas, números, guiones y guiones bajos.",
+    };
+  }
+  if (!name) {
+    return { ok: false, code: "invalid", error: "Falta el nombre del servidor." };
+  }
+  if (!image || !IMAGE_REF_RE.test(image)) {
+    return { ok: false, code: "invalid", error: `Referencia de imagen no válida: ${image}` };
+  }
+  if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
+    return { ok: false, code: "invalid", error: "El puerto debe ser un entero entre 1 y 65535." };
+  }
+
+  if (serverQueries.getById.get(id)) {
+    return { ok: false, code: "invalid", error: `Ya existe un servidor con el id "${id}".` };
+  }
+
+  const gameType = input.game_type?.trim() || "other";
+  const envVars = input.env_vars ?? {};
+
+  // Sin volúmenes explícitos: los del catálogo si la imagen es conocida,
+  // reapuntados al id nuevo; si no, un /data propio.
+  let volumes = input.volumes ?? {};
+  if (Object.keys(volumes).length === 0) {
+    const tpl = findTemplateByImage(image);
+    volumes = tpl
+      ? Object.fromEntries(
+          Object.entries(tpl.default_volumes).map(([host, container]) => [
+            host.replace(new RegExp(`/${tpl.id}(/|$)`), `/${id}$1`),
+            container,
+          ]),
+        )
+      : { [`/data/${id}`]: "/data" };
+  }
+
+  const portSharedWith = serverQueries.getAll
+    .all()
+    .filter((s) => s.port === input.port)
+    .map((s) => s.id);
+
+  try {
+    serverQueries.insert.run(
+      id,
+      name,
+      gameType,
+      image,
+      input.port,
+      JSON.stringify(envVars),
+      JSON.stringify(volumes),
+      input.icon ?? null,
+    );
+  } catch (_err) {
+    return { ok: false, code: "resource", error: "No se pudo dar de alta el servidor." };
+  }
+
+  return {
+    ok: true,
+    data: {
+      id,
+      name,
+      game_type: gameType,
+      docker_image: image,
+      port: input.port,
+      volumes,
+      port_shared_with: portSharedWith,
+    },
+  };
+}
+
+/** Servidores que ya están corriendo y ocupan un puerto dado. */
+export async function runningOnPort(port: number, exceptId?: string): Promise<string[]> {
+  const runningIds = new Set((await getRunningGameServers()).map((c) => c.id));
+  return serverQueries.getAll
+    .all()
+    .filter((s) => s.port === port && s.id !== exceptId && runningIds.has(s.id))
+    .map((s) => s.id);
 }

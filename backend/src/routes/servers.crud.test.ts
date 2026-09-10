@@ -180,7 +180,7 @@ describe("POST /", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/lowercase/i);
+    expect(body.error).toMatch(/minúsculas/i);
   });
 
   it("requires all fields for custom server (no template)", async () => {

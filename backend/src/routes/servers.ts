@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { execRconCommand } from "../adapters/minecraft/rcon";
 import { getValheimPlayers } from "../adapters/valheim";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
-import { findTemplate, findTemplateByImage, GAME_CATALOG } from "../catalog";
+import { findTemplate, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
 import { backupQueries, serverQueries, serverSessionQueries, userServerAccessQueries } from "../db";
 import {
@@ -20,7 +20,7 @@ import {
   requireAuthOrBotKey,
   requireServerAccess,
 } from "../middleware/auth";
-import { startServer, stopServer } from "../server-actions";
+import { createServer, startServer, stopServer } from "../server-actions";
 
 const servers = new Hono<{
   Variables: { session: Session; isBotRequest?: boolean; role?: string; discordId?: string };
@@ -100,48 +100,27 @@ servers.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
     icon = body.icon ?? null;
   }
 
-  // Validate id format
-  if (!/^[a-z0-9_-]+$/.test(id)) {
-    return c.json(
-      { error: "Server ID must only contain lowercase letters, numbers, hyphens, and underscores" },
-      400,
-    );
+  // Validación, volúmenes por defecto y alta viven en createServer: el MCP crea
+  // servidores por el mismo camino, y tener dos copias de estas reglas es la
+  // forma más rápida de que se separen.
+  const created = createServer({
+    id,
+    name,
+    game_type,
+    docker_image,
+    port,
+    env_vars,
+    volumes,
+    icon,
+  });
+
+  if (!created.ok) {
+    // "Ya existe" es un conflicto, no una petición mal formada.
+    const status = created.error.includes("Ya existe un servidor") ? 409 : 400;
+    return c.json({ error: created.error }, status);
   }
 
-  // Check uniqueness
-  const existing = serverQueries.getById.get(id);
-  if (existing) return c.json({ error: "A server with this ID already exists" }, 409);
-
-  // Default volume if none provided — use catalog template if image matches
-  if (Object.keys(volumes).length === 0) {
-    const tpl = findTemplateByImage(docker_image);
-    if (tpl) {
-      volumes = Object.fromEntries(
-        Object.entries(tpl.default_volumes).map(([host, container]) => [
-          host.replace(new RegExp(`/${tpl.id}(/|$)`), `/${id}$1`),
-          container,
-        ]),
-      );
-    } else {
-      volumes = { [`/data/${id}`]: "/data" };
-    }
-  }
-
-  try {
-    serverQueries.insert.run(
-      id,
-      name,
-      game_type,
-      docker_image,
-      port,
-      JSON.stringify(env_vars),
-      JSON.stringify(volumes),
-      icon,
-    );
-    return c.json({ ok: true });
-  } catch (_err) {
-    return c.json({ error: "Failed to create server" }, 500);
-  }
+  return c.json({ ok: true, server: created.data });
 });
 
 // Delete a server — only when stopped (admin only)
