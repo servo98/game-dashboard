@@ -81,9 +81,7 @@ export default function BackupsTab({ servers }: Props) {
   const totalSize = useMemo(() => backups.reduce((sum, b) => sum + b.size_bytes, 0), [backups]);
 
   if (loading) {
-    return (
-      <div className="text-sm text-gray-500 animate-pulse py-8 text-center">Loading backups...</div>
-    );
+    return <div className="text-body text-faint tick py-8 text-center">Cargando copias</div>;
   }
 
   const autoBackupHours = settings ? Number(settings.auto_backup_interval_hours) : 0;
@@ -93,39 +91,39 @@ export default function BackupsTab({ servers }: Props) {
     <div className="space-y-6">
       {/* Auto-backup config summary */}
       {settings && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface border border-line rounded-lg px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span
-                className={`inline-block w-2 h-2 rounded-full ${autoBackupHours > 0 ? "bg-green-500" : "bg-gray-600"}`}
+                className={`inline-block w-2 h-2 rounded-full ${autoBackupHours > 0 ? "bg-ok" : "bg-line-strong"}`}
               />
-              <span className="text-sm text-gray-300">
+              <span className="text-body text-muted">
                 Auto-backup: {autoBackupHours > 0 ? `every ${autoBackupHours}h` : "disabled"}
               </span>
             </div>
-            <span className="text-sm text-gray-500">|</span>
-            <span className="text-sm text-gray-400">Max {maxPerServer} per server</span>
+            <span className="text-body text-faint">|</span>
+            <span className="text-body text-muted">Max {maxPerServer} per server</span>
           </div>
-          <span className="text-xs text-gray-600">Change in Settings</span>
+          <span className="text-meta text-faint">Se cambia en Ajustes</span>
         </div>
       )}
 
       {/* Summary */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">
+        <p className="text-body text-muted">
           {backups.length} backup{backups.length !== 1 ? "s" : ""} &middot; {formatSize(totalSize)}{" "}
           total
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-sm text-red-300">
+        <div className="bg-danger/10 border border-danger/35 rounded-md px-4 py-3 text-body text-danger">
           {error}
         </div>
       )}
 
       {backups.length === 0 ? (
-        <div className="text-center text-gray-600 py-12">
+        <div className="text-center text-faint py-12">
           No backups yet. Create backups from each game server's card.
         </div>
       ) : (
@@ -142,39 +140,39 @@ export default function BackupsTab({ servers }: Props) {
             return (
               <div
                 key={serverId}
-                className={`bg-gray-900 border rounded-xl overflow-hidden ${
-                  isRunning ? "border-green-800/60" : "border-gray-800"
+                className={`bg-surface border rounded-lg overflow-hidden ${
+                  isRunning ? "border-ok/60" : "border-line"
                 }`}
               >
                 {/* Server header */}
-                <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-line flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🎮</span>
-                    <span className="text-sm font-medium text-white">
+                    <span className="text-title">🎮</span>
+                    <span className="text-body font-medium text-ink">
                       {server?.name ?? serverId}
                     </span>
                     {server && (
                       <span
                         className={`inline-block w-2 h-2 rounded-full ${
-                          isRunning ? "bg-green-500" : "bg-gray-500"
+                          isRunning ? "bg-ok" : "bg-line-strong"
                         }`}
                       />
                     )}
                   </div>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-meta text-faint">
                     {serverBackups.length} backup{serverBackups.length !== 1 ? "s" : ""}
                   </span>
                 </div>
 
                 {/* Backup rows */}
-                <div className="divide-y divide-gray-800/50">
+                <div className="divide-y divide-line/50">
                   {serverBackups.map((b) => (
                     <div
                       key={b.id}
-                      className="px-4 py-2.5 flex items-center justify-between hover:bg-gray-800/30 transition-colors"
+                      className="px-4 py-2.5 flex items-center justify-between hover:bg-raised/30 transition-colors"
                     >
                       <div className="flex flex-col">
-                        <span className="text-sm text-gray-300">
+                        <span className="text-body text-muted">
                           {new Date(b.created_at * 1000).toLocaleString([], {
                             month: "short",
                             day: "numeric",
@@ -182,13 +180,13 @@ export default function BackupsTab({ servers }: Props) {
                             minute: "2-digit",
                           })}
                         </span>
-                        <span className="text-xs text-gray-600">{formatSize(b.size_bytes)}</span>
+                        <span className="text-meta text-faint">{formatSize(b.size_bytes)}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <a
                           href={api.downloadBackupUrl(serverId, b.id)}
-                          className="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-colors"
-                          title="Download"
+                          className="tap px-2 py-1 rounded-md bg-raised hover:bg-line text-meta text-muted hover:text-ink transition-colors"
+                          title="Descargar"
                         >
                           Download
                         </a>
@@ -196,24 +194,24 @@ export default function BackupsTab({ servers }: Props) {
                           onClick={() => handleRestore(b)}
                           disabled={isRunning}
                           title={isRunning ? "Stop server first" : "Restore this backup"}
-                          className={`px-2 py-1 rounded-lg text-xs transition-colors ${
+                          className={`tap px-2 py-1 rounded-md text-meta transition-colors ${
                             confirmRestore === b.id
-                              ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                              ? "bg-warn text-warn-ink hover:bg-warn/90"
+                              : "bg-raised hover:bg-line text-muted hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
                           }`}
                         >
                           {confirmRestore === b.id ? "Confirm?" : "Restore"}
                         </button>
                         <button
                           onClick={() => handleDelete(b)}
-                          className={`px-2 py-1 rounded-lg text-xs transition-colors ${
+                          className={`tap px-2 py-1 rounded-md text-meta transition-colors ${
                             confirmDelete === b.id
-                              ? "bg-red-600 text-white hover:bg-red-700"
-                              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
+                              ? "bg-danger text-danger-ink hover:bg-danger/90"
+                              : "bg-raised hover:bg-line text-muted hover:text-danger"
                           }`}
-                          title="Delete"
+                          title="Borrar"
                         >
-                          {confirmDelete === b.id ? "Confirm?" : "Delete"}
+                          {confirmDelete === b.id ? "Confirm?" : "Borrar"}
                         </button>
                       </div>
                     </div>

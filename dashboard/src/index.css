@@ -2,17 +2,282 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Tokens. Dos modos con paridad de jerarquía: en ambos, el texto secundario
+  ronda 5.8:1 y el terciario 4.7:1 contra su fondo, así que la lectura pesa
+  igual de noche que de día. Nunca #000 ni #fff.
+*/
 @layer base {
   :root {
-    --brand-50: 240 244 255;
-    --brand-300: 152 172 253;
-    --brand-400: 116 143 252;
-    --brand-500: 79 110 247;
-    --brand-600: 58 86 212;
-    --brand-700: 45 67 176;
+    /* Papel cálido */
+    --bg: 246 245 242;
+    --surface: 255 255 254;
+    --raised: 240 239 235;
+    --line: 224 222 216;
+    --line-strong: 198 195 187;
+    --ink: 26 25 23;
+    --muted: 96 94 89;
+    --faint: 110 108 102;
+
+    --ok: 21 118 71;
+    --warn: 150 96 4;
+    --danger: 176 36 30;
+
+    /* Tinte que va encima de cada relleno de estado. En claro los tokens son
+       oscuros y admiten blanco; en oscuro son claros y piden tinta oscura. */
+    --ok-ink: 255 255 254;
+    --warn-ink: 255 255 254;
+    --danger-ink: 255 255 254;
+
+    /* Reserva antes de que arranque el JS. theme.ts recalcula estos dos por
+       modo para que el acento del juego pase AA en ambos temas sin perder
+       identidad; estos valores ya son el resultado para el azul por defecto. */
+    --accent: 41 109 204;
+    --accent-ink: 255 255 254;
+
+    --t-fast: 150ms;
+    --t-base: 200ms;
+    --t-slow: 380ms;
+    --e-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    color-scheme: light;
+  }
+
+  /* Grafito frío */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: 13 14 15;
+      --surface: 22 23 25;
+      --raised: 30 32 34;
+      --line: 39 41 44;
+      --line-strong: 60 63 67;
+      --ink: 233 233 231;
+      --muted: 154 154 150;
+      --faint: 124 124 119;
+
+      --ok: 63 185 107;
+      --warn: 217 154 43;
+      --danger: 239 107 98;
+
+      --ok-ink: 26 25 23;
+      --warn-ink: 26 25 23;
+      --danger-ink: 26 25 23;
+
+      --accent: 68 131 218;
+      --accent-ink: 26 25 23;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: 13 14 15;
+    --surface: 22 23 25;
+    --raised: 30 32 34;
+    --line: 39 41 44;
+    --line-strong: 60 63 67;
+    --ink: 233 233 231;
+    --muted: 154 154 150;
+    --faint: 124 124 119;
+
+    --ok: 63 185 107;
+    --warn: 217 154 43;
+    --danger: 239 107 98;
+
+    --ok-ink: 26 25 23;
+    --warn-ink: 26 25 23;
+    --danger-ink: 26 25 23;
+
+    --accent: 68 131 218;
+    --accent-ink: 26 25 23;
+
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-gray-950 text-gray-100 min-h-screen;
+    @apply bg-bg text-ink font-sans text-body;
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis-weight: none;
+  }
+
+  /* Todo número que pueda cambiar en vivo no debe bailar. */
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.22);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* Barras de scroll a juego con el resto del instrumento. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--muted));
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /*
+    Un solo gesto táctil para todo lo pulsable: sube 1px al pasar por encima,
+    se hunde al presionar. 150ms / 160ms.
+  */
+  .tap {
+    transition:
+      transform var(--t-fast) var(--e-out),
+      background-color var(--t-fast) var(--e-out),
+      border-color var(--t-fast) var(--e-out),
+      color var(--t-fast) var(--e-out),
+      opacity var(--t-fast) var(--e-out);
+  }
+
+  .tap:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .tap:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 160ms;
+  }
+
+  /* Etiqueta de instrumento: mono, versalita, ancha. Nunca para prosa. */
+  .label {
+    @apply font-mono text-micro uppercase text-faint;
+  }
+
+  .num {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Regla de sección: filete + etiqueta, en lugar del eyebrow en pastilla. */
+  .rule {
+    @apply flex items-center gap-3;
+  }
+
+  .rule::after {
+    content: "";
+    @apply flex-1 h-px bg-line;
+  }
+}
+
+@layer utilities {
+  /* Cuantiza cualquier barra en tramos, como la escala de un instrumento. */
+  .segmented {
+    -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
+    mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
+  }
+
+  /* Entrada escalonada de filas: 380ms, 70ms de retraso entre una y otra. */
+  @keyframes row-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .row-in {
+    animation: row-in var(--t-slow) var(--e-out) both;
+  }
+
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .sheet-in {
+    animation: sheet-in 240ms var(--e-out) both;
+  }
+
+  @keyframes veil-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .veil-in {
+    animation: veil-in 180ms linear both;
+  }
+
+  /* Latido de dato vivo: opacidad, no escala. Sustituye al animate-pulse. */
+  @keyframes tick {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .tick {
+    animation: tick 1.8s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .tap:hover,
+    .tap:active {
+      transform: none;
+    }
   }
 }

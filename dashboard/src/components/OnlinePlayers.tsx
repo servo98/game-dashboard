@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type PlayersResponse } from "../api";
+import { Tag } from "./ui";
 
 type Props = {
   serverId: string;
@@ -7,6 +8,7 @@ type Props = {
   joinable?: "starting" | "joinable" | null;
 };
 
+/** Quién está dentro ahora mismo. */
 export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props) {
   const [data, setData] = useState<PlayersResponse | null>(null);
 
@@ -42,10 +44,11 @@ export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props
   if (!isSupported || !isReady || !data) return null;
 
   return (
-    <div className="flex items-center gap-2 text-xs text-gray-400">
-      <span className="font-medium text-gray-300">
-        {/* max 0 = no pudimos leer el máximo (A2S mudo): mejor "3 Players" que "3/0" */}
-        {data.max > 0 ? `${data.count}/${data.max}` : data.count} Players
+    <div className="flex items-center gap-2.5">
+      <span className="label shrink-0">Dentro</span>
+      <span className="num shrink-0 text-meta text-ink">
+        {/* max 0 = no pudimos leer el máximo (A2S mudo): mejor "3" que "3/0" */}
+        {data.max > 0 ? `${data.count}/${data.max}` : data.count}
       </span>
       {data.online.length > 0 &&
         (isMinecraft ? (
@@ -56,20 +59,16 @@ export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props
                 src={`https://mc-heads.net/avatar/${name}/20`}
                 alt={name}
                 title={name}
-                className="w-5 h-5 rounded-sm border border-gray-700"
+                className="h-5 w-5 rounded-xs border border-line bg-raised"
               />
             ))}
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-w-0 flex-wrap gap-1">
             {data.online.map((name) => (
-              <span
-                key={name}
-                title={name}
-                className="px-1.5 py-0.5 rounded-sm bg-gray-800 border border-gray-700 text-gray-300"
-              >
+              <Tag key={name} title={name}>
                 {name}
-              </span>
+              </Tag>
             ))}
           </div>
         ))}

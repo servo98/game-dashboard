@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayersResponse } from "../api";
 import { api } from "../api";
 import { formatLine } from "../utils/format";
+import { Button, Modal, StatusMark } from "./ui";
 
 type LogLine = {
   text: string;
@@ -35,10 +36,10 @@ function parseLevel(text: string): string {
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-  INFO: "text-gray-300",
-  WARN: "text-yellow-400",
-  ERROR: "text-red-400",
-  DEBUG: "text-gray-500",
+  INFO: "text-muted",
+  WARN: "text-warn",
+  ERROR: "text-danger",
+  DEBUG: "text-faint",
 };
 
 export default function LogViewer({ title, streamFactory, onClose, serverId, dockerImage }: Props) {
@@ -241,9 +242,9 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
   });
 
   function getLineColor(level: string): string {
-    if (level === "COMMAND") return "text-cyan-400";
-    if (level === "RESPONSE") return "text-cyan-300";
-    return LEVEL_COLORS[level] ?? "text-gray-300";
+    if (level === "COMMAND") return "text-accent font-medium";
+    if (level === "RESPONSE") return "text-accent";
+    return LEVEL_COLORS[level] ?? "text-muted";
   }
 
   // Render a single line with timestamp dimmed
@@ -255,7 +256,7 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
     if (tsMatch) {
       return (
         <div key={idx} className="leading-tight">
-          <span className="text-gray-500">{tsMatch[1]}</span>{" "}
+          <span className="text-faint">{tsMatch[1]}</span>{" "}
           <span className={color}>{tsMatch[2]}</span>
         </div>
       );
@@ -268,126 +269,36 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
     );
   }
 
-  const filterButtons: { level: LogLevel; label: string; color: string; activeColor: string }[] = [
-    {
-      level: "INFO",
-      label: "INFO",
-      color: "text-gray-400 border-gray-600",
-      activeColor: "text-gray-200 bg-gray-700 border-gray-500",
-    },
-    {
-      level: "WARN",
-      label: "WARN",
-      color: "text-yellow-500/60 border-yellow-700/40",
-      activeColor: "text-yellow-300 bg-yellow-900/30 border-yellow-600",
-    },
-    {
-      level: "ERROR",
-      label: "ERROR",
-      color: "text-red-500/60 border-red-700/40",
-      activeColor: "text-red-300 bg-red-900/30 border-red-600",
-    },
-    {
-      level: "DEBUG",
-      label: "DEBUG",
-      color: "text-gray-500 border-gray-700",
-      activeColor: "text-gray-300 bg-gray-800 border-gray-500",
-    },
+  const FILTERS: Array<{ level: LogLevel; tone: string }> = [
+    { level: "INFO", tone: "text-muted" },
+    { level: "WARN", tone: "text-warn" },
+    { level: "ERROR", tone: "text-danger" },
+    { level: "DEBUG", tone: "text-faint" },
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                connected ? "bg-green-500 animate-pulse" : "bg-red-500"
-              }`}
-            />
-            <span className="text-sm font-medium text-gray-200">Live Logs — {title}</span>
-
-            {/* Player badge (MC only) */}
-            {isMC && players && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowPlayers((p) => !p)}
-                  className="ml-2 px-2 py-0.5 rounded-full bg-gray-800 text-xs text-gray-300 hover:bg-gray-700 transition-colors"
-                >
-                  {players.count} player{players.count !== 1 ? "s" : ""}
-                </button>
-                {showPlayers && players.online.length > 0 && (
-                  <div className="absolute top-full left-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl px-3 py-2 z-10 min-w-[120px]">
-                    {players.online.map((p) => (
-                      <div key={p} className="text-xs text-gray-300 py-0.5">
-                        {p}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Filter pills */}
-            {filterButtons.map((fb) => (
-              <button
-                key={fb.level}
-                onClick={() => toggleFilter(fb.level)}
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded border transition-colors ${
-                  filters[fb.level] ? fb.activeColor : fb.color
-                }`}
-              >
-                {fb.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setLines([])}
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded border text-gray-400 border-gray-600 hover:text-gray-200 hover:bg-gray-700 hover:border-gray-500 transition-colors"
-            >
-              Clear
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors p-1 ml-1"
-            >
-              ✕
-            </button>
-          </div>
+    <Modal
+      title={title}
+      subtitle="Registro en vivo"
+      size="lg"
+      padded={false}
+      onClose={onClose}
+      toolbar={
+        <div className="flex items-center gap-2">
+          <StatusMark
+            tone={connected ? "ok" : "danger"}
+            label={connected ? "Conectado" : "Sin conexión"}
+            live={connected}
+          />
+          <Button tone="ghost" size="sm" onClick={() => setLines([])}>
+            Limpiar
+          </Button>
         </div>
-
-        {/* Log output */}
-        <div
-          ref={containerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-4 font-mono text-xs relative"
-          style={{ contain: "content" }}
-        >
-          {filteredLines.length === 0 ? (
-            <p className="text-gray-600">Waiting for log output...</p>
-          ) : (
-            <div className="whitespace-pre-wrap break-all m-0">
-              {filteredLines.map((line, i) => renderLine(line, i))}
-            </div>
-          )}
-
-          {/* Scroll to bottom button */}
-          {showScrollBtn && (
-            <button
-              onClick={scrollToBottom}
-              className="sticky bottom-2 left-full -translate-x-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg border border-gray-700 transition-colors flex items-center gap-1"
-            >
-              ↓ Latest
-            </button>
-          )}
-        </div>
-
-        {/* Command input (MC only) */}
-        {isMC && (
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-800">
-            <span className="text-gray-500 text-xs font-mono">&gt;</span>
+      }
+      footer={
+        isMC ? (
+          <div className="flex w-full items-center gap-2">
+            <span className="num shrink-0 text-body text-faint">&gt;</span>
             <input
               ref={inputRef}
               type="text"
@@ -397,19 +308,87 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
                 setHistoryIdx(-1);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Type a command..."
-              className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 font-mono placeholder-gray-600 focus:outline-none focus:border-gray-500"
+              placeholder="Escribe un comando"
+              spellCheck={false}
+              className="num h-8 flex-1 rounded-md border border-line bg-raised px-2.5 text-body
+                text-ink placeholder:text-faint focus:border-accent focus:outline-none"
             />
-            <button
-              onClick={handleSendCommand}
-              disabled={!command.trim() || sending}
-              className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
+            <Button tone="accent" onClick={handleSendCommand} disabled={!command.trim() || sending}>
+              {sending ? "Enviando" : "Enviar"}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
+      {/* Filtros de nivel y jugadores dentro: una barra, no pastillas sueltas */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4 py-2">
+        <span className="label">Niveles</span>
+        <div className="flex items-center gap-3">
+          {FILTERS.map(({ level, tone }) => (
+            <label
+              key={level}
+              className={`flex cursor-pointer items-center gap-1.5 font-mono text-micro uppercase
+                ${filters[level] ? tone : "text-faint/50"}`}
             >
-              {sending ? "..." : "Send"}
-            </button>
+              <input
+                type="checkbox"
+                checked={filters[level]}
+                onChange={() => toggleFilter(level)}
+                className="h-3 w-3 rounded-xs border border-line-strong bg-raised accent-accent"
+              />
+              {level}
+            </label>
+          ))}
+        </div>
+
+        {isMC && players && (
+          <button
+            type="button"
+            onClick={() => setShowPlayers((v) => !v)}
+            className={`tap ml-auto font-mono text-micro uppercase ${
+              showPlayers ? "text-accent" : "text-faint hover:text-muted"
+            }`}
+          >
+            {players.count} dentro
+          </button>
+        )}
+      </div>
+
+      {isMC && showPlayers && players && players.online.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-2">
+          {players.online.map((p) => (
+            <span
+              key={p}
+              className="rounded-xs border border-line bg-raised px-1.5 py-0.5 font-mono text-micro text-muted"
+            >
+              {p}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3 font-mono text-meta"
+        style={{ contain: "content" }}
+      >
+        {filteredLines.length === 0 ? (
+          <p className="text-faint">Esperando salida del registro.</p>
+        ) : (
+          <div className="m-0 whitespace-pre-wrap break-all">
+            {filteredLines.map((line, i) => renderLine(line, i))}
+          </div>
+        )}
+
+        {showScrollBtn && (
+          <div className="sticky bottom-2 flex justify-end">
+            <Button size="sm" onClick={scrollToBottom}>
+              Ir al final
+            </Button>
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

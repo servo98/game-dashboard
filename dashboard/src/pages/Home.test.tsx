@@ -6,9 +6,6 @@ import { renderWithRouter } from "../__tests__/render-with-router";
 vi.mock("../components/HostStatsBar", () => ({
   default: () => <div data-testid="host-stats-bar" />,
 }));
-vi.mock("../components/ThemeBanner", () => ({
-  default: () => <div data-testid="theme-banner" />,
-}));
 vi.mock("../components/StatsBar", () => ({
   default: () => <div data-testid="stats-bar" />,
 }));
@@ -33,9 +30,12 @@ vi.mock("../components/PanelSettings", () => ({
   default: () => <div data-testid="panel-settings" />,
 }));
 vi.mock("../theme", () => ({
-  applyTheme: vi.fn(),
-  resolveTheme: vi.fn(() => ({ banner: "/banner.jpg", colors: {} })),
-  DEFAULT_THEMES: { _idle: { banner: "/idle.jpg", colors: {} } },
+  applyAccent: vi.fn(),
+  applyMode: vi.fn(() => "dark"),
+  readModePreference: vi.fn(() => "system"),
+  watchSystemMode: vi.fn(() => () => {}),
+  resolveTheme: vi.fn(() => ({ banner: "/banner.jpg", accent: "#3b7dd8" })),
+  DEFAULT_THEMES: { _idle: { banner: "/idle.jpg", accent: "#3b7dd8" } },
 }));
 
 // Mock api module
@@ -105,21 +105,22 @@ describe("Home page", () => {
    * BUG #1 REGRESSION: Status link must exist in navbar.
    * Production deploy had /status page but no link to it.
    */
-  it("renders Status button in navbar that navigates to /status", async () => {
+  it("el atajo de estado lleva a /status", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
       expect(screen.getByText("testuser")).toBeInTheDocument();
     });
-    const statusBtn = screen.getByText("Status");
+    const statusBtn = screen.getByLabelText("Estado del sistema");
     expect(statusBtn).toBeInTheDocument();
-    // The button should be in the navbar header area
-    expect(statusBtn.closest("header")).not.toBeNull();
+    // Vive en el armazón (barra lateral en escritorio, cabecera en móvil),
+    // no enterrado dentro del contenido de una pestaña.
+    expect(statusBtn.closest("aside, header")).not.toBeNull();
   });
 
   it("renders Infrastructure section with 6 services", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
-      expect(screen.getByText("Infrastructure")).toBeInTheDocument();
+      expect(screen.getByText("Infraestructura")).toBeInTheDocument();
     });
     expect(screen.getByText("backend")).toBeInTheDocument();
     expect(screen.getByText("bot")).toBeInTheDocument();
@@ -133,7 +134,7 @@ describe("Home page", () => {
     mockListServers.mockRejectedValue(new Error("Network error"));
     renderWithRouter(<Home />);
     await waitFor(() => {
-      expect(screen.getByText("Failed to load servers")).toBeInTheDocument();
+      expect(screen.getByText("No se pudo cargar la lista de servidores.")).toBeInTheDocument();
     });
   });
 });

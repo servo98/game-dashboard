@@ -13,6 +13,7 @@ import {
 } from "./game-config/valheim-config";
 import { EyeIcon, EyeOffIcon } from "./Icons";
 import MinecraftConfigEditor from "./MinecraftConfigEditor";
+import { Button, Loading, Modal } from "./ui";
 
 type Props = {
   serverId: string;
@@ -117,7 +118,7 @@ function compressImage(file: File, maxWidth: number, quality: number): Promise<F
 }
 
 const INPUT_CLASS =
-  "w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500";
+  "w-full bg-surface border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent";
 
 export default function ConfigEditor({
   serverId,
@@ -400,7 +401,7 @@ export default function ConfigEditor({
       <div className="flex flex-col gap-4 max-w-2xl">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1.5">Nombre del panel</label>
+            <label className="block text-meta text-faint mb-1.5">Nombre del panel</label>
             <input
               type="text"
               value={name}
@@ -409,7 +410,7 @@ export default function ConfigEditor({
             />
           </div>
           <div className="sm:w-32">
-            <label className="block text-xs text-gray-500 mb-1.5">Puerto</label>
+            <label className="block text-meta text-faint mb-1.5">Puerto</label>
             <input
               type="number"
               value={port}
@@ -420,9 +421,9 @@ export default function ConfigEditor({
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1.5">Imagen Docker</label>
+          <label className="block text-meta text-faint mb-1.5">Imagen Docker</label>
           {isMinecraft ? (
-            <div className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg px-3 py-2 text-sm font-mono text-gray-400 break-all">
+            <div className="w-full bg-surface/50 border border-line/50 rounded-lg px-3 py-2 text-body font-mono text-muted break-all">
               {dockerImage}
             </div>
           ) : (
@@ -434,7 +435,7 @@ export default function ConfigEditor({
             />
           )}
           {isMinecraft && (
-            <p className="text-xs text-gray-600 mt-1.5">
+            <p className="text-meta text-faint mt-1.5">
               La imagen la elige el editor de Minecraft según la versión.
             </p>
           )}
@@ -446,10 +447,10 @@ export default function ConfigEditor({
   function renderTheme() {
     return (
       <div className="flex flex-col gap-4 max-w-2xl">
-        <div className="relative h-32 rounded-xl overflow-hidden bg-gray-900">
+        <div className="relative h-32 rounded-md overflow-hidden bg-surface">
           <img src={displayBanner} alt="Banner preview" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 to-transparent" />
-          <div className="absolute bottom-2 left-3 text-xs text-gray-400">
+          <div className="absolute inset-0 bg-gradient-to-t from-bg/80 to-transparent" />
+          <div className="absolute bottom-2 left-3 text-meta text-muted">
             {bannerPath ? "Banner propio" : "Banner por defecto"}
           </div>
         </div>
@@ -468,14 +469,14 @@ export default function ConfigEditor({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+            className="tap px-3 py-1.5 bg-raised hover:bg-line text-muted text-meta rounded-md transition-colors disabled:opacity-50"
           >
             {uploading ? "Subiendo..." : "Subir banner"}
           </button>
           {(bannerPath || accentColor) && (
             <button
               onClick={handleResetTheme}
-              className="px-3 py-1.5 text-gray-500 hover:text-red-400 text-xs transition-colors"
+              className="tap px-3 py-1.5 text-faint hover:text-danger text-meta transition-colors"
             >
               Volver al de por defecto
             </button>
@@ -483,19 +484,19 @@ export default function ConfigEditor({
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="text-xs text-gray-500">Color de acento</label>
+          <label className="text-meta text-faint">Color de acento</label>
           <input
             type="color"
             value={accentColor || "#4f6ef7"}
             onChange={(e) => setAccentColor(e.target.value)}
-            className="w-8 h-8 rounded-lg border border-gray-700 bg-transparent cursor-pointer"
+            className="w-8 h-8 rounded-md border border-line bg-transparent cursor-pointer"
           />
-          {accentColor && <span className="text-xs font-mono text-gray-400">{accentColor}</span>}
+          {accentColor && <span className="text-meta font-mono text-muted">{accentColor}</span>}
         </div>
 
         {suggestedColors.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Sugeridos:</span>
+            <span className="text-meta text-faint">Sugeridos:</span>
             <div className="flex gap-1.5">
               {suggestedColors.map((color) => (
                 <button
@@ -504,7 +505,7 @@ export default function ConfigEditor({
                   className={`w-6 h-6 rounded-full border-2 transition-all ${
                     accentColor === color
                       ? "border-white scale-110"
-                      : "border-gray-700 hover:border-gray-500"
+                      : "border-line hover:border-line-strong"
                   }`}
                   style={{ backgroundColor: color }}
                   title={color}
@@ -524,7 +525,7 @@ export default function ConfigEditor({
   function renderEnvPairs() {
     return (
       <div className="flex flex-col gap-3 max-w-3xl">
-        <p className="text-xs text-gray-500">
+        <p className="text-meta text-faint">
           Todas las variables tal cual se le pasan al contenedor. Lo que toques en las otras
           secciones acaba aquí.
         </p>
@@ -536,16 +537,16 @@ export default function ConfigEditor({
                 placeholder="CLAVE"
                 value={pair.key}
                 onChange={(e) => updateEnvPair(i, "key", e.target.value)}
-                className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
+                className="flex-1 min-w-0 bg-surface border border-line rounded-lg px-2.5 py-1.5 text-meta font-mono text-ink focus:outline-none focus:border-accent"
               />
-              <span className="text-gray-600">=</span>
+              <span className="text-faint">=</span>
               <div className="flex-1 min-w-0 relative">
                 <input
                   type={isSecret(pair.key) ? "password" : "text"}
                   placeholder="valor"
                   value={pair.value}
                   onChange={(e) => updateEnvPair(i, "value", e.target.value)}
-                  className={`w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500 ${
+                  className={`w-full bg-surface border border-line rounded-lg px-2.5 py-1.5 text-meta font-mono text-ink focus:outline-none focus:border-accent ${
                     SECRET_KEY_RE.test(pair.key) ? "pr-8" : ""
                   }`}
                 />
@@ -555,7 +556,7 @@ export default function ConfigEditor({
                     onClick={() => toggleReveal(pair.key)}
                     aria-label={revealedEnv.has(pair.key) ? "Ocultar" : "Mostrar"}
                     title={revealedEnv.has(pair.key) ? "Ocultar" : "Mostrar"}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200 transition-colors p-0.5"
+                    className="tap absolute right-1.5 top-1/2 -translate-y-1/2 text-faint hover:text-ink transition-colors p-0.5"
                   >
                     {revealedEnv.has(pair.key) ? (
                       <EyeOffIcon className="w-3.5 h-3.5" />
@@ -567,20 +568,20 @@ export default function ConfigEditor({
               </div>
               <button
                 onClick={() => removeEnvPair(i)}
-                className="text-gray-600 hover:text-red-400 transition-colors shrink-0 px-1"
+                className="tap text-faint hover:text-danger transition-colors shrink-0 px-1"
               >
                 ✕
               </button>
             </div>
           ))}
           {envPairs.length === 0 && (
-            <p className="text-xs text-gray-600">No hay variables definidas.</p>
+            <p className="text-meta text-faint">No hay variables definidas.</p>
           )}
         </div>
         <div>
           <button
             onClick={addEnvPair}
-            className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+            className="text-meta text-accent hover:text-accent transition-colors"
           >
             + Añadir variable
           </button>
@@ -594,13 +595,13 @@ export default function ConfigEditor({
     if (!state || state.loading) {
       return (
         <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <Loading>Cargando</Loading>
         </div>
       );
     }
     if (state.error) {
       return (
-        <div className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+        <div className="text-body text-danger bg-danger/10 border border-danger/35 rounded-md px-3 py-2">
           {state.error}
         </div>
       );
@@ -614,11 +615,11 @@ export default function ConfigEditor({
     return (
       <div className="flex flex-col gap-4">
         {dirty && (
-          <div className="flex items-center gap-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-3 text-meta text-warn bg-warn/10 border border-warn/50 rounded-md px-3 py-2">
             <span>Hay cambios sin guardar en este fichero.</span>
             <button
               onClick={() => revertFile(path)}
-              className="ml-auto text-amber-200 hover:text-white transition-colors"
+              className="ml-auto text-warn hover:text-ink transition-colors"
             >
               Descartar
             </button>
@@ -673,153 +674,122 @@ export default function ConfigEditor({
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-6xl h-[92vh] shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
-          <div className="min-w-0">
-            <h2 className="font-semibold text-white truncate">
-              Configuración — {name || serverName}
-            </h2>
-            {activePanel && (
-              <p className="text-xs text-gray-500 truncate">
-                {activePanel.group} · {activePanel.label}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-1 shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="flex-1 flex justify-center items-center">
-            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+    <Modal
+      title={`Configuración de ${name || serverName}`}
+      subtitle={activePanel ? `${activePanel.group} · ${activePanel.label}` : undefined}
+      size="xl"
+      padded={false}
+      fill
+      onClose={onClose}
+      footer={
+        showRestartPrompt ? (
+          <>
+            <span className="mr-auto text-body text-muted">
+              ¿Reiniciar el servidor para aplicar los cambios?
+            </span>
+            <Button tone="ghost" onClick={handleRestartDecline} disabled={restarting}>
+              Ahora no
+            </Button>
+            <Button tone="accent" onClick={handleRestartConfirm} disabled={restarting}>
+              {restarting ? "Reiniciando" : "Reiniciar"}
+            </Button>
+          </>
         ) : (
-          <div className="flex-1 flex flex-col md:flex-row min-h-0">
-            {/* Navegación */}
-            <nav className="md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-gray-800 md:overflow-y-auto overflow-x-auto">
-              <div className="flex md:flex-col gap-1 p-2 md:p-3 min-w-max md:min-w-0">
-                {groups.map((group) => {
-                  const items = panels.filter((p) => p.group === group);
-                  if (items.length === 0 && group !== "Archivos de config") return null;
-                  return (
-                    <div
-                      key={group}
-                      className="flex md:flex-col gap-1 md:mb-2 items-center md:items-stretch"
-                    >
-                      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider px-2 md:mb-1 whitespace-nowrap">
-                        {group}
-                      </span>
-                      {items.length === 0 ? (
-                        <span className="text-xs text-gray-700 px-2 py-1.5 whitespace-nowrap">
-                          {filesError ? "No disponible" : "Ninguno encontrado"}
-                        </span>
-                      ) : (
-                        items.map((panel) => {
-                          const path = panel.id.startsWith("file:")
-                            ? panel.id.slice("file:".length)
-                            : null;
-                          const dirty = path ? dirtyPaths.includes(path) : false;
-                          return (
-                            <button
-                              key={panel.id}
-                              onClick={() => setPanelId(panel.id)}
-                              className={`text-left px-2.5 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap md:whitespace-normal ${
-                                panelId === panel.id
-                                  ? "bg-gray-800 text-white"
-                                  : "text-gray-400 hover:text-white hover:bg-gray-900"
-                              }`}
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <span className="truncate">{panel.label}</span>
-                                {dirty && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                                )}
-                              </span>
-                              {panel.sublabel && (
-                                <span className="block text-[10px] text-gray-600 font-mono truncate">
-                                  {panel.sublabel}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </nav>
-
-            {/* Panel activo */}
-            <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-5">
-              {error && (
-                <div className="mb-4 text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
-                  {error}
-                </div>
-              )}
-              {panelId === "env" && unknownEnvCount > 0 && (
-                <div className="mb-4 text-xs text-gray-500">
-                  {unknownEnvCount} variable(s) no tienen control en el formulario guiado de
-                  Valheim.
-                </div>
-              )}
-              {renderPanel()}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-800 shrink-0">
-          {showRestartPrompt ? (
-            <>
-              <span className="text-sm text-gray-300 mr-auto">
-                ¿Reiniciar el servidor para aplicar los cambios?
+          <>
+            {dirtyPaths.length > 0 && (
+              <span className="mr-auto text-meta text-warn">
+                {dirtyPaths.length === 1
+                  ? "1 fichero con cambios sin guardar"
+                  : `${dirtyPaths.length} ficheros con cambios sin guardar`}
               </span>
-              <button
-                onClick={handleRestartDecline}
-                disabled={restarting}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                No
-              </button>
-              <button
-                onClick={handleRestartConfirm}
-                disabled={restarting}
-                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                {restarting ? "Reiniciando..." : "Sí"}
-              </button>
-            </>
-          ) : (
-            <>
-              {dirtyPaths.length > 0 && (
-                <span className="text-xs text-amber-400 mr-auto">
-                  {dirtyPaths.length} fichero(s) con cambios sin guardar
-                </span>
-              )}
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || loading}
-                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                {saving ? "Guardando..." : "Guardar"}
-              </button>
-            </>
-          )}
+            )}
+            <Button tone="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button tone="accent" onClick={handleSave} disabled={saving || loading}>
+              {saving ? "Guardando" : "Guardar"}
+            </Button>
+          </>
+        )
+      }
+    >
+      {loading ? (
+        <div className="grid flex-1 place-items-center">
+          <p className="label tick">Cargando configuración</p>
         </div>
-      </div>
-    </div>
+      ) : (
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {/* Navegación */}
+          <nav className="md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-line md:overflow-y-auto overflow-x-auto">
+            <div className="flex md:flex-col gap-1 p-2 md:p-3 min-w-max md:min-w-0">
+              {groups.map((group) => {
+                const items = panels.filter((p) => p.group === group);
+                if (items.length === 0 && group !== "Archivos de config") return null;
+                return (
+                  <div
+                    key={group}
+                    className="flex md:flex-col gap-1 md:mb-2 items-center md:items-stretch"
+                  >
+                    <span className="text-[10px] font-semibold text-faint uppercase tracking-wider px-2 md:mb-1 whitespace-nowrap">
+                      {group}
+                    </span>
+                    {items.length === 0 ? (
+                      <span className="text-meta text-faint px-2 py-1.5 whitespace-nowrap">
+                        {filesError ? "No disponible" : "Ninguno encontrado"}
+                      </span>
+                    ) : (
+                      items.map((panel) => {
+                        const path = panel.id.startsWith("file:")
+                          ? panel.id.slice("file:".length)
+                          : null;
+                        const dirty = path ? dirtyPaths.includes(path) : false;
+                        return (
+                          <button
+                            key={panel.id}
+                            onClick={() => setPanelId(panel.id)}
+                            className={`tap text-left px-2.5 py-1.5 rounded-md text-body transition-colors whitespace-nowrap md:whitespace-normal ${
+                              panelId === panel.id
+                                ? "bg-raised text-ink"
+                                : "text-muted hover:text-ink hover:bg-surface"
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span className="truncate">{panel.label}</span>
+                              {dirty && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-warn shrink-0" />
+                              )}
+                            </span>
+                            {panel.sublabel && (
+                              <span className="block text-[10px] text-faint font-mono truncate">
+                                {panel.sublabel}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </nav>
+
+          {/* Panel activo */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-5">
+            {error && (
+              <div className="mb-4 text-body text-danger bg-danger/10 border border-danger/35 rounded-md px-3 py-2">
+                {error}
+              </div>
+            )}
+            {panelId === "env" && unknownEnvCount > 0 && (
+              <div className="mb-4 text-meta text-faint">
+                {unknownEnvCount} variable(s) no tienen control en el formulario guiado de Valheim.
+              </div>
+            )}
+            {renderPanel()}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

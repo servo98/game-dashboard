@@ -9,6 +9,7 @@ import {
   type ServiceStats,
   type User,
 } from "../api";
+import { AppShell, type NavItem } from "../components/AppShell";
 import BackupsTab from "../components/BackupsTab";
 import BotSettings from "../components/BotSettings";
 import ConfigEditor from "../components/ConfigEditor";
@@ -16,6 +17,18 @@ import FileManager from "../components/FileManager";
 import FreelancerProfileForm from "../components/FreelancerProfileForm";
 import GameStore from "../components/GameStore";
 import HostStatsBar from "../components/HostStatsBar";
+import {
+  BotIcon,
+  BoxIcon,
+  KeyIcon,
+  LogsIcon,
+  PlusIcon,
+  ReceiptIcon,
+  RestoreIcon,
+  ServersIcon,
+  SettingsIcon,
+  UsersIcon,
+} from "../components/Icons";
 import InvoiceList from "../components/InvoiceList";
 import InvoiceUpload from "../components/InvoiceUpload";
 import LogViewer from "../components/LogViewer";
@@ -23,15 +36,43 @@ import McpTokens from "../components/McpTokens";
 import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
 import ServiceStatsBar from "../components/ServiceStatsBar";
-import ThemeBanner from "../components/ThemeBanner";
 import UsersTab from "../components/UsersTab";
-import { applyTheme, DEFAULT_THEMES, resolveTheme } from "../theme";
+import { Button, Divider, Empty, Notice, Panel, SectionRule, StatusMark } from "../components/ui";
+import {
+  applyAccent,
+  applyMode,
+  DEFAULT_THEMES,
+  type ModePreference,
+  readModePreference,
+  resolveTheme,
+  watchSystemMode,
+} from "../theme";
 
 type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users" | "facturas";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 // nginx/dashboard sirven el propio panel → reiniciarlos cortaría esta sesión; sin botón.
 const RESTARTABLE_SERVICES = ["backend", "bot", "chatpapol", "livekit"] as const;
+
+const TAB_LABEL: Record<Tab, string> = {
+  servers: "Servidores",
+  bot: "Bot",
+  mcp: "MCP",
+  backups: "Copias",
+  users: "Usuarios",
+  settings: "Ajustes",
+  facturas: "Facturas",
+};
+
+const TAB_ICON: Record<Tab, React.ReactNode> = {
+  servers: <ServersIcon className="h-4 w-4" />,
+  bot: <BotIcon className="h-4 w-4" />,
+  mcp: <KeyIcon className="h-4 w-4" />,
+  backups: <BoxIcon className="h-4 w-4" />,
+  users: <UsersIcon className="h-4 w-4" />,
+  settings: <SettingsIcon className="h-4 w-4" />,
+  facturas: <ReceiptIcon className="h-4 w-4" />,
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -58,6 +99,7 @@ export default function Home() {
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
   const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
   const [sseConnected, setSseConnected] = useState(true);
+  const [modePref, setModePref] = useState<ModePreference>(() => readModePreference());
 
   // Auth guard
   useEffect(() => {
@@ -108,7 +150,7 @@ export default function Home() {
       setServers(list);
       setError(null);
     } catch {
-      if (serversRef.current.length === 0) setError("Failed to load servers");
+      if (serversRef.current.length === 0) setError("No se pudo cargar la lista de servidores.");
     }
   }, []);
 
@@ -245,7 +287,6 @@ export default function Home() {
   const isAdmin = user?.role === "admin";
   const editConfigServer = editConfigId ? servers.find((s) => s.id === editConfigId) : null;
 
-  // Dynamic theme based on the primary running game
   const currentTheme = useMemo(
     () =>
       primaryServer
@@ -253,234 +294,197 @@ export default function Home() {
             banner_path: primaryServer.banner_path,
             accent_color: primaryServer.accent_color,
           })
-        : { banner: DEFAULT_THEMES._idle.banner, colors: DEFAULT_THEMES._idle.colors },
+        : DEFAULT_THEMES._idle,
     [primaryServer],
   );
 
+  // El acento se recalibra contra el fondo del modo activo, no se aplica crudo.
   useEffect(() => {
-    applyTheme(currentTheme.colors);
-  }, [currentTheme]);
+    const mode = applyMode(modePref);
+    applyAccent(currentTheme.accent, mode);
+  }, [currentTheme, modePref]);
+
+  // Si el modo es automático, seguir al sistema cuando cambie de tema.
+  useEffect(() => {
+    if (modePref !== "system") return;
+    return watchSystemMode((mode) => applyAccent(currentTheme.accent, mode));
+  }, [modePref, currentTheme]);
+
+  const nav: NavItem[] = useMemo(() => {
+    const ids: Tab[] = isAdmin
+      ? ["servers", "bot", "mcp", "backups", "users", "settings"]
+      : ["servers"];
+    if (user?.invoice_role) ids.push("facturas");
+    return ids.map((id) => ({ id, label: TAB_LABEL[id], icon: TAB_ICON[id] }));
+  }, [isAdmin, user?.invoice_role]);
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="grid min-h-screen place-items-center">
+        <p className="label tick">Cargando panel</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Navbar */}
-      <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <span className="text-xl">🎮</span> Game Panel
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/status")}
-              className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
-            >
-              Status
-            </button>
-            {user.avatar && (
-              <img
-                src={user.avatar}
-                alt={user.username}
-                className="w-8 h-8 rounded-full border border-gray-700"
-              />
-            )}
-            <span className="text-sm text-gray-300">{user.username}</span>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
-            >
-              Logout
-            </button>
-          </div>
+    <AppShell
+      nav={nav}
+      active={tab}
+      onNavigate={(id) => setTab(id as Tab)}
+      user={user}
+      onLogout={handleLogout}
+      onStatus={() => navigate("/status")}
+      hostDomain={hostDomain}
+      mode={modePref}
+      onModeChange={setModePref}
+      aside={isAdmin ? <HostStatsBar onMemTotal={setHostMemTotalMB} /> : undefined}
+    >
+      <div className="flex flex-col gap-5">
+        {/* Cabecera de sección */}
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-display font-semibold text-ink">{TAB_LABEL[tab]}</h1>
+          {tab === "servers" && isAdmin && (
+            <Button tone="accent" onClick={() => setShowGameStore(true)}>
+              <PlusIcon className="h-3.5 w-3.5" />
+              Añadir juego
+            </Button>
+          )}
         </div>
-      </header>
 
-      {/* Main */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
-        {/* Host stats (admin only) */}
-        {isAdmin && <HostStatsBar onMemTotal={setHostMemTotalMB} />}
-
-        {/* Hero banner */}
-        <ThemeBanner
-          banner={currentTheme.banner}
-          activeServers={runningServers}
-          loadingId={loadingId}
-          onStop={handleStop}
-        />
-
-        {/* SSE disconnected indicator */}
         {!sseConnected && (
-          <div className="mb-4 bg-yellow-950/40 border border-yellow-800 rounded-xl px-4 py-2 text-xs text-yellow-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-            Live stats disconnected — reconnecting...
-          </div>
+          <Notice tone="warn">
+            <span className="tick">Sin lecturas en vivo.</span> Reintentando conexión.
+          </Notice>
         )}
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 bg-red-950/40 border border-red-800 rounded-xl px-4 py-3 text-sm text-red-300">
-            {error}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-gray-800 overflow-x-auto">
-          {((): Tab[] => {
-            const tabs: Tab[] = isAdmin
-              ? ["servers", "bot", "mcp", "backups", "users", "settings"]
-              : ["servers"];
-            if (user?.invoice_role) tabs.push("facturas");
-            return tabs;
-          })().map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px whitespace-nowrap ${
-                tab === t
-                  ? "border-brand-500 text-white"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              {t === "servers"
-                ? "Game Servers"
-                : t === "bot"
-                  ? "Bot"
-                  : t === "mcp"
-                    ? "MCP"
-                    : t === "backups"
-                      ? "Backups"
-                      : t === "users"
-                        ? "Users"
-                        : t === "facturas"
-                          ? "Facturas"
-                          : "Settings"}
-            </button>
-          ))}
-        </div>
+        {error && <Notice tone="danger">{error}</Notice>}
+        {restartMsg && <Notice tone="ok">{restartMsg}</Notice>}
 
         {tab === "servers" && (
           <>
-            {/* Server grid header with add button */}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-400">
-                {servers.length} server{servers.length !== 1 ? "s" : ""}
-              </span>
-              {isAdmin && (
-                <button
-                  onClick={() => setShowGameStore(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  + Add Game
-                </button>
-              )}
-            </div>
+            <section className="flex flex-col gap-3">
+              <SectionRule
+                right={
+                  <span className="num shrink-0 text-micro text-faint">
+                    {runningServers.length}/{servers.length}
+                  </span>
+                }
+              >
+                Servidores
+              </SectionRule>
 
-            {/* Server grid */}
-            {servers.length === 0 ? (
-              <div className="text-center text-gray-600 py-16">
-                {isAdmin ? (
-                  <>
-                    <p>No servers configured.</p>
-                    <button
-                      onClick={() => setShowGameStore(true)}
-                      className="mt-3 text-brand-400 hover:text-brand-300 text-sm"
-                    >
-                      Add your first game server
-                    </button>
-                  </>
-                ) : (
-                  <p>No servers assigned to you yet. Ask an admin to give you access.</p>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {sortedServers.map((server) => (
-                  <ServerCard
-                    key={server.id}
-                    server={server}
-                    isActive={server.status === "running"}
-                    loading={loadingId === server.id}
-                    hostMemTotalMB={hostMemTotalMB}
-                    hostDomain={hostDomain}
-                    iconUrl={server.icon || gameIcons[server.id]}
-                    isAdmin={isAdmin}
-                    onStart={handleStart}
-                    onStop={handleStop}
-                    onDelete={handleDelete}
-                    onViewLogs={handleViewLogs}
-                    onEditConfig={handleEditConfig}
-                    onOpenFiles={handleOpenFiles}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Infrastructure (admin only) */}
-            {isAdmin && (
-              <div className="mt-10">
-                <h2 className="text-lg font-semibold text-gray-200 mb-4">Infrastructure</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {INFRA_SERVICES.map((svc) => (
+              {servers.length === 0 ? (
+                <Empty
+                  title={
+                    isAdmin
+                      ? "Todavía no hay ningún servidor configurado."
+                      : "No tienes servidores asignados. Pide acceso a un administrador."
+                  }
+                  action={
+                    isAdmin ? (
+                      <Button tone="accent" onClick={() => setShowGameStore(true)}>
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        Añadir el primero
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+                  {sortedServers.map((server, i) => (
                     <div
-                      key={svc}
-                      className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col"
+                      key={server.id}
+                      className="row-in"
+                      style={{ animationDelay: `${Math.min(i, 8) * 70}ms` }}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-200 capitalize">{svc}</span>
-                        <div className="flex gap-1.5">
-                          <button
+                      <ServerCard
+                        server={server}
+                        isActive={server.status === "running"}
+                        loading={loadingId === server.id}
+                        hostMemTotalMB={hostMemTotalMB}
+                        hostDomain={hostDomain}
+                        iconUrl={server.icon || gameIcons[server.id]}
+                        banner={
+                          resolveTheme(server.game_type, { banner_path: server.banner_path }).banner
+                        }
+                        isAdmin={isAdmin}
+                        onStart={handleStart}
+                        onStop={handleStop}
+                        onDelete={handleDelete}
+                        onViewLogs={handleViewLogs}
+                        onEditConfig={handleEditConfig}
+                        onOpenFiles={handleOpenFiles}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {isAdmin && (
+              <section className="flex flex-col gap-3">
+                <SectionRule>Infraestructura</SectionRule>
+                <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {INFRA_SERVICES.map((svc) => {
+                    const stats = serviceStats[svc] ?? null;
+                    return (
+                      <Panel key={svc} className="flex flex-col" as="article">
+                        <div className="flex items-center justify-between px-3.5 py-2.5">
+                          <span className="text-body font-medium text-ink">{svc}</span>
+                          <StatusMark
+                            tone={stats ? "ok" : "idle"}
+                            label={stats ? "Activo" : "Sin dato"}
+                          />
+                        </div>
+                        <Divider />
+                        <div className="px-3.5 py-2.5">
+                          <ServiceStatsBar stats={stats} />
+                        </div>
+                        <Divider />
+                        <div className="flex items-center gap-1 px-3.5 py-2">
+                          <Button
+                            tone="ghost"
+                            size="sm"
                             onClick={() =>
                               setLogTarget({
                                 title: svc,
                                 factory: () => createServiceLogStream(svc),
                               })
                             }
-                            className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
                           >
-                            Logs
-                          </button>
+                            <LogsIcon className="h-3.5 w-3.5" />
+                            Registro
+                          </Button>
                           {(RESTARTABLE_SERVICES as readonly string[]).includes(svc) && (
-                            <button
+                            <Button
+                              tone="ghost"
+                              size="sm"
                               onClick={() =>
                                 handleRestartService(svc as (typeof RESTARTABLE_SERVICES)[number])
                               }
                               disabled={restartingService === svc}
-                              className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {restartingService === svc ? (
-                                <span className="inline-block animate-spin">⟳</span>
-                              ) : (
-                                "⟳ Restart"
-                              )}
-                            </button>
+                              <RestoreIcon className="h-3.5 w-3.5" />
+                              {restartingService === svc ? "Reiniciando" : "Reiniciar"}
+                            </Button>
                           )}
                         </div>
-                      </div>
-                      <ServiceStatsBar stats={serviceStats[svc] ?? null} />
-                    </div>
-                  ))}
+                      </Panel>
+                    );
+                  })}
                 </div>
-                {restartMsg && <p className="mt-2 text-xs text-green-400">{restartMsg}</p>}
-              </div>
+              </section>
             )}
           </>
         )}
 
         {tab === "bot" && (
-          <div className="max-w-lg">
+          <div className="max-w-xl">
             <BotSettings />
           </div>
         )}
 
         {tab === "mcp" && (
-          <div className="max-w-lg">
+          <div className="max-w-xl">
             <McpTokens />
           </div>
         )}
@@ -490,28 +494,23 @@ export default function Home() {
         {tab === "users" && <UsersTab />}
 
         {tab === "settings" && (
-          <div className="max-w-lg">
+          <div className="max-w-xl">
             <PanelSettings />
           </div>
         )}
 
         {tab === "facturas" && user?.invoice_role && (
-          <div className="max-w-3xl">
+          <div className="flex max-w-3xl flex-col gap-6">
             <InvoiceUpload
               invoiceRole={user.invoice_role}
               onUploaded={() => setInvoiceRefresh((k) => k + 1)}
             />
             <InvoiceList invoiceRole={user.invoice_role} refreshKey={invoiceRefresh} />
-            {user.invoice_role === "freelancer" && (
-              <div className="mt-8">
-                <FreelancerProfileForm />
-              </div>
-            )}
+            {user.invoice_role === "freelancer" && <FreelancerProfileForm />}
           </div>
         )}
-      </main>
+      </div>
 
-      {/* Log viewer modal */}
       {logTarget && (
         <LogViewer
           title={logTarget.title}
@@ -522,7 +521,6 @@ export default function Home() {
         />
       )}
 
-      {/* Config editor modal */}
       {editConfigId && editConfigServer && (
         <ConfigEditor
           serverId={editConfigId}
@@ -535,7 +533,6 @@ export default function Home() {
         />
       )}
 
-      {/* File manager modal */}
       {fileManagerId && (
         <FileManager
           serverId={fileManagerId}
@@ -544,12 +541,11 @@ export default function Home() {
         />
       )}
 
-      {/* Game store modal */}
       <GameStore
         open={showGameStore}
         onClose={() => setShowGameStore(false)}
         onCreated={fetchServers}
       />
-    </div>
+    </AppShell>
   );
 }

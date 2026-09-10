@@ -67,7 +67,7 @@ describe("ServerCard", () => {
    */
   it("renders Start button for stopped servers and calls onStart on click", () => {
     render(<ServerCard server={stoppedServer} {...defaultProps} />);
-    const startBtn = screen.getByText("Start");
+    const startBtn = screen.getByText("Arrancar");
     expect(startBtn).toBeInTheDocument();
     fireEvent.click(startBtn);
     expect(defaultProps.onStart).toHaveBeenCalledWith("minecraft");
@@ -75,7 +75,7 @@ describe("ServerCard", () => {
 
   it("renders Stop button for running servers and calls onStop on click", () => {
     render(<ServerCard server={runningServer} {...defaultProps} isActive />);
-    const stopBtn = screen.getByText("Stop");
+    const stopBtn = screen.getByText("Detener");
     expect(stopBtn).toBeInTheDocument();
     fireEvent.click(stopBtn);
     expect(defaultProps.onStop).toHaveBeenCalledWith("minecraft");
@@ -89,18 +89,18 @@ describe("ServerCard", () => {
     expect(screen.queryByTitle("Logs")).not.toBeInTheDocument();
 
     rerender(<ServerCard server={runningServer} {...defaultProps} isActive />);
-    expect(screen.getByTitle("Logs")).toBeInTheDocument();
+    expect(screen.getByTitle("Registro")).toBeInTheDocument();
   });
 
   it("Logs button calls onViewLogs on click", () => {
     render(<ServerCard server={runningServer} {...defaultProps} isActive />);
-    fireEvent.click(screen.getByTitle("Logs"));
+    fireEvent.click(screen.getByTitle("Registro"));
     expect(defaultProps.onViewLogs).toHaveBeenCalledTimes(1);
   });
 
   it("shows 'Starting...' when loading and button is disabled", () => {
     render(<ServerCard server={stoppedServer} {...defaultProps} loading />);
-    const btn = screen.getByText("Starting...");
+    const btn = screen.getByText("Arrancando");
     expect(btn).toBeInTheDocument();
     expect(btn).toBeDisabled();
   });
@@ -113,7 +113,7 @@ describe("ServerCard", () => {
 
   it("renders edit config button when stopped", () => {
     render(<ServerCard server={stoppedServer} {...defaultProps} />);
-    const configBtn = screen.getByTitle("Edit config");
+    const configBtn = screen.getByTitle("Configuración");
     expect(configBtn).toBeInTheDocument();
     fireEvent.click(configBtn);
     expect(defaultProps.onEditConfig).toHaveBeenCalledTimes(1);
@@ -122,30 +122,30 @@ describe("ServerCard", () => {
   it("shows 'Starting...' status when joinable is 'starting'", () => {
     const startingServer: GameServer = { ...runningServer, joinable: "starting" };
     render(<ServerCard server={startingServer} {...defaultProps} isActive />);
-    expect(screen.getByText("Starting...")).toBeInTheDocument();
+    expect(screen.getByText("Arrancando")).toBeInTheDocument();
   });
 
   it("shows 'Ready' status when joinable is 'joinable'", () => {
     const readyServer: GameServer = { ...runningServer, joinable: "joinable" };
     render(<ServerCard server={readyServer} {...defaultProps} isActive />);
-    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Listo")).toBeInTheDocument();
   });
 
   it("shows 'Running' status when joinable is null (non-MC server)", () => {
     const noJoinableServer: GameServer = { ...runningServer, joinable: null };
     render(<ServerCard server={noJoinableServer} {...defaultProps} isActive />);
-    expect(screen.getByText("Running")).toBeInTheDocument();
+    expect(screen.getByText("En marcha")).toBeInTheDocument();
   });
 
   it("delete requires double-click confirmation", () => {
     render(<ServerCard server={stoppedServer} {...defaultProps} />);
-    const deleteBtn = screen.getByTitle("Delete server");
+    const deleteBtn = screen.getByTitle("Borrar servidor");
     fireEvent.click(deleteBtn);
     // First click shows confirm button
-    expect(screen.getByTitle("Confirm delete server and files")).toBeInTheDocument();
+    expect(screen.getByTitle("Confirmar borrado del servidor y sus ficheros")).toBeInTheDocument();
     expect(defaultProps.onDelete).not.toHaveBeenCalled();
     // Second click confirms deletion
-    fireEvent.click(screen.getByTitle("Confirm delete server and files"));
+    fireEvent.click(screen.getByTitle("Confirmar borrado del servidor y sus ficheros"));
     expect(defaultProps.onDelete).toHaveBeenCalledWith("minecraft", true);
   });
 });

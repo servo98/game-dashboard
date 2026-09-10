@@ -50,8 +50,8 @@ describe("LogViewer", () => {
     // Wait for microtask (onopen fires)
     await act(() => Promise.resolve());
 
-    // The green dot has the bg-green-500 class
-    const dot = document.querySelector(".bg-green-500");
+    // The green dot has the bg-ok class
+    const dot = document.querySelector(".bg-ok");
     expect(dot).not.toBeNull();
   });
 
@@ -73,10 +73,10 @@ describe("LogViewer", () => {
     expect(screen.getByText(/Hello server log/)).toBeInTheDocument();
   });
 
-  it("shows 'Waiting for log output...' initially", () => {
+  it("muestra el aviso de espera al abrir", () => {
     const factory = () => new MockEventSource("/logs") as unknown as EventSource;
     render(<LogViewer title="test" streamFactory={factory} onClose={onClose} />);
-    expect(screen.getByText("Waiting for log output...")).toBeInTheDocument();
+    expect(screen.getByText("Esperando salida del registro.")).toBeInTheDocument();
   });
 
   it("shows red dot on error", async () => {
@@ -90,7 +90,7 @@ describe("LogViewer", () => {
       es.__simulateError();
     });
 
-    const redDot = document.querySelector(".bg-red-500");
+    const redDot = document.querySelector(".bg-danger");
     expect(redDot).not.toBeNull();
   });
 
@@ -100,7 +100,8 @@ describe("LogViewer", () => {
 
     await act(() => Promise.resolve());
 
-    const closeBtn = screen.getByText("✕");
+    // El modal ofrece dos formas de cerrar: el velo y el botón de la cabecera.
+    const [, closeBtn] = screen.getAllByLabelText("Cerrar");
     closeBtn.click();
     expect(onClose).toHaveBeenCalledTimes(1);
   });

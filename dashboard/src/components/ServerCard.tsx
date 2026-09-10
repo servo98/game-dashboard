@@ -3,18 +3,21 @@ import type { BackupRecord, GameServer, ServerSessionRecord } from "../api";
 import { api } from "../api";
 import { connectAddress, formatDuration, formatSize } from "../utils/format";
 import {
-  BoxIcon,
-  ClockIcon,
+  CheckIcon,
+  CopyIcon,
   DownloadIcon,
   FolderIcon,
   GamepadIcon,
   LogsIcon,
+  PlayIcon,
   RestoreIcon,
   SettingsIcon,
+  StopIcon,
   TrashIcon,
 } from "./Icons";
 import OnlinePlayers from "./OnlinePlayers";
 import StatsBar from "./StatsBar";
+import { Button, ButtonLink, Divider, Panel, StatusMark, Tag, type Tone } from "./ui";
 
 type Props = {
   server: GameServer;
@@ -29,30 +32,30 @@ type Props = {
   hostMemTotalMB?: number;
   hostDomain?: string;
   iconUrl?: string;
+  /** Arte del juego. Va detrás de la cabecera, no como héroe de página. */
+  banner?: string;
   isAdmin?: boolean;
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  running: "bg-green-500",
-  starting: "bg-yellow-500 animate-pulse",
-  joinable: "bg-green-500",
-  stopped: "bg-gray-500",
-  missing: "bg-gray-500",
+/** El estado se dice con palabras; el color solo lo subraya. */
+const STATUS: Record<string, { tone: Tone; label: string; live?: boolean }> = {
+  running: { tone: "ok", label: "En marcha" },
+  joinable: { tone: "ok", label: "Listo" },
+  starting: { tone: "warn", label: "Arrancando", live: true },
+  stopped: { tone: "idle", label: "Parado" },
+  missing: { tone: "idle", label: "Parado" },
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  running: "Running",
-  starting: "Starting...",
-  joinable: "Ready",
-  stopped: "Stopped",
-  missing: "Stopped",
+const STOP_REASON: Record<string, { tone: Tone; label: string }> = {
+  user: { tone: "idle", label: "Parado" },
+  crash: { tone: "danger", label: "Caída" },
+  replaced: { tone: "warn", label: "Reemplazado" },
 };
 
-const REASON_LABEL: Record<string, string> = {
-  user: "Stopped",
-  crash: "Crashed",
-  replaced: "Replaced",
-};
+/** Fila de un desplegable: dos columnas, mono a la izquierda, acciones a la derecha. */
+function Row({ children }: { children: React.ReactNode }) {
+  return <div className="flex items-center justify-between gap-3 py-1">{children}</div>;
+}
 
 export default memo(function ServerCard({
   server,
@@ -67,22 +70,22 @@ export default memo(function ServerCard({
   hostMemTotalMB,
   hostDomain = "aypapol.com",
   iconUrl,
+  banner,
   isAdmin = true,
 }: Props) {
   const [copied, setCopied] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [drawer, setDrawer] = useState<"backups" | "history" | null>(null);
   const [history, setHistory] = useState<ServerSessionRecord[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showBackups, setShowBackups] = useState(false);
   const [backups, setBackups] = useState<BackupRecord[] | null>(null);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [backupCreating, setBackupCreating] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
 
   const isRunning = server.status === "running";
-  // Derive effective status: if running, use joinable sub-state when available
   const effectiveStatus = isRunning && server.joinable ? server.joinable : server.status;
+  const status = STATUS[effectiveStatus] ?? STATUS.stopped;
   const address = connectAddress(server.game_type, server.port, hostDomain);
 
   function handleCopy() {
@@ -91,21 +94,32 @@ export default memo(function ServerCard({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function toggleHistory() {
-    if (showHistory) {
-      setShowHistory(false);
+  async function openDrawer(which: "backups" | "history") {
+    if (drawer === which) {
+      setDrawer(null);
       return;
     }
-    setShowHistory(true);
-    if (history === null) {
+    setDrawer(which);
+
+    if (which === "history" && history === null) {
       setHistoryLoading(true);
       try {
-        const rows = await api.getServerHistory(server.id);
-        setHistory(rows);
+        setHistory(await api.getServerHistory(server.id));
       } catch {
         setHistory([]);
       } finally {
         setHistoryLoading(false);
+      }
+    }
+
+    if (which === "backups" && backups === null) {
+      setBackupsLoading(true);
+      try {
+        setBackups(await api.listBackups(server.id));
+      } catch {
+        setBackups([]);
+      } finally {
+        setBackupsLoading(false);
       }
     }
   }
@@ -120,32 +134,13 @@ export default memo(function ServerCard({
     }
   }
 
-  async function toggleBackups() {
-    if (showBackups) {
-      setShowBackups(false);
-      return;
-    }
-    setShowBackups(true);
-    if (backups === null) {
-      setBackupsLoading(true);
-      try {
-        const rows = await api.listBackups(server.id);
-        setBackups(rows);
-      } catch {
-        setBackups([]);
-      } finally {
-        setBackupsLoading(false);
-      }
-    }
-  }
-
   async function handleCreateBackup() {
     setBackupCreating(true);
     try {
       const record = await api.createBackup(server.id);
       setBackups((prev) => (prev ? [record, ...prev] : [record]));
     } catch {
-      // ignore
+      // el listado se recarga al reabrir el cajón
     } finally {
       setBackupCreating(false);
     }
@@ -156,7 +151,7 @@ export default memo(function ServerCard({
       await api.deleteBackup(server.id, backupId);
       setBackups((prev) => prev?.filter((b) => b.id !== backupId) ?? null);
     } catch {
-      // ignore
+      // sin cambios visibles si falla
     }
   }
 
@@ -165,7 +160,7 @@ export default memo(function ServerCard({
       try {
         await api.restoreBackup(server.id, backupId);
       } catch {
-        // ignore
+        // sin cambios visibles si falla
       }
       setConfirmRestore(null);
     } else {
@@ -174,270 +169,293 @@ export default memo(function ServerCard({
     }
   }
 
+  const stamp = (unix: number) =>
+    new Date(unix * 1000).toLocaleString([], {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
   return (
-    <div
-      className={`border rounded-2xl p-5 flex flex-col gap-4 transition-all ${
-        isActive
-          ? "bg-gray-900 border-brand-500 ring-1 ring-brand-500/20"
-          : "bg-gray-900 border-gray-800"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {iconUrl ? (
-            <img src={iconUrl} alt="" className="w-7 h-7 rounded object-cover" />
-          ) : (
-            <GamepadIcon className="w-7 h-7 text-gray-400" />
-          )}
-          <div>
-            <h3 className="font-semibold text-white leading-tight">{server.name}</h3>
-            <p className="text-xs text-gray-500">Port {server.port}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_COLOR[effectiveStatus] ?? STATUS_COLOR.stopped}`}
-          />
-          <span className="text-xs text-gray-400">
-            {STATUS_LABEL[effectiveStatus] ?? "Stopped"}
-          </span>
-        </div>
-      </div>
-
-      {/* Connect address — only when running */}
-      {isRunning && (
-        <div className="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
-          <div className="flex flex-col">
-            <span className="text-xs text-gray-500 leading-none mb-0.5">Connect</span>
-            <span className="text-sm font-mono text-green-400">{address}</span>
-          </div>
-          <button
-            onClick={handleCopy}
-            className="text-xs px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors shrink-0"
-          >
-            {copied ? "Copied!" : "Copy"}
-          </button>
-        </div>
-      )}
-
-      {/* CPU/RAM stats — only when running */}
-      {isRunning && <StatsBar serverId={server.id} hostMemTotalMB={hostMemTotalMB} />}
-
-      {/* Online players — only when running and joinable */}
-      {isRunning && (
-        <OnlinePlayers
-          serverId={server.id}
-          dockerImage={server.docker_image}
-          joinable={server.joinable}
-        />
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        {!isRunning ? (
-          <button
-            onClick={() => onStart(server.id)}
-            disabled={loading}
-            className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
-          >
-            {loading ? "Starting..." : "Start"}
-          </button>
-        ) : (
+    <Panel rail={isActive} className="flex flex-col" as="article">
+      {/* Identidad y estado. El arte del juego vive aquí, recortado y al fondo:
+          da carácter a la tarjeta sin robarle sitio a los datos. */}
+      <div className="relative overflow-hidden rounded-t-lg">
+        {banner && (
           <>
-            <button
-              onClick={() => onStop(server.id)}
-              disabled={loading}
-              className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2 text-sm font-medium transition-colors"
-            >
-              {loading ? "Stopping..." : "Stop"}
-            </button>
-            <button
-              onClick={() => onViewLogs(server.id)}
-              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-300 transition-colors"
-              title="Logs"
-            >
-              <LogsIcon />
-            </button>
+            <img
+              src={banner}
+              alt=""
+              aria-hidden
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.14]"
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-surface/40 via-surface/70 to-surface"
+            />
           </>
         )}
-        {isAdmin && (
-          <button
-            onClick={() => onEditConfig(server.id)}
-            title="Edit config"
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
-          >
-            <SettingsIcon />
-          </button>
-        )}
-        {isAdmin && (
-          <button
-            onClick={() => onOpenFiles(server.id)}
-            title="Browse files"
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 hover:text-white transition-colors"
-          >
-            <FolderIcon />
-          </button>
-        )}
-        {isAdmin && !isRunning && !confirmDelete && (
-          <button
-            onClick={() => handleDeleteClick()}
-            title="Delete server"
-            className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors"
-          >
-            <TrashIcon />
-          </button>
-        )}
-        {isAdmin && !isRunning && confirmDelete && (
-          <button
-            onClick={() => handleDeleteClick()}
-            title="Confirm delete server and files"
-            className="px-2.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors"
-          >
-            Confirm Delete
-          </button>
-        )}
-        {isAdmin && (
-          <button
-            onClick={toggleBackups}
-            className={`px-3 py-2 rounded-xl transition-colors ${
-              showBackups
-                ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
-                : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
-            }`}
-            title="Backups"
-          >
-            <BoxIcon />
-          </button>
-        )}
-        <button
-          onClick={toggleHistory}
-          className={`px-3 py-2 rounded-xl transition-colors ${
-            showHistory
-              ? "bg-brand-500/20 ring-1 ring-brand-500 text-brand-400"
-              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300"
-          }`}
-          title="Session history"
-        >
-          <ClockIcon />
-        </button>
+        <div className="relative flex items-start gap-3 px-4 py-3">
+          {iconUrl ? (
+            <img src={iconUrl} alt="" className="h-8 w-8 shrink-0 rounded-sm object-cover" />
+          ) : (
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-line bg-raised text-faint">
+              <GamepadIcon className="h-4 w-4" />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-title font-semibold text-ink">{server.name}</h3>
+            <p className="num mt-0.5 truncate text-micro uppercase text-faint">
+              {server.game_type} · puerto {server.port}
+            </p>
+          </div>
+          <StatusMark
+            tone={status.tone}
+            label={status.label}
+            live={status.live}
+            className="mt-0.5"
+          />
+        </div>
       </div>
 
-      {/* Backups panel */}
-      {showBackups && (
-        <div className="border-t border-gray-800 pt-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-gray-500">Backups</p>
-            <button
-              onClick={handleCreateBackup}
-              disabled={backupCreating}
-              className="text-xs px-2.5 py-1 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
+      {/* Dirección de conexión: lo primero que alguien viene a buscar */}
+      {isRunning && (
+        <>
+          <Divider />
+          <div className="flex items-center gap-2 px-4 py-2.5">
+            <span className="label shrink-0">Entrar</span>
+            <span className="num min-w-0 flex-1 truncate text-body text-ink">{address}</span>
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={handleCopy}
+              title="Copiar dirección"
+              className="shrink-0"
             >
-              {backupCreating ? "Creating..." : "Create Backup"}
-            </button>
+              {copied ? (
+                <CheckIcon className="h-3.5 w-3.5" />
+              ) : (
+                <CopyIcon className="h-3.5 w-3.5" />
+              )}
+              {copied ? "Copiado" : "Copiar"}
+            </Button>
           </div>
-          {backupsLoading ? (
-            <div className="text-xs text-gray-600 animate-pulse">Loading...</div>
-          ) : backups && backups.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              {backups.map((b) => (
-                <div key={b.id} className="flex items-center justify-between text-xs text-gray-400">
-                  <div className="flex flex-col">
-                    <span>
-                      {new Date(b.created_at * 1000).toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    <span className="text-gray-600">{formatSize(b.size_bytes)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <a
-                      href={api.downloadBackupUrl(server.id, b.id)}
-                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors inline-flex items-center"
-                      title="Download"
-                    >
-                      <DownloadIcon className="w-3.5 h-3.5" />
-                    </a>
-                    <button
-                      onClick={() => handleRestoreBackup(b.id)}
-                      disabled={isRunning}
-                      title={isRunning ? "Stop server first" : "Restore"}
-                      className={`px-1.5 py-0.5 rounded transition-colors inline-flex items-center ${
-                        confirmRestore === b.id
-                          ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                          : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                      }`}
-                    >
-                      {confirmRestore === b.id ? (
-                        "Confirm?"
-                      ) : (
-                        <RestoreIcon className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBackup(b.id)}
-                      className="px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400 transition-colors inline-flex items-center"
-                      title="Delete"
-                    >
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-600">No backups yet.</p>
-          )}
-        </div>
+        </>
       )}
 
-      {/* Session history panel */}
-      {showHistory && (
-        <div className="border-t border-gray-800 pt-3">
-          <p className="text-xs text-gray-500 mb-2">Recent Sessions</p>
-          {historyLoading ? (
-            <div className="text-xs text-gray-600 animate-pulse">Loading...</div>
-          ) : history && history.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              {history.slice(0, 5).map((s) => (
-                <div key={s.id} className="flex items-center justify-between text-xs text-gray-400">
-                  <span>
-                    {new Date(s.started_at * 1000).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {s.duration_seconds !== null && (
-                      <span className="text-gray-500">{formatDuration(s.duration_seconds)}</span>
-                    )}
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-xs ${
-                        s.stop_reason === "crash"
-                          ? "bg-red-950/50 text-red-400"
-                          : s.stop_reason === "replaced"
-                            ? "bg-yellow-950/50 text-yellow-500"
-                            : s.stop_reason
-                              ? "bg-gray-800 text-gray-500"
-                              : "bg-green-950/50 text-green-500"
-                      }`}
-                    >
-                      {s.stop_reason ? (REASON_LABEL[s.stop_reason] ?? s.stop_reason) : "Running"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-600">No sessions recorded yet.</p>
+      {/* Telemetría y jugadores */}
+      {isRunning && (
+        <>
+          <Divider />
+          <div className="flex flex-col gap-2.5 px-4 py-3">
+            <StatsBar serverId={server.id} hostMemTotalMB={hostMemTotalMB} />
+            <OnlinePlayers
+              serverId={server.id}
+              dockerImage={server.docker_image}
+              joinable={server.joinable}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Acciones: una gana, el resto se retira a iconos discretos */}
+      <Divider />
+      <div className="flex items-center gap-2 px-4 py-3">
+        {isRunning ? (
+          <Button tone="danger" onClick={() => onStop(server.id)} disabled={loading}>
+            <StopIcon className="h-3 w-3" />
+            {loading ? "Deteniendo" : "Detener"}
+          </Button>
+        ) : (
+          <Button tone="accent" onClick={() => onStart(server.id)} disabled={loading}>
+            <PlayIcon className="h-3 w-3" />
+            {loading ? "Arrancando" : "Arrancar"}
+          </Button>
+        )}
+
+        <div className="ml-auto flex items-center gap-0.5">
+          {isRunning && (
+            <Button
+              tone="ghost"
+              size="sm"
+              icon
+              onClick={() => onViewLogs(server.id)}
+              title="Registro"
+            >
+              <LogsIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              tone="ghost"
+              size="sm"
+              icon
+              onClick={() => onEditConfig(server.id)}
+              title="Configuración"
+            >
+              <SettingsIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              tone="ghost"
+              size="sm"
+              icon
+              onClick={() => onOpenFiles(server.id)}
+              title="Ficheros"
+            >
+              <FolderIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {isAdmin && !isRunning && (
+            <Button
+              tone={confirmDelete ? "danger-solid" : "ghost"}
+              size="sm"
+              icon={!confirmDelete}
+              onClick={handleDeleteClick}
+              title={
+                confirmDelete ? "Confirmar borrado del servidor y sus ficheros" : "Borrar servidor"
+              }
+              className={confirmDelete ? "" : "hover:text-danger"}
+            >
+              {confirmDelete ? "Confirmar" : <TrashIcon className="h-4 w-4" />}
+            </Button>
           )}
         </div>
+      </div>
+
+      {/* Cajones: texto, no más iconos */}
+      {isAdmin && (
+        <>
+          <Divider />
+          <div className="flex items-center gap-4 px-4 py-2">
+            <button
+              type="button"
+              onClick={() => openDrawer("backups")}
+              className={`tap font-mono text-micro uppercase ${
+                drawer === "backups" ? "text-accent" : "text-faint hover:text-muted"
+              }`}
+            >
+              Copias{backups ? ` (${backups.length})` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => openDrawer("history")}
+              className={`tap font-mono text-micro uppercase ${
+                drawer === "history" ? "text-accent" : "text-faint hover:text-muted"
+              }`}
+            >
+              Sesiones
+            </button>
+          </div>
+        </>
       )}
-    </div>
+
+      {drawer === "backups" && (
+        <>
+          <Divider />
+          <div className="px-4 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="label">Copias de seguridad</span>
+              <Button size="sm" onClick={handleCreateBackup} disabled={backupCreating}>
+                {backupCreating ? "Creando" : "Crear copia"}
+              </Button>
+            </div>
+            {backupsLoading ? (
+              <p className="text-meta text-faint">Cargando</p>
+            ) : backups && backups.length > 0 ? (
+              <div className="divide-y divide-line">
+                {backups.map((b) => (
+                  <Row key={b.id}>
+                    <div className="min-w-0">
+                      <div className="num text-meta text-muted">{stamp(b.created_at)}</div>
+                      <div className="num text-micro text-faint">{formatSize(b.size_bytes)}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <ButtonLink
+                        href={api.downloadBackupUrl(server.id, b.id)}
+                        tone="ghost"
+                        size="sm"
+                        icon
+                        title="Descargar"
+                      >
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                      </ButtonLink>
+                      <Button
+                        tone={confirmRestore === b.id ? "danger-solid" : "ghost"}
+                        size="sm"
+                        icon={confirmRestore !== b.id}
+                        onClick={() => handleRestoreBackup(b.id)}
+                        disabled={isRunning}
+                        title={isRunning ? "Detén el servidor antes de restaurar" : "Restaurar"}
+                      >
+                        {confirmRestore === b.id ? (
+                          "Confirmar"
+                        ) : (
+                          <RestoreIcon className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        tone="ghost"
+                        size="sm"
+                        icon
+                        onClick={() => handleDeleteBackup(b.id)}
+                        title="Borrar copia"
+                        className="hover:text-danger"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </Row>
+                ))}
+              </div>
+            ) : (
+              <p className="text-meta text-faint">Todavía no hay copias.</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {drawer === "history" && (
+        <>
+          <Divider />
+          <div className="px-4 py-3">
+            <span className="label">Últimas sesiones</span>
+            <div className="mt-2">
+              {historyLoading ? (
+                <p className="text-meta text-faint">Cargando</p>
+              ) : history && history.length > 0 ? (
+                <div className="divide-y divide-line">
+                  {history.slice(0, 5).map((s) => {
+                    const reason = s.stop_reason
+                      ? (STOP_REASON[s.stop_reason] ?? {
+                          tone: "idle" as Tone,
+                          label: s.stop_reason,
+                        })
+                      : { tone: "ok" as Tone, label: "En marcha" };
+                    return (
+                      <Row key={s.id}>
+                        <span className="num text-meta text-muted">{stamp(s.started_at)}</span>
+                        <div className="flex items-center gap-2">
+                          {s.duration_seconds !== null && (
+                            <span className="num text-micro text-faint">
+                              {formatDuration(s.duration_seconds)}
+                            </span>
+                          )}
+                          <Tag tone={reason.tone}>{reason.label}</Tag>
+                        </div>
+                      </Row>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-meta text-faint">Sin sesiones registradas.</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </Panel>
   );
 });

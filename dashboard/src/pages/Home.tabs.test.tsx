@@ -6,9 +6,6 @@ import { renderWithRouter } from "../__tests__/render-with-router";
 vi.mock("../components/HostStatsBar", () => ({
   default: () => <div data-testid="host-stats-bar" />,
 }));
-vi.mock("../components/ThemeBanner", () => ({
-  default: () => <div data-testid="theme-banner" />,
-}));
 vi.mock("../components/StatsBar", () => ({
   default: () => <div data-testid="stats-bar" />,
 }));
@@ -31,9 +28,12 @@ vi.mock("../components/PanelSettings", () => ({
   default: () => <div data-testid="panel-settings" />,
 }));
 vi.mock("../theme", () => ({
-  applyTheme: vi.fn(),
-  resolveTheme: vi.fn(() => ({ banner: "/banner.jpg", colors: {} })),
-  DEFAULT_THEMES: { _idle: { banner: "/idle.jpg", colors: {} } },
+  applyAccent: vi.fn(),
+  applyMode: vi.fn(() => "dark"),
+  readModePreference: vi.fn(() => "system"),
+  watchSystemMode: vi.fn(() => () => {}),
+  resolveTheme: vi.fn(() => ({ banner: "/banner.jpg", accent: "#3b7dd8" })),
+  DEFAULT_THEMES: { _idle: { banner: "/idle.jpg", accent: "#3b7dd8" } },
 }));
 
 vi.mock("../api", () => ({
@@ -74,7 +74,7 @@ describe("Home tabs", () => {
   it("defaults to servers tab with Infrastructure visible", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
-      expect(screen.getByText("Infrastructure")).toBeInTheDocument();
+      expect(screen.getByText("Infraestructura")).toBeInTheDocument();
     });
   });
 
@@ -84,20 +84,20 @@ describe("Home tabs", () => {
     fireEvent.click(screen.getByText("Bot"));
     expect(screen.getByTestId("bot-settings")).toBeInTheDocument();
     // Infrastructure should NOT be visible on Bot tab
-    expect(screen.queryByText("Infrastructure")).not.toBeInTheDocument();
+    expect(screen.queryByText("Infraestructura")).not.toBeInTheDocument();
   });
 
   it("switches to Backups tab", async () => {
     renderWithRouter(<Home />);
-    await waitFor(() => screen.getByText("Backups"));
-    fireEvent.click(screen.getByText("Backups"));
+    await waitFor(() => screen.getByText("Copias"));
+    fireEvent.click(screen.getByText("Copias"));
     expect(screen.getByTestId("backups-tab")).toBeInTheDocument();
   });
 
   it("switches to Settings tab", async () => {
     renderWithRouter(<Home />);
-    await waitFor(() => screen.getByText("Settings"));
-    fireEvent.click(screen.getByText("Settings"));
+    await waitFor(() => screen.getByText("Ajustes"));
+    fireEvent.click(screen.getByText("Ajustes"));
     expect(screen.getByTestId("panel-settings")).toBeInTheDocument();
   });
 });

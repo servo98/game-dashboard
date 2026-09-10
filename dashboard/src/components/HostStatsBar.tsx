@@ -1,97 +1,73 @@
 import { useEffect, useRef, useState } from "react";
 import { createHostStatsStream, type HostStats } from "../api";
+import { Meter, Sparkline } from "./ui";
 
 type Props = {
   onMemTotal?: (totalMB: number) => void;
 };
 
+function gb(mb: number): string {
+  return `${(mb / 1024).toFixed(1)}G`;
+}
+
+/**
+ * Telemetría del anfitrión, al pie de la barra lateral. Antes era una tarjeta
+ * que empujaba el contenido hacia abajo; aquí está siempre visible y sin robar
+ * ancho, que es justo lo que se espera de un panel de instrumentos.
+ */
 export default function HostStatsBar({ onMemTotal }: Props) {
   const [stats, setStats] = useState<HostStats | null>(null);
-  const esRef = useRef<EventSource | null>(null);
-  const reportedRef = useRef(false);
+  const reported = useRef(false);
 
   useEffect(() => {
     const es = createHostStatsStream();
-    esRef.current = es;
 
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data as string) as HostStats;
         setStats(data);
-        if (!reportedRef.current && data.memTotalMB > 0 && onMemTotal) {
-          reportedRef.current = true;
+        if (!reported.current && data.memTotalMB > 0 && onMemTotal) {
+          reported.current = true;
           onMemTotal(data.memTotalMB);
         }
       } catch {
-        // ignore
+        // trama incompleta, llega otra en un segundo
       }
     };
 
     return () => es.close();
   }, [onMemTotal]);
 
-  if (!stats) {
-    return (
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-6">
-        <div className="text-xs text-gray-600 animate-pulse">Loading host stats...</div>
-      </div>
-    );
-  }
-
-  const cpuPct = Math.min(100, Math.max(0, stats.cpuPercent));
-  const ramPct = stats.memTotalMB > 0 ? (stats.memUsageMB / stats.memTotalMB) * 100 : 0;
-  const diskPct = stats.diskTotalGB > 0 ? (stats.diskUsedGB / stats.diskTotalGB) * 100 : 0;
+  const cpu = stats ? Math.min(100, Math.max(0, stats.cpuPercent)) : null;
+  const ramPct = stats && stats.memTotalMB > 0 ? (stats.memUsageMB / stats.memTotalMB) * 100 : 0;
+  const diskPct = stats && stats.diskTotalGB > 0 ? (stats.diskUsedGB / stats.diskTotalGB) * 100 : 0;
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-6">
-      <p className="text-xs text-gray-500 mb-3 font-medium">Host</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* CPU */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-500">CPU</span>
-            <span className="text-gray-400 tabular-nums">{cpuPct.toFixed(1)}%</span>
-          </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-brand-500 rounded-full transition-[width] duration-300"
-              style={{ width: `${cpuPct}%` }}
-            />
-          </div>
-        </div>
-        {/* RAM */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-500">RAM</span>
-            <span className="text-gray-400 tabular-nums">
-              {stats.memUsageMB.toFixed(0)} / {stats.memTotalMB.toFixed(0)} MB ({ramPct.toFixed(1)}
-              %)
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-purple-500 rounded-full transition-[width] duration-300"
-              style={{ width: `${ramPct}%` }}
-            />
-          </div>
-        </div>
-        {/* Disk */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-500">Disk</span>
-            <span className="text-gray-400 tabular-nums">
-              {stats.diskUsedGB.toFixed(1)} / {stats.diskTotalGB.toFixed(1)} GB (
-              {diskPct.toFixed(1)}%)
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-amber-500 rounded-full transition-[width] duration-300"
-              style={{ width: `${diskPct}%` }}
-            />
-          </div>
-        </div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between">
+        <span className="label">Anfitrión</span>
+        <span className="num text-micro text-faint">{stats ? `${cpu?.toFixed(0)}%` : "···"}</span>
       </div>
+
+      <Sparkline value={cpu} title="Carga de CPU del anfitrión" />
+
+      {stats ? (
+        <div className="flex flex-col gap-1.5">
+          <Meter label="CPU" value={cpu ?? 0} readout={`${(cpu ?? 0).toFixed(0)}%`} />
+          <Meter
+            label="RAM"
+            value={ramPct}
+            readout={`${gb(stats.memUsageMB)}/${gb(stats.memTotalMB)}`}
+          />
+          <Meter
+            label="SSD"
+            value={diskPct}
+            readout={`${stats.diskUsedGB.toFixed(0)}/${stats.diskTotalGB.toFixed(0)}G`}
+          />
+        </div>
+      ) : (
+        <p className="text-meta text-faint">Conectando</p>
+      )}
     </div>
   );
 }

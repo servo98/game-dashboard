@@ -1,32 +1,37 @@
 import { useEffect, useState } from "react";
 import { api, type BotSettings as BotSettingsType, type DiscordChannel } from "../api";
+import { Button, Divider, Field, Notice, Panel, Select } from "./ui";
 
 const CHANNEL_FIELDS = [
   {
     key: "allowed_channel_id" as const,
-    label: "Bot Commands Channel",
-    desc: "Restrict bot commands to this channel (empty = all channels)",
+    label: "Canal de comandos",
+    desc: "Limita los comandos del bot a este canal. En blanco, todos.",
   },
   {
     key: "errors_channel_id" as const,
-    label: "Error Notifications",
-    desc: "Dashboard errors are sent here",
+    label: "Avisos de error",
+    desc: "Aquí llegan los errores del panel.",
   },
   {
     key: "crashes_channel_id" as const,
-    label: "Crash Notifications",
-    desc: "Game server crash alerts are sent here",
+    label: "Avisos de caída",
+    desc: "Aquí llegan las caídas de los servidores de juego.",
   },
-  { key: "logs_channel_id" as const, label: "Log Channel", desc: "General log messages" },
+  {
+    key: "logs_channel_id" as const,
+    label: "Canal de registro",
+    desc: "Mensajes de registro generales.",
+  },
   {
     key: "quests_channel_id" as const,
-    label: "Quest Notifications",
-    desc: "Quest completion announcements",
+    label: "Avisos de misiones",
+    desc: "Anuncios de misiones completadas.",
   },
   {
     key: "invoices_channel_id" as const,
-    label: "Invoice Notifications",
-    desc: "New invoice upload alerts",
+    label: "Avisos de facturas",
+    desc: "Aviso cuando se sube una factura nueva.",
   },
 ];
 
@@ -70,71 +75,60 @@ export default function BotSettings() {
   }
 
   if (!settings) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-gray-600 py-4">
-        <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
-        Loading...
-      </div>
-    );
+    return <p className="label tick py-4">Cargando ajustes del bot</p>;
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col gap-4">
-      <h3 className="font-semibold text-gray-200">Bot Settings</h3>
+    <Panel>
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <h2 className="text-title font-semibold text-ink">Ajustes del bot</h2>
+        <Button tone="accent" size="sm" onClick={handleSave} disabled={saving}>
+          {saved ? "Guardado" : saving ? "Guardando" : "Guardar"}
+        </Button>
+      </div>
 
       {error && (
-        <div className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
-          {error}
-        </div>
+        <>
+          <Divider />
+          <div className="px-4 py-3">
+            <Notice>{error}</Notice>
+          </div>
+        </>
       )}
 
-      {/* Channel selectors */}
-      <div className="flex flex-col gap-3">
+      <Divider />
+      <div className="flex flex-col gap-3.5 px-4 py-4">
         {CHANNEL_FIELDS.map((field) => (
-          <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">
-              {field.label}
-              <span className="ml-1 text-gray-600 font-normal">{field.desc}</span>
-            </label>
-            <select
+          <Field key={field.key} label={field.label} hint={field.desc}>
+            <Select
               value={draft[field.key] ?? ""}
               onChange={(e) =>
                 setDraft((prev) => ({ ...prev, [field.key]: e.target.value || null }))
               }
-              className="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 appearance-none"
             >
-              <option value="">None</option>
+              <option value="">Ninguno</option>
               {channels.map((ch) => (
                 <option key={ch.id} value={ch.id}>
                   #{ch.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
         ))}
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="self-start px-5 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
-      >
-        {saved ? "Saved ✓" : saving ? "Saving..." : "Save"}
-      </button>
-
-      {/* Commands list */}
-      <div className="border-t border-gray-800 pt-3">
-        <p className="text-xs text-gray-500 mb-2">Available Commands</p>
-        <div className="flex flex-col gap-1.5">
+      <Divider />
+      <div className="px-4 py-3">
+        <p className="label mb-2">Comandos disponibles</p>
+        <dl className="flex flex-col gap-1">
           {settings.commands.map((cmd) => (
-            <div key={cmd.name} className="flex items-center gap-2 text-sm">
-              <span className="text-brand-400 font-mono">/{cmd.name}</span>
-              <span className="text-gray-600">—</span>
-              <span className="text-gray-400">{cmd.description}</span>
+            <div key={cmd.name} className="flex flex-wrap items-baseline gap-x-2">
+              <dt className="num text-meta text-accent">/{cmd.name}</dt>
+              <dd className="m-0 text-meta text-faint">{cmd.description}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </div>
-    </div>
+    </Panel>
   );
 }

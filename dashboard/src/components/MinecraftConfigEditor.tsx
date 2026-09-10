@@ -12,6 +12,7 @@ import {
   type ModpackPlatform,
   SECTIONS,
 } from "./minecraft-config";
+import { Loading } from "./ui";
 
 type Props = {
   envVars: Record<string, string>;
@@ -49,7 +50,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
         const results = await api.searchCurseForge(q);
         setCfResults(results);
       } catch (err) {
-        setCfError(err instanceof Error ? err.message : "Search failed");
+        setCfError(err instanceof Error ? err.message : "La búsqueda ha fallado");
         setCfResults([]);
       } finally {
         setCfLoading(false);
@@ -144,14 +145,14 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       case "memory":
         return (
           <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label className="block text-meta text-muted mb-1">
               {field.label}
-              <span className="ml-1.5 text-gray-600 font-normal">{field.description}</span>
+              <span className="ml-1.5 text-faint font-normal">{field.description}</span>
             </label>
             <select
               value={value}
               onChange={(e) => set(field.key, e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 appearance-none cursor-pointer"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body text-ink focus:outline-none focus:border-accent appearance-none cursor-pointer"
             >
               {field.options?.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -168,18 +169,18 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
         return (
           <div key={field.key} className="flex items-center justify-between py-1">
             <div>
-              <span className="text-sm text-white">{field.label}</span>
-              <span className="ml-1.5 text-xs text-gray-600">{field.description}</span>
+              <span className="text-body text-ink">{field.label}</span>
+              <span className="ml-1.5 text-meta text-faint">{field.description}</span>
             </div>
             <button
               type="button"
               onClick={() => set(field.key, isOn ? "FALSE" : "TRUE")}
               className={`relative w-10 h-5 rounded-full transition-colors ${
-                isOn ? "bg-brand-500" : "bg-gray-700"
+                isOn ? "bg-accent" : "bg-line"
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full transition-transform ${
                   isOn ? "translate-x-5" : ""
                 }`}
               />
@@ -191,9 +192,9 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       case "slider":
         return (
           <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label className="block text-meta text-muted mb-1">
               {field.label}
-              <span className="ml-1.5 text-gray-600 font-normal">{field.description}</span>
+              <span className="ml-1.5 text-faint font-normal">{field.description}</span>
             </label>
             <SliderField
               value={value}
@@ -209,15 +210,15 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       case "number":
         return (
           <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label className="block text-meta text-muted mb-1">
               {field.label}
-              <span className="ml-1.5 text-gray-600 font-normal">{field.description}</span>
+              <span className="ml-1.5 text-faint font-normal">{field.description}</span>
             </label>
             <input
               type="number"
               value={value}
               onChange={(e) => set(field.key, e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body font-mono text-ink focus:outline-none focus:border-accent"
             />
           </div>
         );
@@ -225,16 +226,16 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       case "text":
         return (
           <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label className="block text-meta text-muted mb-1">
               {field.label}
-              <span className="ml-1.5 text-gray-600 font-normal">{field.description}</span>
+              <span className="ml-1.5 text-faint font-normal">{field.description}</span>
             </label>
             <input
               type="text"
               value={value}
               placeholder={field.default || undefined}
               onChange={(e) => set(field.key, e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body font-mono text-ink focus:outline-none focus:border-accent"
             />
           </div>
         );
@@ -249,7 +250,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
           if (fields.length === 0) return null;
           return (
             <div key={section}>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <h3 className="text-meta font-semibold text-faint uppercase tracking-wider mb-2">
                 {section}
               </h3>
               <div className="flex flex-col gap-3">{fields.map(renderField)}</div>
@@ -267,9 +268,9 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       <div className="flex flex-col gap-3">
         {/* Current selection */}
         {currentSlug && (
-          <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2">
-            <span className="text-xs text-gray-400">Selected:</span>
-            <span className="text-sm font-mono text-white">{currentSlug}</span>
+          <div className="flex items-center gap-2 bg-surface border border-line rounded-lg px-3 py-2">
+            <span className="text-meta text-muted">Selected:</span>
+            <span className="text-body font-mono text-ink">{currentSlug}</span>
             <button
               type="button"
               onClick={() => {
@@ -277,7 +278,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
                 setCfQuery("");
                 setCfResults([]);
               }}
-              className="ml-auto text-xs text-gray-500 hover:text-red-400 transition-colors"
+              className="ml-auto text-meta text-faint hover:text-danger transition-colors"
             >
               Clear
             </button>
@@ -286,10 +287,10 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
 
         {/* Search input */}
         <div>
-          <label className="block text-xs text-gray-400 mb-1">
-            Search Modpacks
-            <span className="ml-1.5 text-gray-600 font-normal">
-              Type to search CurseForge modpacks
+          <label className="block text-meta text-muted mb-1">
+            Buscar modpacks
+            <span className="ml-1.5 text-faint font-normal">
+              Escribe para buscar modpacks en CurseForge
             </span>
           </label>
           <div className="relative">
@@ -298,22 +299,22 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
               value={cfQuery}
               placeholder="e.g. all the mods"
               onChange={(e) => searchCurseForge(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+              className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
             />
             {cfLoading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-gray-600 border-t-brand-400 rounded-full animate-spin" />
+                <Loading>Buscando</Loading>
               </div>
             )}
           </div>
         </div>
 
         {/* Error */}
-        {cfError && <p className="text-xs text-red-400">{cfError}</p>}
+        {cfError && <p className="text-meta text-danger">{cfError}</p>}
 
         {/* Results */}
         {cfResults.length > 0 && (
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto border border-gray-700 rounded-lg">
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto border border-line rounded-md">
             {cfResults.map((mod) => (
               <button
                 key={mod.id}
@@ -323,22 +324,22 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
                   setCfQuery("");
                   setCfResults([]);
                 }}
-                className={`flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-800 transition-colors ${
-                  currentSlug === mod.slug ? "bg-gray-800" : ""
+                className={`tap flex items-center gap-3 px-3 py-2 text-left hover:bg-raised transition-colors ${
+                  currentSlug === mod.slug ? "bg-raised" : ""
                 }`}
               >
                 {mod.thumbnailUrl && (
                   <img
                     src={mod.thumbnailUrl}
                     alt=""
-                    className="w-8 h-8 rounded object-cover shrink-0"
+                    className="w-8 h-8 rounded-sm object-cover shrink-0"
                   />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">{mod.name}</div>
-                  <div className="text-xs text-gray-500 truncate">{mod.summary}</div>
+                  <div className="text-body text-ink truncate">{mod.name}</div>
+                  <div className="text-meta text-faint truncate">{mod.summary}</div>
                 </div>
-                <div className="text-xs text-gray-600 shrink-0">
+                <div className="text-meta text-faint shrink-0">
                   {mod.downloadCount >= 1_000_000
                     ? `${(mod.downloadCount / 1_000_000).toFixed(1)}M`
                     : mod.downloadCount >= 1_000
@@ -353,7 +354,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
 
         {/* No results message */}
         {cfQuery.trim() && !cfLoading && cfResults.length === 0 && !cfError && (
-          <p className="text-xs text-gray-500">No modpacks found</p>
+          <p className="text-meta text-faint">Ningún modpack encontrado</p>
         )}
       </div>
     );
@@ -370,19 +371,19 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       <div className="flex flex-col gap-5">
         {/* Platform selector */}
         <div>
-          <label className="block text-xs text-gray-500 uppercase tracking-wider mb-2">
+          <label className="block text-meta text-faint uppercase tracking-wider mb-2">
             Platform
           </label>
-          <div className="flex gap-1 bg-gray-900 border border-gray-700 rounded-lg p-1">
+          <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
             {MODPACK_PLATFORMS.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => switchPlatform(p.id)}
-                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`tap flex-1 px-3 py-1.5 text-body font-medium rounded-md transition-colors ${
                   selectedPlatform === p.id
-                    ? "bg-brand-500 text-white"
-                    : "text-gray-400 hover:text-white"
+                    ? "bg-accent text-accent-ink"
+                    : "text-muted hover:text-ink"
                 }`}
               >
                 {p.label}
@@ -399,16 +400,16 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
             <div className="flex flex-col gap-3">
               {platform.fields.map((f) => (
                 <div key={f.key}>
-                  <label className="block text-xs text-gray-400 mb-1">
+                  <label className="block text-meta text-muted mb-1">
                     {f.label}
-                    <span className="ml-1.5 text-gray-600 font-normal">{f.description}</span>
+                    <span className="ml-1.5 text-faint font-normal">{f.description}</span>
                   </label>
                   <input
                     type="text"
                     value={envVars[f.key] ?? ""}
                     placeholder={f.placeholder}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+                    className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body font-mono text-ink focus:outline-none focus:border-accent"
                   />
                 </div>
               ))}
@@ -417,7 +418,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
 
         {/* Common settings that work with modpacks */}
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <h3 className="text-meta font-semibold text-faint uppercase tracking-wider mb-2">
             Common Settings
           </h3>
           <div className="flex flex-col gap-3">{compatibleFields.map(renderField)}</div>
@@ -431,7 +432,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="text-meta font-semibold text-faint uppercase tracking-wider">
             Other Variables
           </h3>
         </div>
@@ -442,18 +443,18 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
                 type="text"
                 value={pair.key}
                 onChange={(e) => updateCustomKey(pair.key, e.target.value)}
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
+                className="flex-1 bg-surface border border-line rounded-lg px-2.5 py-1.5 text-meta font-mono text-ink focus:outline-none focus:border-accent"
               />
-              <span className="text-gray-600">=</span>
+              <span className="text-faint">=</span>
               <input
                 type="text"
                 value={pair.value}
                 onChange={(e) => updateCustomValue(pair.key, e.target.value)}
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
+                className="flex-1 bg-surface border border-line rounded-lg px-2.5 py-1.5 text-meta font-mono text-ink focus:outline-none focus:border-accent"
               />
               <button
                 onClick={() => removeCustomPair(pair.key)}
-                className="text-gray-600 hover:text-red-400 transition-colors shrink-0 px-1"
+                className="tap text-faint hover:text-danger transition-colors shrink-0 px-1"
               >
                 ✕
               </button>
@@ -467,12 +468,12 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
   return (
     <div className="flex flex-col gap-4">
       {/* Mode toggle */}
-      <div className="flex gap-1 bg-gray-900 border border-gray-700 rounded-lg p-1">
+      <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
         <button
           type="button"
           onClick={() => switchMode("vanilla")}
-          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-            mode === "vanilla" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+          className={`tap flex-1 px-3 py-1.5 text-body font-medium rounded-md transition-colors ${
+            mode === "vanilla" ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
           }`}
         >
           Vanilla / Custom
@@ -480,8 +481,8 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
         <button
           type="button"
           onClick={() => switchMode("modpack")}
-          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-            mode === "modpack" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+          className={`tap flex-1 px-3 py-1.5 text-body font-medium rounded-md transition-colors ${
+            mode === "modpack" ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
           }`}
         >
           Modpack
@@ -498,7 +499,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
       <button
         type="button"
         onClick={addCustomPair}
-        className="text-xs text-brand-400 hover:text-brand-300 transition-colors self-start"
+        className="text-meta text-accent hover:text-accent transition-colors self-start"
       >
         + Add Custom Variable
       </button>

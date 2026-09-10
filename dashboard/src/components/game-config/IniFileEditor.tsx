@@ -122,14 +122,14 @@ export default function IniFileEditor({ path, content, onChange }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-xs font-mono text-gray-500 mr-auto break-all">{path}</p>
+        <p className="text-meta font-mono text-faint mr-auto break-all">{path}</p>
         {parseable && (
-          <div className="flex bg-gray-900 border border-gray-800 rounded-lg p-0.5">
+          <div className="flex bg-surface border border-line rounded-lg p-0.5">
             <button
               type="button"
               onClick={() => setRawMode(false)}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
-                !rawMode ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+              className={`tap px-2.5 py-1 rounded-md text-meta transition-colors ${
+                !rawMode ? "bg-raised text-ink" : "text-faint hover:text-muted"
               }`}
             >
               Formulario
@@ -137,8 +137,8 @@ export default function IniFileEditor({ path, content, onChange }: Props) {
             <button
               type="button"
               onClick={() => setRawMode(true)}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
-                rawMode ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+              className={`tap px-2.5 py-1 rounded-md text-meta transition-colors ${
+                rawMode ? "bg-raised text-ink" : "text-faint hover:text-muted"
               }`}
             >
               Texto
@@ -148,7 +148,7 @@ export default function IniFileEditor({ path, content, onChange }: Props) {
       </div>
 
       {!parseable && (
-        <p className="text-xs text-gray-500 bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2">
+        <p className="text-meta text-faint bg-surface/60 border border-line rounded-lg px-3 py-2">
           Este fichero no tiene el formato clave/valor que el formulario sabe leer, así que se edita
           como texto.
         </p>
@@ -159,7 +159,7 @@ export default function IniFileEditor({ path, content, onChange }: Props) {
           value={content}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="w-full h-[55vh] bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500 resize-none"
+          className="w-full h-[55vh] bg-surface border border-line rounded-lg px-3 py-2 text-meta font-mono text-ink focus:outline-none focus:border-accent resize-none"
         />
       ) : (
         <>
@@ -168,11 +168,11 @@ export default function IniFileEditor({ path, content, onChange }: Props) {
             value={query}
             placeholder={`Buscar entre ${parsed.entryCount} opciones…`}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+            className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
           />
 
           {sections.length === 0 ? (
-            <p className="text-sm text-gray-600">Ninguna opción coincide con «{query}».</p>
+            <p className="text-body text-faint">Ninguna opción coincide con «{query}».</p>
           ) : (
             <div className="flex flex-col gap-6">
               {sections.map((section) => (

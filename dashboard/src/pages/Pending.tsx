@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type User } from "../api";
+import { AuthShell } from "../components/AuthShell";
+import { Button, StatusMark } from "../components/ui";
 
 export default function Pending() {
   const navigate = useNavigate();
@@ -23,7 +25,7 @@ export default function Pending() {
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
-  // Poll /me every 10s to detect approval
+  // Sondeo cada 10s para detectar la aprobación sin recargar
   useEffect(() => {
     const interval = setInterval(() => {
       api
@@ -47,45 +49,31 @@ export default function Pending() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="grid min-h-screen place-items-center">
+        <p className="label tick">Comprobando acceso</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 flex flex-col items-center gap-6 shadow-2xl max-w-sm w-full">
+    <AuthShell footer="Esta pantalla se abrirá sola en cuanto te aprueben.">
+      <div className="flex items-center gap-3">
         {user.avatar && (
-          <img
-            src={user.avatar}
-            alt={user.username}
-            className="w-20 h-20 rounded-full border-2 border-gray-700"
-          />
+          <img src={user.avatar} alt="" className="h-10 w-10 rounded-full border border-line" />
         )}
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-xl font-bold text-white">{user.username}</h1>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse" />
-            <span className="text-yellow-400 text-sm font-medium">Pending Approval</span>
-          </div>
+        <div className="min-w-0">
+          <p className="truncate text-title font-semibold text-ink">{user.username}</p>
+          <StatusMark tone="warn" label="Pendiente de aprobación" live className="mt-1" />
         </div>
-
-        <p className="text-gray-400 text-sm text-center">
-          Your access request has been submitted. An administrator will review it shortly.
-        </p>
-
-        <p className="text-gray-600 text-xs text-center">
-          This page will automatically redirect once approved.
-        </p>
-
-        <button
-          onClick={handleLogout}
-          className="w-full text-center text-sm text-gray-500 hover:text-white transition-colors px-4 py-2 rounded-xl hover:bg-gray-800"
-        >
-          Logout
-        </button>
       </div>
-    </div>
+
+      <p className="mt-5 text-body text-muted">
+        Tu solicitud ya está enviada. Un administrador la revisará en cuanto pueda.
+      </p>
+
+      <Button tone="quiet" className="mt-5 w-full" onClick={handleLogout}>
+        Cerrar sesión
+      </Button>
+    </AuthShell>
   );
 }

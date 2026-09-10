@@ -1,44 +1,28 @@
 import { memo } from "react";
 import type { ServiceStats } from "../api";
+import { Meter } from "./ui";
 
 type Props = {
   stats: ServiceStats | null;
 };
 
+/** Consumo de un servicio de infraestructura. */
 export default memo(function ServiceStatsBar({ stats }: Props) {
   if (!stats) {
-    return <div className="text-xs text-gray-600 animate-pulse">...</div>;
+    return <p className="text-meta text-faint">Sin lectura</p>;
   }
 
-  const cpuPct = Math.min(100, Math.max(0, stats.cpuPercent));
-  const ramMB = stats.memUsageMB;
+  const cpu = Math.min(100, Math.max(0, stats.cpuPercent));
 
   return (
-    <div className="flex flex-col gap-1 mt-2">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-gray-500 w-8 shrink-0">CPU</span>
-        <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-brand-500 rounded-full transition-[width] duration-300"
-            style={{ width: `${cpuPct}%` }}
-          />
-        </div>
-        <span className="text-gray-400 w-10 text-right shrink-0 tabular-nums">
-          {cpuPct.toFixed(1)}%
-        </span>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-gray-500 w-8 shrink-0">RAM</span>
-        <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-purple-500 rounded-full transition-[width] duration-300"
-            style={{ width: `${stats.memLimitMB > 0 ? (ramMB / stats.memLimitMB) * 100 : 0}%` }}
-          />
-        </div>
-        <span className="text-gray-400 w-16 text-right shrink-0 tabular-nums whitespace-nowrap">
-          {ramMB.toFixed(0)} MB
-        </span>
-      </div>
+    <div className="flex flex-col gap-1.5">
+      <Meter label="CPU" value={cpu} readout={`${cpu.toFixed(1)}%`} />
+      <Meter
+        label="RAM"
+        value={stats.memUsageMB}
+        max={stats.memLimitMB > 0 ? stats.memLimitMB : stats.memUsageMB || 1}
+        readout={`${stats.memUsageMB.toFixed(0)} MB`}
+      />
     </div>
   );
 });

@@ -4,6 +4,7 @@ import { api, type User } from "../api";
 import FreelancerProfileForm from "../components/FreelancerProfileForm";
 import InvoiceList from "../components/InvoiceList";
 import InvoiceUpload from "../components/InvoiceUpload";
+import { Loading } from "../components/ui";
 
 export default function InvoiceHome() {
   const navigate = useNavigate();
@@ -40,27 +41,27 @@ export default function InvoiceHome() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        <Loading>Cargando facturas</Loading>
       </div>
     );
   }
 
   if (!user.invoice_role) {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col">
-        <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
+      <div className="min-h-screen bg-bg flex flex-col">
+        <header className="border-b border-line bg-bg sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-            <span className="font-semibold text-white">Facturas</span>
+            <span className="font-semibold text-ink">Facturas</span>
             <button
               onClick={handleLogout}
-              className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
+              className="tap text-meta text-faint hover:text-ink transition-colors px-2 py-1 rounded-md hover:bg-raised"
             >
-              Logout
+              Cerrar sesión
             </button>
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500">
+          <p className="text-faint">
             No tienes acceso al sistema de facturas. Contacta a un admin.
           </p>
         </main>
@@ -69,28 +70,28 @@ export default function InvoiceHome() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-screen bg-bg flex flex-col">
       {/* Navbar */}
-      <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
+      <header className="border-b border-line bg-bg sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="font-semibold text-white">Facturas</span>
+          <span className="font-semibold text-ink">Facturas</span>
           <div className="flex items-center gap-3">
             {user.avatar && (
               <img
                 src={user.avatar}
                 alt={user.username}
-                className="w-8 h-8 rounded-full border border-gray-700"
+                className="w-8 h-8 rounded-full border border-line"
               />
             )}
-            <span className="text-sm text-gray-300">{user.username}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">
+            <span className="text-body text-muted">{user.username}</span>
+            <span className="text-meta px-2 py-0.5 rounded-full bg-raised text-muted">
               {user.invoice_role}
             </span>
             <button
               onClick={handleLogout}
-              className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
+              className="tap text-meta text-faint hover:text-ink transition-colors px-2 py-1 rounded-md hover:bg-raised"
             >
-              Logout
+              Cerrar sesión
             </button>
           </div>
         </div>

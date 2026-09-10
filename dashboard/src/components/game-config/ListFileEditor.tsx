@@ -39,10 +39,10 @@ export default function ListFileEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-xs font-mono text-gray-500 break-all">{path}</p>
+      <p className="text-meta font-mono text-faint break-all">{path}</p>
 
       {overrideActive && overrideEnv && (
-        <div className="text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-lg px-3 py-2">
+        <div className="text-meta text-warn bg-warn/10 border border-warn/60 rounded-md px-3 py-2">
           La variable <span className="font-mono">{overrideEnv}</span> está definida y pisa este
           fichero al arrancar. Bórrala en «Variables de entorno» para que mande esta lista.
         </div>
@@ -50,23 +50,23 @@ export default function ListFileEditor({
 
       <div className="flex flex-col gap-2">
         {parsed.entries.length === 0 && (
-          <p className="text-sm text-gray-600">La lista está vacía.</p>
+          <p className="text-body text-faint">La lista está vacía.</p>
         )}
         {parsed.entries.map((id) => (
           <div
             key={id}
-            className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2"
+            className="flex items-center gap-2 bg-surface border border-line rounded-lg px-3 py-2"
           >
-            <span className="text-sm font-mono text-white break-all">{id}</span>
+            <span className="text-body font-mono text-ink break-all">{id}</span>
             {!looksLikeSteamId(id) && (
-              <span className="text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-700/60 rounded px-1 py-px shrink-0">
+              <span className="text-[10px] uppercase tracking-wide text-warn border border-warn/60 rounded-sm px-1 py-px shrink-0">
                 no parece un SteamID64
               </span>
             )}
             <button
               type="button"
               onClick={() => commit(parsed.entries.filter((e) => e !== id))}
-              className="ml-auto text-gray-600 hover:text-red-400 transition-colors shrink-0 px-1"
+              className="tap ml-auto text-faint hover:text-danger transition-colors shrink-0 px-1"
               title="Quitar"
             >
               ✕
@@ -88,18 +88,18 @@ export default function ListFileEditor({
                 add();
               }
             }}
-            className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+            className="flex-1 min-w-0 bg-surface border border-line rounded-lg px-3 py-2 text-body font-mono text-ink focus:outline-none focus:border-accent"
           />
           <button
             type="button"
             onClick={add}
             disabled={!draft.trim()}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-300 text-sm rounded-lg transition-colors shrink-0"
+            className="tap px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-muted text-body rounded-md transition-colors shrink-0"
           >
             Añadir
           </button>
         </div>
-        <p className={`text-xs mt-1.5 ${draftInvalid ? "text-amber-400" : "text-gray-600"}`}>
+        <p className={`text-meta mt-1.5 ${draftInvalid ? "text-warn" : "text-faint"}`}>
           {draftInvalid
             ? "Un SteamID64 son 17 dígitos empezando por 7656119. Se guardará igual por si es un ID de otra plataforma."
             : "Un SteamID64 por entrada. Se puede sacar con steamid.io o con el comando del servidor."}

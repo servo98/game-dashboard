@@ -4,7 +4,7 @@ import { EyeIcon, EyeOffIcon } from "../Icons";
 /** Controles compartidos por el editor guiado y por el de ficheros .cfg. */
 
 const INPUT_CLASS =
-  "w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500";
+  "w-full bg-surface border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent";
 
 type RowProps = {
   label: string;
@@ -18,10 +18,10 @@ export function FieldRow({ label, description, hint, children }: RowProps) {
     <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] sm:items-center sm:gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-gray-200 break-words">{label}</span>
+          <span className="text-body text-ink break-words">{label}</span>
           {hint}
         </div>
-        {description && <p className="text-xs text-gray-500 mt-0.5 break-words">{description}</p>}
+        {description && <p className="text-meta text-faint mt-0.5 break-words">{description}</p>}
       </div>
       <div className="min-w-0">{children}</div>
     </div>
@@ -30,7 +30,7 @@ export function FieldRow({ label, description, hint, children }: RowProps) {
 
 export function DefaultBadge() {
   return (
-    <span className="text-[10px] uppercase tracking-wide text-gray-600 border border-gray-800 rounded px-1 py-px">
+    <span className="text-[10px] uppercase tracking-wide text-faint border border-line rounded-sm px-1 py-px">
       por defecto
     </span>
   );
@@ -38,7 +38,7 @@ export function DefaultBadge() {
 
 export function ChangedBadge() {
   return (
-    <span className="text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-700/60 rounded px-1 py-px">
+    <span className="text-[10px] uppercase tracking-wide text-warn border border-warn/60 rounded-sm px-1 py-px">
       modificado
     </span>
   );
@@ -58,11 +58,11 @@ export function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-        checked ? "bg-brand-500" : "bg-gray-700"
+        checked ? "bg-accent" : "bg-line"
       }`}
     >
       <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full transition-transform ${
           checked ? "translate-x-5" : ""
         }`}
       />
@@ -131,7 +131,7 @@ export function SliderField({
         step={step}
         value={safe}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 min-w-0 accent-brand-500 cursor-pointer"
+        className="flex-1 min-w-0 accent-accent cursor-pointer"
       />
       <div className="flex items-center gap-1 shrink-0">
         <input
@@ -141,9 +141,9 @@ export function SliderField({
           step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-20 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
+          className="w-20 bg-surface border border-line rounded-lg px-2 py-1.5 text-meta font-mono text-ink focus:outline-none focus:border-accent"
         />
-        {unit && <span className="text-xs text-gray-600 whitespace-nowrap">{unit}</span>}
+        {unit && <span className="text-meta text-faint whitespace-nowrap">{unit}</span>}
       </div>
     </div>
   );
@@ -203,7 +203,7 @@ export function SecretField({
         onClick={() => setRevealed((prev) => !prev)}
         aria-label={revealed ? "Ocultar" : "Mostrar"}
         title={revealed ? "Ocultar" : "Mostrar"}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200 transition-colors p-1"
+        className="tap absolute right-2 top-1/2 -translate-y-1/2 text-faint hover:text-ink transition-colors p-1"
       >
         {revealed ? <EyeOffIcon /> : <EyeIcon />}
       </button>
@@ -230,16 +230,16 @@ export function SegmentedField({
   const all = known ? options : [...options, { value, label: `${value} (actual)` }];
 
   return (
-    <div className="flex flex-wrap gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1">
+    <div className="flex flex-wrap gap-1 bg-surface border border-line rounded-lg p-1">
       {all.map((opt) => (
         <button
           key={opt.value || "__default"}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-md text-xs transition-colors ${
+          className={`tap flex-1 min-w-[4.5rem] px-2 py-1.5 rounded-md text-meta transition-colors ${
             value === opt.value
-              ? "bg-brand-500 text-white font-medium"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
+              ? "bg-accent text-accent-ink font-medium"
+              : "text-muted hover:text-ink hover:bg-raised"
           }`}
         >
           {opt.label}
@@ -252,8 +252,8 @@ export function SegmentedField({
 export function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-3">
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</h3>
-      {subtitle && <p className="text-xs text-gray-600 mt-0.5">{subtitle}</p>}
+      <h3 className="text-meta font-semibold text-faint uppercase tracking-wider">{title}</h3>
+      {subtitle && <p className="text-meta text-faint mt-0.5">{subtitle}</p>}
     </div>
   );
 }

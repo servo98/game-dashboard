@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { GamepadIcon } from "../components/Icons";
+import { Divider, Meter, Panel, SectionRule, StatusMark, Tag } from "../components/ui";
+import { Wordmark } from "../components/Wordmark";
 
 type ServiceHealth = {
   name: string;
@@ -25,18 +28,6 @@ type HealthResponse = {
   timestamp: string;
 };
 
-function formatUptime(isoDate: string): string {
-  const start = new Date(isoDate).getTime();
-  const seconds = Math.floor((Date.now() - start) / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
-}
-
 function formatSeconds(secs: number): string {
   if (secs < 60) return `${secs}s`;
   const m = Math.floor(secs / 60);
@@ -47,14 +38,36 @@ function formatSeconds(secs: number): string {
   return `${d}d ${h % 24}h`;
 }
 
+function formatUptime(isoDate: string): string {
+  return formatSeconds(Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000));
+}
+
 const SERVICE_LABELS: Record<string, string> = {
-  backend: "Backend API",
-  bot: "Discord Bot",
-  dashboard: "Dashboard",
-  nginx: "Reverse Proxy",
+  backend: "API del panel",
+  bot: "Bot de Discord",
+  dashboard: "Panel web",
+  nginx: "Proxy inverso",
   chatpapol: "ChatPapol",
-  livekit: "LiveKit (voz/video)",
+  livekit: "LiveKit (voz y vídeo)",
 };
+
+/** Dato suelto de una ficha: etiqueta arriba, valor en mono debajo. */
+function Readout({
+  label,
+  value,
+  alarm = false,
+}: {
+  label: string;
+  value: string;
+  alarm?: boolean;
+}) {
+  return (
+    <div>
+      <div className="label">{label}</div>
+      <p className={`num mt-1 text-meta ${alarm ? "text-warn" : "text-ink"}`}>{value}</p>
+    </div>
+  );
+}
 
 export default function Status() {
   const [data, setData] = useState<HealthResponse | null>(null);
@@ -88,181 +101,145 @@ export default function Status() {
   }, []);
 
   const allHealthy = data?.status === "operational";
+  // La marca da el estado en una palabra; la frase explica. Decir lo mismo dos
+  // veces seguidas es lo que hacía la versión anterior con el titular.
+  const overall = error
+    ? {
+        tone: "danger" as const,
+        mark: "Sin respuesta",
+        line: "No se puede contactar con la API del panel.",
+      }
+    : allHealthy
+      ? {
+          tone: "ok" as const,
+          mark: "Operativo",
+          line: "Todos los servicios responden con normalidad.",
+        }
+      : {
+          tone: "warn" as const,
+          mark: "Degradado",
+          line: "Algún servicio no está respondiendo como debería.",
+        };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🎮</span>
-            <h1 className="font-semibold text-white">Game Panel Status</h1>
-          </div>
-          <a href="/" className="text-sm text-gray-400 hover:text-white transition-colors">
-            Dashboard
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-line bg-surface">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+          <Wordmark />
+          <a
+            href="/"
+            className="tap rounded-md px-2 py-1 text-meta text-muted no-underline hover:text-ink"
+          >
+            Ir al panel
           </a>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        {/* Overall status */}
-        <div
-          className={`rounded-2xl px-6 py-5 mb-8 border ${
-            error
-              ? "bg-red-950/30 border-red-800"
-              : allHealthy
-                ? "bg-green-950/30 border-green-800"
-                : "bg-yellow-950/30 border-yellow-800"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className={`w-3 h-3 rounded-full ${
-                error
-                  ? "bg-red-500"
-                  : allHealthy
-                    ? "bg-green-500 animate-pulse"
-                    : "bg-yellow-500 animate-pulse"
-              }`}
-            />
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                {error
-                  ? "Unable to reach API"
-                  : allHealthy
-                    ? "All Systems Operational"
-                    : "Degraded Performance"}
-              </h2>
-              {data && (
-                <p className="text-sm text-gray-400 mt-0.5">
-                  Backend uptime: {formatSeconds(data.backendUptime)}
-                </p>
-              )}
-            </div>
+      <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+        {/* Veredicto: una línea, no una tarjeta de color a pantalla completa */}
+        <div>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h1 className="text-hero font-semibold text-ink">Estado del sistema</h1>
+            {data && (
+              <p className="num text-meta text-faint">
+                API en pie desde hace {formatSeconds(data.backendUptime)}
+              </p>
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <StatusMark tone={overall.tone} label={overall.mark} live={!error && !allHealthy} />
+            <p className="text-body text-muted">{overall.line}</p>
           </div>
         </div>
 
-        {/* Services */}
         {data && (
-          <div className="space-y-3 mb-8">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-              Infrastructure Services
-            </h3>
-            {data.services.map((svc) => (
-              <div key={svc.name} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        svc.status === "healthy" ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    />
-                    <div>
-                      <span className="font-medium text-white">
+          <section className="flex flex-col gap-3">
+            <SectionRule>Servicios</SectionRule>
+            <div className="flex flex-col gap-3">
+              {data.services.map((svc) => (
+                <Panel key={svc.name} as="article">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                    <div className="min-w-0">
+                      <span className="text-title font-semibold text-ink">
                         {SERVICE_LABELS[svc.name] ?? svc.name}
                       </span>
-                      <span className="ml-2 text-xs text-gray-500">{svc.name}</span>
+                      <span className="num ml-2 text-micro uppercase text-faint">{svc.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Tag tone={svc.status === "healthy" ? "ok" : "danger"}>{svc.health}</Tag>
                     </div>
                   </div>
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      svc.status === "healthy"
-                        ? "bg-green-500/10 text-green-400"
-                        : "bg-red-500/10 text-red-400"
-                    }`}
-                  >
-                    {svc.health}
-                  </span>
-                </div>
-
-                {/* Stats row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <span className="text-gray-500">Uptime</span>
-                    <p className="text-gray-300 font-mono mt-0.5">
-                      {svc.uptime ? formatUptime(svc.uptime) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">CPU</span>
-                    <p className="text-gray-300 font-mono mt-0.5">{svc.cpuPercent}%</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Memory</span>
-                    <p className="text-gray-300 font-mono mt-0.5">
-                      {svc.memUsageMB}MB{svc.memLimitMB > 0 ? ` / ${svc.memLimitMB}MB` : ""}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Restarts</span>
-                    <p
-                      className={`font-mono mt-0.5 ${svc.restarts > 0 ? "text-yellow-400" : "text-gray-300"}`}
-                    >
-                      {svc.restarts}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Memory bar */}
-                {svc.memLimitMB > 0 && (
-                  <div className="mt-2.5 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        svc.memUsageMB / svc.memLimitMB > 0.8
-                          ? "bg-red-500"
-                          : svc.memUsageMB / svc.memLimitMB > 0.5
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                      }`}
-                      style={{
-                        width: `${Math.min((svc.memUsageMB / svc.memLimitMB) * 100, 100)}%`,
-                      }}
+                  <Divider />
+                  <div className="grid grid-cols-2 gap-3 px-4 py-3 sm:grid-cols-4">
+                    <Readout
+                      label="En pie"
+                      value={svc.uptime ? formatUptime(svc.uptime) : "sin dato"}
+                    />
+                    <Readout label="CPU" value={`${svc.cpuPercent}%`} />
+                    <Readout
+                      label="RAM"
+                      value={`${svc.memUsageMB}MB${svc.memLimitMB > 0 ? ` / ${svc.memLimitMB}MB` : ""}`}
+                    />
+                    <Readout
+                      label="Reinicios"
+                      value={String(svc.restarts)}
+                      alarm={svc.restarts > 0}
                     />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {svc.memLimitMB > 0 && (
+                    <>
+                      <Divider />
+                      <div className="px-4 py-2.5">
+                        <Meter
+                          label="RAM"
+                          value={svc.memUsageMB}
+                          max={svc.memLimitMB}
+                          readout={`${((svc.memUsageMB / svc.memLimitMB) * 100).toFixed(0)}%`}
+                          warnAt={50}
+                          dangerAt={80}
+                        />
+                      </div>
+                    </>
+                  )}
+                </Panel>
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* Active games */}
         {data && (
-          <div className="mb-8">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-              Active Game Servers
-            </h3>
+          <section className="flex flex-col gap-3">
+            <SectionRule>Servidores de juego</SectionRule>
             {data.activeGames.length > 0 ? (
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 {data.activeGames.map((game) => (
-                  <div
-                    key={game.name}
-                    className="bg-gray-900 border border-green-800/50 rounded-xl p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                      <div>
-                        <span className="font-medium text-white">{game.name}</span>
-                        <p className="text-xs text-gray-500 mt-0.5 font-mono">{game.image}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{game.status}</p>
+                  <Panel key={game.name} rail as="article">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-line bg-raised text-faint">
+                        <GamepadIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-title font-semibold text-ink">{game.name}</p>
+                        <p className="num truncate text-micro text-faint">{game.image}</p>
                       </div>
+                      <StatusMark tone="ok" label={game.status} />
                     </div>
-                  </div>
+                  </Panel>
                 ))}
               </div>
             ) : (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-500">
-                No game server running
-              </div>
+              <p className="text-body text-muted">Ningún servidor de juego en marcha.</p>
             )}
-          </div>
+          </section>
         )}
 
-        {/* Footer */}
-        <div className="text-center text-xs text-gray-600 pt-4 border-t border-gray-800">
+        <footer className="border-t border-line pt-4">
           {lastUpdate && (
-            <p>Last updated: {lastUpdate.toLocaleTimeString()} — refreshes every 10s</p>
+            <p className="num text-micro text-faint">
+              Última lectura {lastUpdate.toLocaleTimeString()} · se refresca cada 10s
+            </p>
           )}
-        </div>
+        </footer>
       </main>
     </div>
   );

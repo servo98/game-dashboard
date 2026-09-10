@@ -39,51 +39,45 @@ export default function InvoiceList({ invoiceRole, refreshKey }: Props) {
   }
 
   if (loading) {
-    return (
-      <div className="text-gray-500 text-sm animate-pulse py-8 text-center">
-        Cargando facturas...
-      </div>
-    );
+    return <div className="text-faint text-body tick py-8 text-center">Cargando facturas...</div>;
   }
 
   if (invoices.length === 0) {
     return (
-      <div className="text-center text-gray-600 py-12">
-        <p>No hay facturas todavia.</p>
+      <div className="text-center text-faint py-12">
+        <p>No hay facturas todavía.</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="font-semibold text-gray-200">Facturas ({invoices.length})</h3>
+      <h3 className="font-semibold text-ink">Facturas ({invoices.length})</h3>
       {invoices.map((inv) => (
-        <div key={inv.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div key={inv.id} className="bg-surface border border-line rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-brand-400">
+              <span className="text-meta font-mono text-accent">
                 {inv.cfdi_uuid.slice(0, 8)}...
               </span>
-              <span className="px-2 py-0.5 rounded-full text-xs bg-gray-800 text-gray-400">
+              <span className="px-2 py-0.5 rounded-full text-meta bg-raised text-muted">
                 {inv.status}
               </span>
               <span
-                className={`px-2 py-0.5 rounded-full text-xs ${
-                  inv.kind === "bono"
-                    ? "bg-amber-500/15 text-amber-400"
-                    : "bg-gray-800 text-gray-400"
+                className={`px-2 py-0.5 rounded-full text-meta ${
+                  inv.kind === "bono" ? "bg-warn/15 text-warn" : "bg-raised text-muted"
                 }`}
               >
                 {inv.kind === "bono" ? "Bono" : "Mensualidad"}
               </span>
             </div>
-            <span className="text-sm font-semibold text-white">
+            <span className="text-body font-semibold text-ink">
               ${inv.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
-              <span className="text-xs text-gray-500">{inv.moneda}</span>
+              <span className="text-meta text-faint">{inv.moneda}</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+          <div className="flex items-center gap-4 text-meta text-faint mb-3">
             <span>Emisor: {inv.emisor_nombre ?? inv.emisor_rfc}</span>
             {inv.fecha_emision && (
               <span>
@@ -101,7 +95,7 @@ export default function InvoiceList({ invoiceRole, refreshKey }: Props) {
               href={api.timbradoPdfUrl(inv.id)}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
+              className="tap px-2.5 py-1 bg-raised hover:bg-line rounded-md text-meta text-muted hover:text-ink transition-colors"
             >
               Timbrado
             </a>
@@ -109,13 +103,13 @@ export default function InvoiceList({ invoiceRole, refreshKey }: Props) {
               href={api.commercialPdfUrl(inv.id)}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
+              className="tap px-2.5 py-1 bg-raised hover:bg-line rounded-md text-meta text-muted hover:text-ink transition-colors"
             >
               Comercial
             </a>
             <a
               href={api.bundleUrl(inv.id)}
-              className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
+              className="tap px-2.5 py-1 bg-raised hover:bg-line rounded-md text-meta text-muted hover:text-ink transition-colors"
             >
               ZIP
             </a>
@@ -123,7 +117,7 @@ export default function InvoiceList({ invoiceRole, refreshKey }: Props) {
               <button
                 onClick={() => handleDelete(inv.id)}
                 disabled={deleting === inv.id}
-                className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                className="tap px-2.5 py-1 bg-raised hover:bg-line rounded-md text-meta text-muted hover:text-danger transition-colors disabled:opacity-50"
               >
                 {deleting === inv.id ? "..." : "Eliminar"}
               </button>

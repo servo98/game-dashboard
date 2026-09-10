@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type McpTokenRecord } from "../api";
+import { TrashIcon } from "./Icons";
+import { Button, Checkbox, Divider, Field, Input, Notice, Panel, Tag } from "./ui";
 
 export default function McpTokens() {
   const [tokens, setTokens] = useState<McpTokenRecord[]>([]);
@@ -73,217 +75,191 @@ export default function McpTokens() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-gray-600 py-4">
-        <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
-        Loading...
-      </div>
-    );
+    return <p className="label tick py-4">Cargando llaves</p>;
   }
 
+  const stamp = (unix: number) => new Date(unix * 1000).toLocaleDateString();
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* MCP Access Tokens */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-200">MCP Access Tokens</h3>
-          <button
+    <div className="flex flex-col gap-5">
+      <Panel>
+        <div className="flex items-center justify-between px-4 py-3">
+          <h2 className="text-title font-semibold text-ink">Llaves de acceso MCP</h2>
+          <Button
+            tone={showForm ? "quiet" : "accent"}
+            size="sm"
             onClick={() => {
               setShowForm(!showForm);
               setNewToken(null);
             }}
-            className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            + Generate Token
-          </button>
+            {showForm ? "Cancelar" : "Generar llave"}
+          </Button>
         </div>
 
         {error && (
-          <div className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
-            {error}
-          </div>
+          <>
+            <Divider />
+            <div className="px-4 py-3">
+              <Notice>{error}</Notice>
+            </div>
+          </>
         )}
 
-        {/* New token display */}
+        {/* La llave solo se ve una vez: se avisa y se pone a mano de copiar */}
         {newToken && (
-          <div className="bg-green-950/30 border border-green-800 rounded-xl p-4 flex flex-col gap-2">
-            <p className="text-sm text-green-300 font-medium">
-              Token created! Copy it now — you won't be able to see it again.
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono break-all select-all">
-                {newToken}
-              </code>
-              <button
-                onClick={() => handleCopy(newToken)}
-                className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-300 hover:text-white transition-colors whitespace-nowrap"
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
+          <>
+            <Divider />
+            <div className="flex flex-col gap-2 px-4 py-3">
+              <p className="text-body text-warn">Cópiala ahora. No se vuelve a mostrar.</p>
+              <div className="flex items-center gap-2">
+                <code className="num min-w-0 flex-1 select-all break-all rounded-md border border-line bg-raised px-2.5 py-2 text-body text-ink">
+                  {newToken}
+                </code>
+                <Button onClick={() => handleCopy(newToken)} className="shrink-0">
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* Create form */}
         {showForm && (
-          <div className="bg-gray-950 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                Minecraft Player Name <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="e.g. Steve"
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                Label <span className="text-gray-600">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Claude Desktop"
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+          <>
+            <Divider />
+            <div className="flex flex-col gap-3 px-4 py-3">
+              <Field label="Nombre de jugador en Minecraft">
+                <Input
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="p. ej. Steve"
+                />
+              </Field>
+              <Field label="Etiqueta (opcional)">
+                <Input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="p. ej. Claude Desktop"
+                />
+              </Field>
+              <Checkbox
                 checked={isAdminToken}
                 onChange={(e) => setIsAdminToken(e.target.checked)}
-                className="mt-0.5 accent-brand-500"
+                label={
+                  <>
+                    <span className="font-medium text-ink">Llave de administrador.</span> Habilita
+                    las herramientas que tocan el servidor de verdad: arrancar, detener, reiniciar,
+                    cambiar variables de entorno y actualizar la imagen de Docker. Dásela solo a
+                    clientes en los que confíes.
+                  </>
+                }
               />
-              <span className="text-xs text-gray-400">
-                <span className="text-gray-200 font-medium">Admin token</span> — allows the
-                destructive server-control tools (start / stop / restart, edit env vars, update
-                Docker image). Only grant this to trusted clients.
-              </span>
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={creating || !playerName.trim()}
-                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                {creating ? "Creating..." : "Create Token"}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
+              <div>
+                <Button
+                  tone="accent"
+                  onClick={handleCreate}
+                  disabled={creating || !playerName.trim()}
+                >
+                  {creating ? "Creando" : "Crear llave"}
+                </Button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* Token list */}
+        <Divider />
         {tokens.length === 0 ? (
-          <p className="text-sm text-gray-600 py-2">
-            No tokens generated yet. Create one to connect your AI assistant.
+          <p className="px-4 py-3 text-body text-faint">
+            Todavía no hay llaves. Crea una para conectar tu asistente.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="divide-y divide-line">
             {tokens.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-4 py-3"
-              >
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-white font-medium">{t.player_name}</span>
-                    {t.label && <span className="text-gray-500 truncate">({t.label})</span>}
-                    {t.is_admin && (
-                      <span className="px-1.5 py-0.5 bg-amber-950/50 border border-amber-700 text-amber-400 rounded text-[10px] font-medium uppercase tracking-wide">
-                        Admin
-                      </span>
-                    )}
+              <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-body font-medium text-ink">{t.player_name}</span>
+                    {t.label && <span className="truncate text-meta text-faint">{t.label}</span>}
+                    {t.is_admin && <Tag tone="warn">Admin</Tag>}
                   </div>
-                  <div className="text-xs text-gray-600">
-                    <span className="font-mono">{t.token_preview}</span>
-                    {" · "}
-                    Created {new Date(t.created_at * 1000).toLocaleDateString()}
-                    {t.last_used_at && (
-                      <>
-                        {" · "}
-                        Last used {new Date(t.last_used_at * 1000).toLocaleDateString()}
-                      </>
-                    )}
+                  <div className="num mt-0.5 text-micro text-faint">
+                    {t.token_preview} · creada el {stamp(t.created_at)}
+                    {t.last_used_at && ` · usada el ${stamp(t.last_used_at)}`}
                   </div>
                 </div>
-                <button
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  icon
                   onClick={() => handleDelete(t.id)}
-                  className="px-2.5 py-1 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
+                  title="Revocar llave"
+                  className="shrink-0 hover:text-danger"
                 >
-                  Revoke
-                </button>
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </Button>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Panel>
 
-      {/* How to Connect */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col gap-3">
-        <h3 className="font-semibold text-gray-200">How to Connect</h3>
+      <Panel>
+        <div className="px-4 py-3">
+          <h2 className="text-title font-semibold text-ink">Cómo conectarse</h2>
+        </div>
+        <Divider />
 
-        <div className="flex flex-col gap-4 text-sm text-gray-400">
+        <div className="flex flex-col gap-4 px-4 py-3">
           <div>
-            <p className="text-gray-300 font-medium mb-1">Claude.ai (Integrations)</p>
-            <ol className="list-decimal list-inside space-y-1 text-gray-500">
-              <li>Go to claude.ai &rarr; Settings &rarr; Integrations</li>
-              <li>Click &ldquo;Add custom integration&rdquo;</li>
+            <p className="label mb-2">Claude.ai, integraciones</p>
+            <ol className="list-inside list-decimal space-y-1 text-body text-muted">
+              <li>Entra en claude.ai, Ajustes, Integraciones.</li>
+              <li>Pulsa «Añadir integración personalizada».</li>
               <li>
-                Name: <span className="text-gray-300">Game Panel</span>
+                Nombre: <span className="text-ink">Game Panel</span>
               </li>
               <li>
                 URL:{" "}
-                <code className="text-brand-400 bg-gray-950 px-1.5 py-0.5 rounded">
+                <code className="num rounded-xs bg-raised px-1.5 py-0.5 text-accent">
                   https://game.aypapol.com/api/mcp
                 </code>
               </li>
-              <li>Click Save &mdash; OAuth login will happen automatically</li>
+              <li>Guarda. El acceso con OAuth se resuelve solo.</li>
             </ol>
-            <p className="text-xs text-gray-600 mt-1">
-              Uses OAuth 2.0. You&apos;ll be asked to log in with Discord and authorize access.
+            <p className="mt-2 text-meta text-faint">
+              Usa OAuth 2.0: te pedirá iniciar sesión con Discord y autorizar el acceso.
             </p>
           </div>
 
           <div>
-            <p className="text-gray-300 font-medium mb-1">Claude Code (CLI)</p>
-            <code className="block bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 break-all">
+            <p className="label mb-2">Claude Code, línea de órdenes</p>
+            <code className="num block break-all rounded-md border border-line bg-raised px-2.5 py-2 text-meta text-muted">
               claude mcp add game-panel -t streamable-http https://game.aypapol.com/api/mcp -h
-              "Authorization: Bearer YOUR_TOKEN"
+              "Authorization: Bearer TU_LLAVE"
             </code>
           </div>
 
           <div>
-            <p className="text-gray-300 font-medium mb-1">Available Tools</p>
-            <div className="grid grid-cols-1 gap-1 text-xs">
+            <p className="label mb-2">Herramientas disponibles</p>
+            <dl className="flex flex-col gap-1">
               {[
-                ["server_status", "Server status, players online"],
-                ["list_quests", "Quest chapters and quests"],
-                ["get_quest_progress", "Your quest completion progress"],
-                ["suggest_next", "Available quests to do next"],
-                ["search_recipes", "Search modpack recipe scripts"],
-                ["player_stats", "Minecraft stats (kills, mining, etc.)"],
-                ["list_mods", "Installed mods list"],
+                ["server_status", "Estado del servidor y quién está dentro"],
+                ["list_quests", "Capítulos y misiones del modpack"],
+                ["get_quest_progress", "Tu progreso en las misiones"],
+                ["suggest_next", "Qué misiones puedes hacer ahora"],
+                ["search_recipes", "Busca recetas en los scripts del modpack"],
+                ["player_stats", "Estadísticas de Minecraft: bajas, minería y demás"],
+                ["list_mods", "Lista de mods instalados"],
               ].map(([name, desc]) => (
-                <div key={name} className="flex items-center gap-2">
-                  <span className="text-brand-400 font-mono">{name}</span>
-                  <span className="text-gray-600">—</span>
-                  <span className="text-gray-500">{desc}</span>
+                <div key={name} className="flex flex-wrap items-baseline gap-x-2">
+                  <dt className="num text-meta text-accent">{name}</dt>
+                  <dd className="m-0 text-meta text-faint">{desc}</dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -69,7 +69,7 @@ export function ValheimEnvSection({ section, envVars, onChange }: EnvProps) {
           description={field.description}
           hint={
             seconds ? undefined : (
-              <span className="text-[10px] uppercase tracking-wide text-gray-600 border border-gray-800 rounded px-1 py-px">
+              <span className="text-[10px] uppercase tracking-wide text-faint border border-line rounded-sm px-1 py-px">
                 por defecto
               </span>
             )
@@ -140,7 +140,7 @@ export function ValheimEnvSection({ section, envVars, onChange }: EnvProps) {
             description={field.description}
             hint={
               value.length > 0 && value.length < 5 ? (
-                <span className="text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-700/60 rounded px-1 py-px">
+                <span className="text-[10px] uppercase tracking-wide text-warn border border-warn/60 rounded-sm px-1 py-px">
                   muy corta
                 </span>
               ) : undefined
@@ -219,8 +219,8 @@ export function ValheimWorldSection({ envVars, onChange }: WorldProps) {
           {VALHEIM_MODIFIERS.map((modifier) => (
             <div key={modifier.key}>
               <div className="mb-1.5">
-                <span className="text-sm text-gray-200">{modifier.label}</span>
-                <p className="text-xs text-gray-500">{modifier.description}</p>
+                <span className="text-body text-ink">{modifier.label}</span>
+                <p className="text-meta text-faint">{modifier.description}</p>
               </div>
               <SegmentedField
                 value={state.modifiers[modifier.key] ?? ""}
@@ -262,7 +262,7 @@ export function ValheimWorldSection({ envVars, onChange }: WorldProps) {
           title="Argumentos resultantes"
           subtitle="Es lo que acaba en SERVER_ARGS. Los modificadores sólo se aplican del todo en un mundo nuevo; en uno ya generado algunos requieren resetearlo."
         />
-        <div className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs font-mono text-gray-400 break-all min-h-[2.25rem]">
+        <div className="bg-surface border border-line rounded-lg px-3 py-2 text-meta font-mono text-muted break-all min-h-[2.25rem]">
           {buildServerArgs(state) || "(ninguno)"}
         </div>
       </div>

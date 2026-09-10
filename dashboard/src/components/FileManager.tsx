@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type FileEntry, uploadFileWithProgress } from "../api";
 import { formatSize } from "../utils/format";
-import { DownloadIcon, FolderIcon, TrashIcon } from "./Icons";
+import { DownloadIcon, TrashIcon } from "./Icons";
+import { Button, Loading, Modal } from "./ui";
 
 type Props = {
   serverId: string;
@@ -83,57 +84,73 @@ async function collectFromEntries(entries: (FileSystemEntry | null)[]): Promise<
   return out;
 }
 
-const FILE_ICONS: Record<string, string> = {
-  dir: "\u{1F4C1}",
-  ".tar": "\u{1F4E6}",
-  ".tar.gz": "\u{1F4E6}",
-  ".tar.zst": "\u{1F4E6}",
-  ".zip": "\u{1F4E6}",
-  ".gz": "\u{1F4E6}",
-  ".rar": "\u{1F4E6}",
-  ".7z": "\u{1F4E6}",
-  ".jar": "\u2615",
-  ".json": "\u{1F4CB}",
-  ".yml": "\u{1F4CB}",
-  ".yaml": "\u{1F4CB}",
-  ".toml": "\u{1F4CB}",
-  ".properties": "\u{1F4CB}",
-  ".cfg": "\u{1F4CB}",
-  ".conf": "\u{1F4CB}",
-  ".ini": "\u{1F4CB}",
-  ".txt": "\u{1F4C4}",
-  ".log": "\u{1F4DC}",
-  ".md": "\u{1F4C4}",
-  ".png": "\u{1F5BC}",
-  ".jpg": "\u{1F5BC}",
-  ".jpeg": "\u{1F5BC}",
-  ".gif": "\u{1F5BC}",
-  ".webp": "\u{1F5BC}",
-  ".svg": "\u{1F5BC}",
-  ".dat": "\u{1F4BE}",
-  ".db": "\u{1F4BE}",
-  ".sqlite": "\u{1F4BE}",
-  ".nbt": "\u{1F4BE}",
-  ".mca": "\u{1F4BE}",
-  ".sh": "\u{1F4DC}",
-  ".bat": "\u{1F4DC}",
-  ".js": "\u{1F4DC}",
-  ".ts": "\u{1F4DC}",
-  ".py": "\u{1F4DC}",
+/**
+ * Clase de fichero por extensión. En un gestor de ficheros de servidor el
+ * emoji no aporta nada que no diga ya el nombre; la extensión en mono, en
+ * cambio, alinea la columna y se lee de un vistazo.
+ */
+const FILE_KIND: Record<string, string> = {
+  ".tar": "arch",
+  ".tar.gz": "arch",
+  ".tar.zst": "arch",
+  ".zip": "arch",
+  ".gz": "arch",
+  ".rar": "arch",
+  ".7z": "arch",
+  ".jar": "java",
+  ".json": "conf",
+  ".yml": "conf",
+  ".yaml": "conf",
+  ".toml": "conf",
+  ".properties": "conf",
+  ".cfg": "conf",
+  ".conf": "conf",
+  ".ini": "conf",
+  ".log": "log",
+  ".png": "img",
+  ".jpg": "img",
+  ".jpeg": "img",
+  ".gif": "img",
+  ".webp": "img",
+  ".svg": "img",
+  ".dat": "bin",
+  ".db": "bin",
+  ".sqlite": "bin",
+  ".nbt": "bin",
+  ".mca": "bin",
+  ".sh": "sh",
+  ".bat": "bat",
+  ".js": "js",
+  ".ts": "ts",
+  ".py": "py",
 };
 
-function getFileIcon(name: string, isDirectory: boolean): string {
-  if (isDirectory) return FILE_ICONS.dir;
+function fileKind(name: string, isDirectory: boolean): string {
+  if (isDirectory) return "dir";
   const lower = name.toLowerCase();
   for (const ext of [".tar.gz", ".tar.zst"]) {
-    if (lower.endsWith(ext)) return FILE_ICONS[ext];
+    if (lower.endsWith(ext)) return FILE_KIND[ext];
   }
   const dotIdx = lower.lastIndexOf(".");
   if (dotIdx >= 0) {
     const ext = lower.slice(dotIdx);
-    if (FILE_ICONS[ext]) return FILE_ICONS[ext];
+    if (FILE_KIND[ext]) return FILE_KIND[ext];
+    return lower.slice(dotIdx + 1).slice(0, 4);
   }
-  return "\u{1F4C4}";
+  return "txt";
+}
+
+/** Distintivo de tipo, ancho fijo para que la columna de nombres no baile. */
+function Kind({ name, isDirectory }: { name: string; isDirectory: boolean }) {
+  return (
+    <span
+      className={`inline-block w-9 shrink-0 text-right font-mono text-micro uppercase ${
+        isDirectory ? "text-accent" : "text-faint"
+      }`}
+    >
+      {fileKind(name, isDirectory)}
+    </span>
+  );
 }
 
 function formatDate(ts: number): string {
@@ -268,7 +285,7 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
         } catch (err) {
           const msg = (err as Error).message;
           // User cancelled — the item is being removed by dismissUpload, just stop.
-          if (msg === "Upload cancelled") return;
+          if (msg === "Subida cancelada") return;
 
           // Give up on deterministic errors or after the last attempt.
           if (NON_RETRYABLE.test(msg) || attempt === MAX_UPLOAD_ATTEMPTS) {
@@ -458,289 +475,271 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
   const visibleUploads = uploads.filter((u) => u.status === "uploading" || u.status === "error");
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <FolderIcon className="w-5 h-5 text-brand-400" />
-            <h2 className="text-lg font-semibold text-white">{serverName} — Files</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewFolder(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-            >
-              New Folder
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="text-xs px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors"
-            >
-              Upload
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files) {
-                  enqueueFiles(
-                    Array.from(e.target.files).map((file) => ({ file, relativePath: file.name })),
-                  );
-                }
-                e.target.value = "";
-              }}
-            />
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-white transition-colors ml-2 text-xl leading-none"
-            >
-              &times;
-            </button>
-          </div>
+    <Modal
+      title={serverName}
+      subtitle="Ficheros del servidor"
+      size="lg"
+      padded={false}
+      fill
+      onClose={onClose}
+      toolbar={
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" onClick={() => setShowNewFolder(true)}>
+            Nueva carpeta
+          </Button>
+          <Button tone="accent" size="sm" onClick={() => fileInputRef.current?.click()}>
+            Subir
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) {
+                enqueueFiles(
+                  Array.from(e.target.files).map((file) => ({ file, relativePath: file.name })),
+                );
+              }
+              e.target.value = "";
+            }}
+          />
         </div>
-
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-1 px-5 py-2 border-b border-gray-800 text-sm overflow-x-auto">
-          <button
-            onClick={() => navigateToBreadcrumb(-1)}
-            className="text-brand-400 hover:text-brand-300 shrink-0"
-          >
-            /
-          </button>
-          {pathParts.map((part, i) => (
-            <span key={i} className="flex items-center gap-1 shrink-0">
-              {i > 0 && <span className="text-gray-600">/</span>}
-              <button
-                onClick={() => navigateToBreadcrumb(i)}
-                className={`hover:text-brand-300 transition-colors ${
-                  i === pathParts.length - 1 ? "text-white" : "text-brand-400"
-                }`}
-              >
-                {part}
-              </button>
-            </span>
-          ))}
-        </div>
-
-        {/* New folder input */}
-        {showNewFolder && (
-          <div className="flex items-center gap-2 px-5 py-2 border-b border-gray-800">
-            <input
-              type="text"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateFolder();
-                if (e.key === "Escape") {
-                  setShowNewFolder(false);
-                  setNewFolderName("");
-                }
-              }}
-              placeholder="Folder name"
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-brand-500"
-            />
+      }
+    >
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-1 px-5 py-2 border-b border-line text-body overflow-x-auto">
+        <button
+          onClick={() => navigateToBreadcrumb(-1)}
+          className="text-accent hover:text-accent shrink-0"
+        >
+          /
+        </button>
+        {pathParts.map((part, i) => (
+          <span key={i} className="flex items-center gap-1 shrink-0">
+            {i > 0 && <span className="text-faint">/</span>}
             <button
-              onClick={handleCreateFolder}
-              className="text-xs px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white transition-colors"
+              onClick={() => navigateToBreadcrumb(i)}
+              className={`hover:text-accent transition-colors ${
+                i === pathParts.length - 1 ? "text-ink" : "text-accent"
+              }`}
             >
-              Create
+              {part}
             </button>
-            <button
-              onClick={() => {
+          </span>
+        ))}
+      </div>
+
+      {/* New folder input */}
+      {showNewFolder && (
+        <div className="flex items-center gap-2 px-5 py-2 border-b border-line">
+          <input
+            type="text"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateFolder();
+              if (e.key === "Escape") {
                 setShowNewFolder(false);
                 setNewFolderName("");
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="mx-5 mt-3 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-xs text-red-300">
-            {error}
-          </div>
-        )}
-
-        {/* File list — entire area is a drop zone */}
-        <div
-          className="flex-1 overflow-y-auto min-h-0 relative"
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-        >
-          {/* Drop overlay */}
-          {dragOver && (
-            <div className="absolute inset-0 bg-brand-500/10 border-2 border-dashed border-brand-500 rounded-lg z-10 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <div className="text-3xl mb-2">&#x1F4E4;</div>
-                <p className="text-brand-400 font-medium text-sm">
-                  Drop files or folders to upload
-                </p>
-                <p className="text-brand-400/60 text-xs mt-1">
-                  to {currentPath === "/" ? "root" : currentPath}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="text-center text-gray-600 py-16 text-sm">
-              <p>{currentPath === "/" ? "No files found" : "Empty directory"}</p>
-              <p className="mt-2 text-gray-700">Drag & drop files here to upload</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500 text-xs border-b border-gray-800">
-                  <th className="text-left px-5 py-2 font-medium">Name</th>
-                  <th className="text-right px-3 py-2 font-medium w-24">Size</th>
-                  <th className="text-right px-3 py-2 font-medium w-40 hidden sm:table-cell">
-                    Modified
-                  </th>
-                  <th className="text-right px-5 py-2 font-medium w-20">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentPath !== "/" && (
-                  <tr
-                    onClick={navigateUp}
-                    className="hover:bg-gray-800/50 cursor-pointer border-b border-gray-800/50"
-                  >
-                    <td className="px-5 py-2 text-gray-400" colSpan={4}>
-                      <span className="mr-2">..</span>
-                    </td>
-                  </tr>
-                )}
-                {entries.map((entry) => (
-                  <tr
-                    key={entry.name}
-                    className="hover:bg-gray-800/50 border-b border-gray-800/50 group"
-                  >
-                    <td className="px-5 py-2">
-                      {entry.isDirectory ? (
-                        <button
-                          onClick={() => navigate(entry.name)}
-                          className="flex items-center gap-2 text-white hover:text-brand-400 transition-colors"
-                        >
-                          <span>{getFileIcon(entry.name, true)}</span>
-                          <span>{entry.name}</span>
-                        </button>
-                      ) : (
-                        <span className="flex items-center gap-2 text-gray-300">
-                          <span>{getFileIcon(entry.name, false)}</span>
-                          <span>{entry.name}</span>
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-right px-3 py-2 text-gray-500 text-xs">
-                      {entry.isDirectory ? "" : formatSize(entry.size)}
-                    </td>
-                    <td className="text-right px-3 py-2 text-gray-500 text-xs hidden sm:table-cell">
-                      {formatDate(entry.modifiedAt)}
-                    </td>
-                    <td className="text-right px-5 py-2">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {!entry.isDirectory && (
-                          <a
-                            href={api.downloadFileUrl(
-                              serverId,
-                              currentPath === "/"
-                                ? `/${entry.name}`
-                                : `${currentPath}/${entry.name}`,
-                            )}
-                            className="p-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors inline-flex"
-                            title="Download"
-                          >
-                            <DownloadIcon className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        <button
-                          onClick={() => handleDeleteClick(entry.name)}
-                          className={`p-1 rounded transition-colors inline-flex ${
-                            confirmDelete === entry.name
-                              ? "bg-red-600 text-white hover:bg-red-700"
-                              : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-400"
-                          }`}
-                          title={confirmDelete === entry.name ? "Click again to confirm" : "Delete"}
-                        >
-                          {confirmDelete === entry.name ? (
-                            <span className="text-xs px-1">Confirm?</span>
-                          ) : (
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+              }
+            }}
+            placeholder="Nombre de la carpeta"
+            className="flex-1 bg-raised border border-line rounded-md px-3 py-1.5 text-body text-ink placeholder:text-faint outline-none focus:border-accent"
+          />
+          <button
+            onClick={handleCreateFolder}
+            className="tap text-meta px-3 py-1.5 rounded-md bg-accent hover:bg-accent/90 text-accent-ink transition-colors"
+          >
+            Create
+          </button>
+          <button
+            onClick={() => {
+              setShowNewFolder(false);
+              setNewFolderName("");
+            }}
+            className="tap text-meta px-3 py-1.5 rounded-md bg-raised hover:bg-line text-muted transition-colors"
+          >
+            Cancel
+          </button>
         </div>
+      )}
 
-        {/* Upload queue panel */}
-        {hasActiveUploads && (
-          <div className="border-t border-gray-800 bg-gray-950">
-            <div className="flex items-center justify-between px-4 py-2 gap-3">
-              <span className="text-xs text-gray-400 flex items-center gap-2 min-w-0">
-                <span className="truncate">
-                  {uploadingCount > 0
-                    ? `Subiendo ${doneCount}/${totalUploads}...`
-                    : errorCount > 0
-                      ? "Subida finalizada con errores"
-                      : "Subida completa"}
-                </span>
-                {doneCount > 0 && <span className="text-green-400 shrink-0">✓ {doneCount}</span>}
-                {errorCount > 0 && <span className="text-red-400 shrink-0">✗ {errorCount}</span>}
-              </span>
-              <div className="flex items-center gap-3 shrink-0">
-                {errorCount > 0 && uploadingCount === 0 && (
-                  <button
-                    onClick={retryFailed}
-                    className="text-[11px] px-2 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors"
-                  >
-                    Reintentar fallidos ({errorCount})
-                  </button>
-                )}
-                {hasFinished && (
-                  <button
-                    onClick={clearFinished}
-                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
-                  >
-                    Limpiar
-                  </button>
-                )}
-              </div>
+      {/* Error */}
+      {error && (
+        <div className="mx-5 mt-3 bg-danger/10 border border-danger/35 rounded-md px-3 py-2 text-meta text-danger">
+          {error}
+        </div>
+      )}
+
+      {/* File list — entire area is a drop zone */}
+      <div
+        className="flex-1 overflow-y-auto min-h-0 relative"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Drop overlay */}
+        {dragOver && (
+          <div className="absolute inset-0 bg-accent/10 border-2 border-dashed border-accent/35 rounded-md z-10 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <div className="text-hero mb-2">&#x1F4E4;</div>
+              <p className="text-accent font-medium text-body">
+                Suelta ficheros o carpetas para subirlos
+              </p>
+              <p className="text-accent text-meta mt-1">
+                to {currentPath === "/" ? "root" : currentPath}
+              </p>
             </div>
-            {visibleUploads.length > 0 && (
-              <div className="max-h-40 overflow-y-auto px-4 pb-3 flex flex-col gap-1.5">
-                {visibleUploads.map((item) => (
-                  <UploadRow key={item.id} item={item} onDismiss={() => dismissUpload(item.id)} />
-                ))}
-              </div>
-            )}
           </div>
         )}
 
-        {/* Drop hint footer — only when no uploads showing */}
-        {!hasActiveUploads && (
-          <div className="border-t border-gray-800 px-5 py-2.5 text-center text-xs text-gray-600">
-            Drag & drop files anywhere to upload
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loading>Leyendo carpeta</Loading>
           </div>
+        ) : entries.length === 0 ? (
+          <div className="text-center text-faint py-16 text-body">
+            <p>{currentPath === "/" ? "No files found" : "Empty directory"}</p>
+            <p className="mt-2 text-faint">Arrastra ficheros hasta aquí para subirlos</p>
+          </div>
+        ) : (
+          <table className="w-full text-body">
+            <thead>
+              <tr className="text-faint text-meta border-b border-line">
+                <th className="text-left px-5 py-2 font-medium">Nombre</th>
+                <th className="text-right px-3 py-2 font-medium w-24">Tamaño</th>
+                <th className="text-right px-3 py-2 font-medium w-40 hidden sm:table-cell">
+                  Modificado
+                </th>
+                <th className="text-right px-5 py-2 font-medium w-20">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentPath !== "/" && (
+                <tr
+                  onClick={navigateUp}
+                  className="hover:bg-raised/50 cursor-pointer border-b border-line/50"
+                >
+                  <td className="px-5 py-2 text-muted" colSpan={4}>
+                    <span className="mr-2">..</span>
+                  </td>
+                </tr>
+              )}
+              {entries.map((entry) => (
+                <tr key={entry.name} className="hover:bg-raised/50 border-b border-line/50 group">
+                  <td className="px-5 py-2">
+                    {entry.isDirectory ? (
+                      <button
+                        onClick={() => navigate(entry.name)}
+                        className="flex items-center gap-2 text-ink hover:text-accent transition-colors"
+                      >
+                        <Kind name={entry.name} isDirectory />
+                        <span>{entry.name}</span>
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-2 text-muted">
+                        <Kind name={entry.name} isDirectory={false} />
+                        <span>{entry.name}</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="text-right px-3 py-2 text-faint text-meta">
+                    {entry.isDirectory ? "" : formatSize(entry.size)}
+                  </td>
+                  <td className="text-right px-3 py-2 text-faint text-meta hidden sm:table-cell">
+                    {formatDate(entry.modifiedAt)}
+                  </td>
+                  <td className="text-right px-5 py-2">
+                    <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100 sm:opacity-0">
+                      {!entry.isDirectory && (
+                        <a
+                          href={api.downloadFileUrl(
+                            serverId,
+                            currentPath === "/" ? `/${entry.name}` : `${currentPath}/${entry.name}`,
+                          )}
+                          className="tap p-1 rounded-sm bg-raised hover:bg-line text-muted hover:text-ink transition-colors inline-flex"
+                          title="Descargar"
+                        >
+                          <DownloadIcon className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDeleteClick(entry.name)}
+                        className={`tap p-1 rounded-sm transition-colors inline-flex ${
+                          confirmDelete === entry.name
+                            ? "bg-danger text-danger-ink hover:bg-danger/90"
+                            : "bg-raised hover:bg-line text-muted hover:text-danger"
+                        }`}
+                        title={confirmDelete === entry.name ? "Click again to confirm" : "Borrar"}
+                      >
+                        {confirmDelete === entry.name ? (
+                          <span className="text-meta px-1">Confirm?</span>
+                        ) : (
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
-    </div>
+
+      {/* Upload queue panel */}
+      {hasActiveUploads && (
+        <div className="border-t border-line bg-bg">
+          <div className="flex items-center justify-between px-4 py-2 gap-3">
+            <span className="text-meta text-muted flex items-center gap-2 min-w-0">
+              <span className="truncate">
+                {uploadingCount > 0
+                  ? `Subiendo ${doneCount}/${totalUploads}...`
+                  : errorCount > 0
+                    ? "Subida finalizada con errores"
+                    : "Subida completa"}
+              </span>
+              {doneCount > 0 && <span className="text-ok shrink-0">✓ {doneCount}</span>}
+              {errorCount > 0 && <span className="text-danger shrink-0">✗ {errorCount}</span>}
+            </span>
+            <div className="flex items-center gap-3 shrink-0">
+              {errorCount > 0 && uploadingCount === 0 && (
+                <button
+                  onClick={retryFailed}
+                  className="tap text-[11px] px-2 py-1 rounded-md bg-danger hover:bg-danger/90 text-ink transition-colors"
+                >
+                  Reintentar fallidos ({errorCount})
+                </button>
+              )}
+              {hasFinished && (
+                <button
+                  onClick={clearFinished}
+                  className="text-[10px] text-faint hover:text-muted transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+          {visibleUploads.length > 0 && (
+            <div className="max-h-40 overflow-y-auto px-4 pb-3 flex flex-col gap-1.5">
+              {visibleUploads.map((item) => (
+                <UploadRow key={item.id} item={item} onDismiss={() => dismissUpload(item.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pista de arrastre: solo cuando no hay subidas ocupando el pie */}
+      {!hasActiveUploads && (
+        <div className="border-t border-line px-5 py-2.5 text-center text-meta text-faint">
+          Suelta ficheros en cualquier punto de esta ventana para subirlos.
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -752,38 +751,36 @@ function UploadRow({ item, onDismiss }: { item: UploadItem; onDismiss: () => voi
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-xs transition-all ${
-        isDone ? "bg-green-950/20" : isError ? "bg-red-950/20" : "bg-gray-900"
+      className={`flex items-center gap-3 rounded-md px-3 py-2 text-meta transition-all ${
+        isDone ? "bg-ok/10" : isError ? "bg-danger/10" : "bg-surface"
       }`}
     >
       {/* Icon/status */}
       <div className="shrink-0 w-4 flex items-center justify-center">
-        {isPending && <span className="text-gray-500">&#x23F3;</span>}
-        {isActive && (
-          <div className="w-3.5 h-3.5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-        )}
-        {isDone && <span className="text-green-400">&#x2713;</span>}
-        {isError && <span className="text-red-400">&#x2717;</span>}
+        {isPending && <span className="text-faint">&#x23F3;</span>}
+        {isActive && <Loading>Subiendo</Loading>}
+        {isDone && <span className="text-ok">&#x2713;</span>}
+        {isError && <span className="text-danger">&#x2717;</span>}
       </div>
 
       {/* File info + progress */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-gray-300 truncate" title={item.relativePath}>
+          <span className="text-muted truncate" title={item.relativePath}>
             {item.relativePath}
           </span>
-          <span className="text-gray-500 shrink-0">{formatSize(item.file.size)}</span>
+          <span className="text-faint shrink-0">{formatSize(item.file.size)}</span>
         </div>
         {(isActive || isPending) && (
-          <div className="mt-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+          <div className="mt-1 h-1 bg-raised rounded-full overflow-hidden">
             <div
-              className="h-full bg-brand-500 rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
               style={{ width: `${item.progress}%` }}
             />
           </div>
         )}
         {isError && item.error && (
-          <p className="text-red-400 mt-0.5 truncate" title={item.error}>
+          <p className="text-danger mt-0.5 truncate" title={item.error}>
             {item.error}
             {item.attempts > 1 ? ` (tras ${item.attempts} intentos)` : ""}
           </p>
@@ -792,16 +789,13 @@ function UploadRow({ item, onDismiss }: { item: UploadItem; onDismiss: () => voi
 
       {/* Percentage / dismiss */}
       <div className="shrink-0 w-12 text-right">
-        {isActive && <span className="text-gray-400">{item.progress}%</span>}
+        {isActive && <span className="text-muted">{item.progress}%</span>}
         {(isDone || isError) && (
-          <button
-            onClick={onDismiss}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
-          >
+          <button onClick={onDismiss} className="text-faint hover:text-muted transition-colors">
             &#x2715;
           </button>
         )}
-        {isPending && <span className="text-gray-600">Queue</span>}
+        {isPending && <span className="text-faint">En cola</span>}
       </div>
     </div>
   );

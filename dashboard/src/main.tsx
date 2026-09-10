@@ -9,6 +9,12 @@ import InvoiceHome from "./pages/InvoiceHome";
 import Login from "./pages/Login";
 import Pending from "./pages/Pending";
 import Status from "./pages/Status";
+import { applyMode, readModePreference } from "./theme";
+// Fuentes servidas por el propio panel: sin salto a Google Fonts y sin FOUT
+// dependiente de la red. Archivo para la interfaz, Plex Mono para todo dato.
+import "@fontsource-variable/archivo/wght.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./index.css";
 
 const isFacturas =
@@ -47,6 +53,10 @@ window.onunhandledrejection = (event) => {
     component: "unhandledrejection",
   });
 };
+
+// El modo guardado se aplica antes del primer pintado, para que las pantallas
+// previas al panel (login, invitación, estado) no destellen en el tema contrario.
+applyMode(readModePreference());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

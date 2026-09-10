@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type GameTemplate } from "../api";
 import MinecraftConfigEditor from "./MinecraftConfigEditor";
+import { Button, Modal } from "./ui";
 
 type Props = {
   open: boolean;
@@ -148,307 +149,287 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
   const showForm = selected || customMode;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      onClick={onClose}
+    <Modal
+      title={showForm ? (selected ? selected.name : "Servidor a medida") : "Catálogo de juegos"}
+      subtitle={showForm ? "Configura y añade el servidor" : "Elige qué quieres levantar"}
+      size={showForm && isMcTemplate ? "lg" : "md"}
+      padded={false}
+      onClose={onClose}
+      toolbar={
+        showForm ? (
+          <Button tone="ghost" size="sm" onClick={handleBack}>
+            Volver
+          </Button>
+        ) : undefined
+      }
     >
-      <div
-        className={`bg-gray-900 border border-gray-700 rounded-2xl w-full max-h-[85vh] flex flex-col overflow-hidden ${showForm && isMcTemplate ? "max-w-3xl" : "max-w-2xl"}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            {showForm && (
-              <button
-                onClick={handleBack}
-                className="text-gray-400 hover:text-white transition-colors mr-1"
-              >
-                &larr;
-              </button>
-            )}
-            <h2 className="text-lg font-semibold text-white">
-              {showForm ? (selected ? selected.name : "Custom Server") : "Game Store"}
-            </h2>
+      {!showForm ? (
+        <>
+          {/* Search */}
+          <div className="px-5 pt-4">
+            <input
+              type="text"
+              placeholder="Buscar juegos"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-raised border border-line rounded-md px-4 py-2.5 text-body text-ink placeholder:text-faint focus:outline-none focus:border-accent"
+            />
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-white transition-colors text-xl leading-none"
-          >
-            &times;
-          </button>
-        </div>
 
-        {!showForm ? (
-          <>
-            {/* Search */}
-            <div className="px-5 pt-4">
-              <input
-                type="text"
-                placeholder="Search games..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-500"
-              />
-            </div>
+          {/* Category tabs */}
+          <div className="flex gap-1 px-5 pt-3 pb-1">
+            {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`tap px-3 py-1.5 text-meta font-medium rounded-md transition-colors ${
+                  category === cat
+                    ? "bg-accent text-accent-ink"
+                    : "bg-raised text-muted hover:text-ink"
+                }`}
+              >
+                {CATEGORY_LABELS[cat]}
+              </button>
+            ))}
+          </div>
 
-            {/* Category tabs */}
-            <div className="flex gap-1 px-5 pt-3 pb-1">
-              {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+          {/* Game grid */}
+          <div className="flex-1 overflow-y-auto px-5 py-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {filtered.map((template) => (
                 <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    category === cat
-                      ? "bg-brand-500 text-white"
-                      : "bg-gray-800 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {CATEGORY_LABELS[cat]}
-                </button>
-              ))}
-            </div>
-
-            {/* Game grid */}
-            <div className="flex-1 overflow-y-auto px-5 py-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {filtered.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => setSelected(template)}
-                    className="bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-brand-500 rounded-xl p-3 text-left transition-all group"
-                  >
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={template.icon}
-                        alt=""
-                        className="w-6 h-6 rounded object-cover shrink-0"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-white truncate group-hover:text-brand-400 transition-colors">
-                          {template.name}
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">{template.category}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-
-                {/* Custom server card */}
-                <button
-                  onClick={handleCustom}
-                  className="bg-gray-800 hover:bg-gray-750 border border-dashed border-gray-600 hover:border-brand-500 rounded-xl p-3 text-left transition-all group"
+                  key={template.id}
+                  onClick={() => setSelected(template)}
+                  className="bg-raised hover:bg-line border border-line hover:border-accent/35 rounded-md p-3 text-left transition-all group"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">+</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-400 group-hover:text-brand-400 transition-colors">
-                        Custom Server
+                    <img
+                      src={template.icon}
+                      alt=""
+                      className="w-6 h-6 rounded-sm object-cover shrink-0"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-body font-medium text-ink truncate group-hover:text-accent transition-colors">
+                        {template.name}
                       </p>
-                      <p className="text-xs text-gray-600">Any Docker image</p>
+                      <p className="text-meta text-faint capitalize">{template.category}</p>
                     </div>
                   </div>
                 </button>
-              </div>
+              ))}
+
+              {/* Custom server card */}
+              <button
+                onClick={handleCustom}
+                className="bg-raised hover:bg-line border border-dashed border-line-strong hover:border-accent/35 rounded-md p-3 text-left transition-all group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-title">+</span>
+                  <div>
+                    <p className="text-body font-medium text-muted group-hover:text-accent transition-colors">
+                      Servidor a medida
+                    </p>
+                    <p className="text-meta text-faint">Cualquier imagen de Docker</p>
+                  </div>
+                </div>
+              </button>
             </div>
-          </>
-        ) : (
-          /* Config form */
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3"
+          </div>
+        </>
+      ) : (
+        /* Config form */
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3"
+        >
+          {error && (
+            <div className="bg-danger/10 border border-danger/35 rounded-md px-3 py-2 text-body text-danger">
+              {error}
+            </div>
+          )}
+
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-muted">Identificador</span>
+            <input
+              type="text"
+              value={formId}
+              onChange={(e) => setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+              required
+              className="bg-raised border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
+              placeholder="mi-servidor"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-muted">Nombre visible</span>
+            <input
+              type="text"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              required
+              className="bg-raised border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
+              placeholder="Mi servidor"
+            />
+          </label>
+
+          {customMode && (
+            <>
+              <label className="flex flex-col gap-1">
+                <span className="text-meta text-muted">Imagen de Docker</span>
+                <input
+                  type="text"
+                  value={formImage}
+                  onChange={(e) => setFormImage(e.target.value)}
+                  required
+                  className="bg-raised border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
+                  placeholder="gameservermanagers/gameserver:cs2"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-meta text-muted">URL del icono (opcional)</span>
+                <input
+                  type="text"
+                  value={formIcon}
+                  onChange={(e) => setFormIcon(e.target.value)}
+                  className="bg-raised border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
+                  placeholder="https://example.com/icon.png"
+                />
+              </label>
+            </>
+          )}
+
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-muted">Puerto</span>
+            <input
+              type="number"
+              value={formPort}
+              onChange={(e) => setFormPort(e.target.value)}
+              required
+              className="bg-raised border border-line rounded-md px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
+              placeholder="27015"
+            />
+          </label>
+
+          {/* Volumes (custom only) */}
+          {customMode && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-meta text-muted">Volúmenes</span>
+                <button
+                  type="button"
+                  onClick={() => setFormVolumes([...formVolumes, { host: "", container: "" }])}
+                  className="text-meta text-accent hover:text-accent"
+                >
+                  + Add
+                </button>
+              </div>
+              {formVolumes.map((vol, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={vol.host}
+                    onChange={(e) => {
+                      const next = [...formVolumes];
+                      next[i] = { ...next[i], host: e.target.value };
+                      setFormVolumes(next);
+                    }}
+                    placeholder={`/data/${formId || "my-server"}`}
+                    className="flex-1 bg-raised border border-line rounded-md px-3 py-1.5 text-meta text-ink font-mono focus:outline-none focus:border-accent"
+                  />
+                  <span className="text-faint text-meta">:</span>
+                  <input
+                    type="text"
+                    value={vol.container}
+                    onChange={(e) => {
+                      const next = [...formVolumes];
+                      next[i] = { ...next[i], container: e.target.value };
+                      setFormVolumes(next);
+                    }}
+                    placeholder="/data"
+                    className="flex-1 bg-raised border border-line rounded-md px-3 py-1.5 text-meta text-ink font-mono focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormVolumes(formVolumes.filter((_, j) => j !== i))}
+                    className="text-faint hover:text-danger text-body px-1"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              <p className="text-meta text-faint">
+                Maps host path to container path for persistent data.
+              </p>
+            </div>
+          )}
+
+          {/* Env vars */}
+          {isMcTemplate ? (
+            <div className="max-h-[40vh] overflow-y-auto pr-1">
+              <MinecraftConfigEditor envVars={mcEnvRecord} onChange={setMcEnvRecord} />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-meta text-muted">Variables de entorno</span>
+                <button
+                  type="button"
+                  onClick={() => setFormEnv([...formEnv, { key: "", value: "" }])}
+                  className="text-meta text-accent hover:text-accent"
+                >
+                  + Add
+                </button>
+              </div>
+              {formEnv.map((env, i) => (
+                <div key={i} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={env.key}
+                    onChange={(e) => {
+                      const next = [...formEnv];
+                      next[i] = { ...next[i], key: e.target.value };
+                      setFormEnv(next);
+                    }}
+                    placeholder="CLAVE"
+                    className="flex-1 bg-raised border border-line rounded-md px-3 py-1.5 text-meta text-ink font-mono focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    type="text"
+                    value={env.value}
+                    onChange={(e) => {
+                      const next = [...formEnv];
+                      next[i] = { ...next[i], value: e.target.value };
+                      setFormEnv(next);
+                    }}
+                    placeholder="valor"
+                    className="flex-1 bg-raised border border-line rounded-md px-3 py-1.5 text-meta text-ink font-mono focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormEnv(formEnv.filter((_, j) => j !== i))}
+                    className="text-faint hover:text-danger text-body px-1"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 bg-accent hover:bg-accent/90 disabled:opacity-50 text-accent-ink rounded-md py-2.5 text-body font-medium transition-colors"
           >
-            {error && (
-              <div className="bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-sm text-red-300">
-                {error}
-              </div>
-            )}
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-400">Server ID</span>
-              <input
-                type="text"
-                value={formId}
-                onChange={(e) =>
-                  setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
-                }
-                required
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                placeholder="my-server"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-400">Display Name</span>
-              <input
-                type="text"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                required
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                placeholder="My Server"
-              />
-            </label>
-
-            {customMode && (
-              <>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-gray-400">Docker Image</span>
-                  <input
-                    type="text"
-                    value={formImage}
-                    onChange={(e) => setFormImage(e.target.value)}
-                    required
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                    placeholder="gameservermanagers/gameserver:cs2"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-gray-400">Icon URL (optional)</span>
-                  <input
-                    type="text"
-                    value={formIcon}
-                    onChange={(e) => setFormIcon(e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                    placeholder="https://example.com/icon.png"
-                  />
-                </label>
-              </>
-            )}
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-gray-400">Port</span>
-              <input
-                type="number"
-                value={formPort}
-                onChange={(e) => setFormPort(e.target.value)}
-                required
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                placeholder="27015"
-              />
-            </label>
-
-            {/* Volumes (custom only) */}
-            {customMode && (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Volumes</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormVolumes([...formVolumes, { host: "", container: "" }])}
-                    className="text-xs text-brand-400 hover:text-brand-300"
-                  >
-                    + Add
-                  </button>
-                </div>
-                {formVolumes.map((vol, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={vol.host}
-                      onChange={(e) => {
-                        const next = [...formVolumes];
-                        next[i] = { ...next[i], host: e.target.value };
-                        setFormVolumes(next);
-                      }}
-                      placeholder={`/data/${formId || "my-server"}`}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                    />
-                    <span className="text-gray-600 text-xs">:</span>
-                    <input
-                      type="text"
-                      value={vol.container}
-                      onChange={(e) => {
-                        const next = [...formVolumes];
-                        next[i] = { ...next[i], container: e.target.value };
-                        setFormVolumes(next);
-                      }}
-                      placeholder="/data"
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormVolumes(formVolumes.filter((_, j) => j !== i))}
-                      className="text-gray-500 hover:text-red-400 text-sm px-1"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-                <p className="text-xs text-gray-600">
-                  Maps host path to container path for persistent data.
-                </p>
-              </div>
-            )}
-
-            {/* Env vars */}
-            {isMcTemplate ? (
-              <div className="max-h-[40vh] overflow-y-auto pr-1">
-                <MinecraftConfigEditor envVars={mcEnvRecord} onChange={setMcEnvRecord} />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Environment Variables</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormEnv([...formEnv, { key: "", value: "" }])}
-                    className="text-xs text-brand-400 hover:text-brand-300"
-                  >
-                    + Add
-                  </button>
-                </div>
-                {formEnv.map((env, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={env.key}
-                      onChange={(e) => {
-                        const next = [...formEnv];
-                        next[i] = { ...next[i], key: e.target.value };
-                        setFormEnv(next);
-                      }}
-                      placeholder="KEY"
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                    />
-                    <input
-                      type="text"
-                      value={env.value}
-                      onChange={(e) => {
-                        const next = [...formEnv];
-                        next[i] = { ...next[i], value: e.target.value };
-                        setFormEnv(next);
-                      }}
-                      placeholder="value"
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormEnv(formEnv.filter((_, j) => j !== i))}
-                      className="text-gray-500 hover:text-red-400 text-sm px-1"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-medium transition-colors"
-            >
-              {loading ? "Adding..." : "Add Server"}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+            {loading ? "Añadiendo" : "Añadir servidor"}
+          </button>
+        </form>
+      )}
+    </Modal>
   );
 }

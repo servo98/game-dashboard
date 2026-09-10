@@ -88,7 +88,7 @@ describe("OnlinePlayers", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1/20 Players")).toBeInTheDocument();
+      expect(screen.getByText("1/20")).toBeInTheDocument();
     });
   });
 
@@ -105,7 +105,7 @@ describe("OnlinePlayers", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("2/20 Players")).toBeInTheDocument();
+      expect(screen.getByText("2/20")).toBeInTheDocument();
     });
 
     const avatars = screen.getAllByRole("img");
@@ -131,7 +131,7 @@ describe("OnlinePlayers", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("2/10 Players")).toBeInTheDocument();
+      expect(screen.getByText("2/10")).toBeInTheDocument();
     });
 
     expect(screen.getByText("Jevus")).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe("OnlinePlayers", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("1 Players")).toBeInTheDocument();
+      expect(screen.getByText("1")).toBeInTheDocument();
     });
   });
 });

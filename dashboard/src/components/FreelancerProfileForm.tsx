@@ -35,28 +35,28 @@ export default function FreelancerProfileForm() {
   function field(key: keyof FreelancerProfile, label: string, placeholder?: string) {
     return (
       <div>
-        <label className="block text-xs text-gray-400 mb-1">{label}</label>
+        <label className="block text-meta text-muted mb-1">{label}</label>
         <input
           type="text"
           value={(profile[key] as string) ?? ""}
           onChange={(e) => setProfile((p) => ({ ...p, [key]: e.target.value || null }))}
           placeholder={placeholder}
-          className="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500"
+          className="w-full bg-bg border border-line rounded-md px-3 py-2 text-body text-ink placeholder:text-faint focus:outline-none focus:border-accent"
         />
       </div>
     );
   }
 
   if (loading) {
-    return <div className="text-gray-500 text-sm animate-pulse py-4">Loading profile...</div>;
+    return <div className="text-faint text-body tick py-4">Cargando perfil</div>;
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-      <h3 className="font-semibold text-gray-200 mb-4">Perfil de Facturacion</h3>
+    <div className="bg-surface border border-line rounded-lg p-5">
+      <h3 className="font-semibold text-ink mb-4">Perfil de Facturacion</h3>
 
       {error && (
-        <div className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 mb-3">
+        <div className="text-body text-danger bg-danger/10 border border-danger/35 rounded-md px-3 py-2 mb-3">
           {error}
         </div>
       )}
@@ -68,8 +68,8 @@ export default function FreelancerProfileForm() {
         </div>
         {field("email", "Email", "tu@email.com")}
 
-        <div className="border-t border-gray-800 pt-3 mt-1">
-          <p className="text-xs text-gray-500 mb-2">Datos bancarios (para PDF comercial)</p>
+        <div className="border-t border-line pt-3 mt-1">
+          <p className="text-meta text-faint mb-2">Datos bancarios (para PDF comercial)</p>
           <div className="flex flex-col gap-3">
             {field("bank_name", "Banco", "Lead Bank (USA)")}
             {field("account_holder", "Beneficiario", "Fernando Servin Victoria")}
@@ -84,8 +84,8 @@ export default function FreelancerProfileForm() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-3 mt-1">
-          <p className="text-xs text-gray-500 mb-2">Billed To (datos del cliente en el PDF)</p>
+        <div className="border-t border-line pt-3 mt-1">
+          <p className="text-meta text-faint mb-2">Billed To (datos del cliente en el PDF)</p>
           <div className="flex flex-col gap-3">
             {field("billed_to_name", "Nombre empresa", "Express Network")}
             {field("billed_to_address", "Direccion", "1605 W. Olympic Blvd., Suite 800...")}
@@ -96,7 +96,7 @@ export default function FreelancerProfileForm() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="self-start px-5 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors mt-2"
+          className="tap self-start px-5 py-2 bg-accent hover:bg-accent/90 disabled:opacity-50 text-accent-ink text-body font-medium rounded-md transition-colors mt-2"
         >
           {saved ? "Guardado" : saving ? "Guardando..." : "Guardar Perfil"}
         </button>

@@ -72,7 +72,7 @@ describe("Status page", () => {
     });
     render(<Status />);
     await waitFor(() => {
-      expect(screen.getByText("All Systems Operational")).toBeInTheDocument();
+      expect(screen.getByText("Todos los servicios responden con normalidad.")).toBeInTheDocument();
     });
   });
 
@@ -83,12 +83,11 @@ describe("Status page", () => {
     });
     render(<Status />);
     await waitFor(() => {
-      expect(screen.getByText("Backend API")).toBeInTheDocument();
+      expect(screen.getByText("API del panel")).toBeInTheDocument();
     });
-    expect(screen.getByText("Discord Bot")).toBeInTheDocument();
-    // "Dashboard" also appears as a link, so use getAllByText
-    expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Reverse Proxy")).toBeInTheDocument();
+    expect(screen.getByText("Bot de Discord")).toBeInTheDocument();
+    expect(screen.getByText("Panel web")).toBeInTheDocument();
+    expect(screen.getByText("Proxy inverso")).toBeInTheDocument();
   });
 
   it("shows Degraded Performance when a service is down", async () => {
@@ -105,7 +104,9 @@ describe("Status page", () => {
     });
     render(<Status />);
     await waitFor(() => {
-      expect(screen.getByText("Degraded Performance")).toBeInTheDocument();
+      expect(
+        screen.getByText("Algún servicio no está respondiendo como debería."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -113,7 +114,7 @@ describe("Status page", () => {
     mockFetch.mockRejectedValue(new Error("Network error"));
     render(<Status />);
     await waitFor(() => {
-      expect(screen.getByText("Unable to reach API")).toBeInTheDocument();
+      expect(screen.getByText("No se puede contactar con la API del panel.")).toBeInTheDocument();
     });
   });
 
@@ -140,22 +141,18 @@ describe("Status page", () => {
     });
     render(<Status />);
     await waitFor(() => {
-      expect(screen.getByText("No game server running")).toBeInTheDocument();
+      expect(screen.getByText("Ningún servidor de juego en marcha.")).toBeInTheDocument();
     });
   });
 
-  it("has Dashboard link back to /", async () => {
+  it("enlaza de vuelta al panel", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(healthyResponse),
     });
     render(<Status />);
     await waitFor(() => {
-      // "Dashboard" appears both as a service name and as a link — find the link
-      const links = screen.getAllByText("Dashboard");
-      const dashLink = links.find((el) => el.tagName === "A");
-      expect(dashLink).toBeTruthy();
-      expect(dashLink?.getAttribute("href")).toBe("/");
+      expect(screen.getByText("Ir al panel").getAttribute("href")).toBe("/");
     });
   });
 });
