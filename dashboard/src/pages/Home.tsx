@@ -14,7 +14,6 @@ import BackupsTab from "../components/BackupsTab";
 import BotSettings from "../components/BotSettings";
 import ConfigEditor from "../components/ConfigEditor";
 import FileManager from "../components/FileManager";
-import FreelancerProfileForm from "../components/FreelancerProfileForm";
 import GameStore from "../components/GameStore";
 import HostStatsBar from "../components/HostStatsBar";
 import {
@@ -23,14 +22,11 @@ import {
   KeyIcon,
   LogsIcon,
   PlusIcon,
-  ReceiptIcon,
   RestoreIcon,
   ServersIcon,
   SettingsIcon,
   UsersIcon,
 } from "../components/Icons";
-import InvoiceList from "../components/InvoiceList";
-import InvoiceUpload from "../components/InvoiceUpload";
 import LogViewer from "../components/LogViewer";
 import McpTokens from "../components/McpTokens";
 import PanelSettings from "../components/PanelSettings";
@@ -48,7 +44,7 @@ import {
   watchSystemMode,
 } from "../theme";
 
-type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users" | "facturas";
+type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users";
 
 const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 // nginx/dashboard sirven el propio panel → reiniciarlos cortaría esta sesión; sin botón.
@@ -61,7 +57,6 @@ const TAB_LABEL: Record<Tab, string> = {
   backups: "Copias",
   users: "Usuarios",
   settings: "Ajustes",
-  facturas: "Facturas",
 };
 
 const TAB_ICON: Record<Tab, React.ReactNode> = {
@@ -71,7 +66,6 @@ const TAB_ICON: Record<Tab, React.ReactNode> = {
   backups: <BoxIcon className="h-4 w-4" />,
   users: <UsersIcon className="h-4 w-4" />,
   settings: <SettingsIcon className="h-4 w-4" />,
-  facturas: <ReceiptIcon className="h-4 w-4" />,
 };
 
 export default function Home() {
@@ -96,7 +90,6 @@ export default function Home() {
   const [showGameStore, setShowGameStore] = useState(false);
   const [fileManagerId, setFileManagerId] = useState<string | null>(null);
   const [hostDomain, setHostDomain] = useState("aypapol.com");
-  const [invoiceRefresh, setInvoiceRefresh] = useState(0);
   const [gameIcons, setGameIcons] = useState<Record<string, string>>({});
   const [sseConnected, setSseConnected] = useState(true);
   const [modePref, setModePref] = useState<ModePreference>(() => readModePreference());
@@ -119,13 +112,15 @@ export default function Home() {
       .catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
 
-  // Fetch host domain from settings (settings GET is public via bot key route)
+  // El dominio sale de los ajustes, que se leen sin sesión: una vez al montar
+  // basta. Antes dependía de `user` sin usarlo, así que se repetía en cada
+  // cambio de sesión sin motivo.
   useEffect(() => {
     api
       .getSettings()
       .then((s) => setHostDomain(s.host_domain))
       .catch(() => {});
-  }, [user]);
+  }, []);
 
   // Fetch game catalog for icons
   useEffect(() => {
@@ -314,9 +309,8 @@ export default function Home() {
     const ids: Tab[] = isAdmin
       ? ["servers", "bot", "mcp", "backups", "users", "settings"]
       : ["servers"];
-    if (user?.invoice_role) ids.push("facturas");
     return ids.map((id) => ({ id, label: TAB_LABEL[id], icon: TAB_ICON[id] }));
-  }, [isAdmin, user?.invoice_role]);
+  }, [isAdmin]);
 
   if (!user) {
     return (
@@ -496,17 +490,6 @@ export default function Home() {
         {tab === "settings" && (
           <div className="max-w-xl">
             <PanelSettings />
-          </div>
-        )}
-
-        {tab === "facturas" && user?.invoice_role && (
-          <div className="flex max-w-3xl flex-col gap-6">
-            <InvoiceUpload
-              invoiceRole={user.invoice_role}
-              onUploaded={() => setInvoiceRefresh((k) => k + 1)}
-            />
-            <InvoiceList invoiceRole={user.invoice_role} refreshKey={invoiceRefresh} />
-            {user.invoice_role === "freelancer" && <FreelancerProfileForm />}
           </div>
         )}
       </div>

@@ -263,23 +263,6 @@ export function UsersIcon({ className = "w-4 h-4" }: IconProps) {
   );
 }
 
-export function ReceiptIcon({ className = "w-4 h-4" }: IconProps) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5 3v18l2.5-1.6L10 21l2-1.6L14 21l2.5-1.6L19 21V3z" />
-      <path d="M9 8h6M9 12h6M9 16h3" />
-    </svg>
-  );
-}
-
 export function PlayIcon({ className = "w-4 h-4" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">

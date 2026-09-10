@@ -164,7 +164,6 @@ auth.get("/me", requireAuth, (c) => {
       : null,
     status: panelUser?.status ?? "pending",
     role: panelUser?.role ?? "user",
-    invoice_role: panelUser?.invoice_role ?? null,
   };
 
   // For non-admin users, include their server access list

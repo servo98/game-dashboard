@@ -3,36 +3,6 @@ import { api, type GameServer, type InviteLinkInfo, type PanelUser } from "../ap
 import { CopyIcon, TrashIcon } from "./Icons";
 import { Button, Divider, Field, Input, Loading, Panel, Select, Tag } from "./ui";
 
-function InvoiceRoleSelect({ user, onChanged }: { user: PanelUser; onChanged: () => void }) {
-  const [saving, setSaving] = useState(false);
-
-  async function handleChange(role: string) {
-    setSaving(true);
-    try {
-      await api.setInvoiceRole(user.discord_id, role || null);
-      onChanged();
-    } catch {
-      // ignore
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <select
-      value={user.invoice_role ?? ""}
-      onChange={(e) => handleChange(e.target.value)}
-      disabled={saving}
-      className="h-7 rounded-md border border-line bg-raised px-2 text-meta text-muted transition-colors duration-fast focus:border-accent focus:outline-none disabled:opacity-50"
-      title="Rol de facturación"
-    >
-      <option value="">Sin rol factura</option>
-      <option value="contador">Contador</option>
-      <option value="freelancer">Freelancer</option>
-    </select>
-  );
-}
-
 /* Definir estos tres dentro de UsersTab hacía que React los tratara como un
    tipo de componente nuevo en cada render y desmontara su subárbol entero.
    Fuera del componente conservan identidad, así que ni se remontan ni tiran
@@ -458,7 +428,6 @@ export default function UsersTab() {
                 <p className="truncate text-body font-medium text-ink">{u.username}</p>
                 <p className="text-micro text-faint">Acceso total al panel</p>
               </div>
-              <InvoiceRoleSelect user={u} onChanged={fetchAll} />
             </div>
           ))}
         </div>
@@ -488,7 +457,6 @@ export default function UsersTab() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <InvoiceRoleSelect user={u} onChanged={fetchAll} />
                     <Button size="sm" onClick={() => startEditAccess(u)}>
                       Acceso
                     </Button>
