@@ -1,4 +1,4 @@
-import { streamContainerLogs } from "./docker";
+import { getContainerStatus, streamContainerLogs } from "./docker";
 
 type JoinableState = "starting" | "joinable";
 
@@ -24,6 +24,28 @@ export function isJoinableLine(line: string): boolean {
   return READY_REGEXES.some((re) => re.test(line));
 }
 
+/**
+ * Imágenes cuyo "listo" sabemos reconocer en los logs. Son juegos que abren el
+ * puerto mucho antes de aceptar jugadores, así que para ellos el patrón es la
+ * única señal honesta y no vale suponer nada por el hecho de que el contenedor
+ * siga en pie.
+ */
+const IMAGES_WITH_READY_PATTERN = [/itzg\/minecraft-server/, /valheim-server/];
+
+export function hasReadyPattern(image: string | undefined): boolean {
+  if (!image) return false;
+  return IMAGES_WITH_READY_PATTERN.some((re) => re.test(image));
+}
+
+/**
+ * Margen antes de dar por listo un contenedor del que no sabemos leer el
+ * arranque. Si a los 20 segundos sigue en pie, ya no está arrancando: o sirve o
+ * habría muerto.
+ */
+const ASSUME_READY_MS = 20_000;
+
+const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function getJoinableStatus(serverId: string): JoinableState | null {
   return statusMap.get(serverId) ?? null;
 }
@@ -36,12 +58,37 @@ export function clearJoinable(serverId: string): void {
   statusMap.delete(serverId);
 }
 
-/** Start watching container logs for the "Done" line to mark as joinable */
-export function beginLogWatching(serverId: string): void {
+/**
+ * Empieza a vigilar el arranque de un servidor.
+ *
+ * Para las imágenes conocidas basta con esperar su línea de "listo". Para
+ * cualquier otra (una app propia publicada en GHCR, por ejemplo) no hay línea
+ * que esperar: antes se quedaban en "Arrancando" para siempre, así que se pasa
+ * a listo si el contenedor sigue vivo tras un margen.
+ */
+export function beginLogWatching(serverId: string, image?: string): void {
   // Clean up any existing watcher
   stopJoinableWatcher(serverId);
 
   setStarting(serverId);
+
+  if (!hasReadyPattern(image)) {
+    const timer = setTimeout(async () => {
+      readyTimers.delete(serverId);
+      // Solo si nadie lo marcó ya y el contenedor no se ha caído entretanto.
+      if (statusMap.get(serverId) !== "starting") return;
+      try {
+        if ((await getContainerStatus(serverId)) === "running") {
+          statusMap.set(serverId, "joinable");
+        }
+      } catch {
+        // Si no se puede consultar, se queda como está.
+      }
+    }, ASSUME_READY_MS);
+    // No debe mantener vivo el proceso si es lo único pendiente.
+    timer.unref?.();
+    readyTimers.set(serverId, timer);
+  }
 
   const ac = new AbortController();
   watcherAborts.set(serverId, ac);
@@ -69,6 +116,11 @@ export function stopJoinableWatcher(serverId: string): void {
   if (ac) {
     ac.abort();
     watcherAborts.delete(serverId);
+  }
+  const timer = readyTimers.get(serverId);
+  if (timer) {
+    clearTimeout(timer);
+    readyTimers.delete(serverId);
   }
   clearJoinable(serverId);
 }
