@@ -33,6 +33,84 @@ function InvoiceRoleSelect({ user, onChanged }: { user: PanelUser; onChanged: ()
   );
 }
 
+/* Definir estos tres dentro de UsersTab hacía que React los tratara como un
+   tipo de componente nuevo en cada render y desmontara su subárbol entero.
+   Fuera del componente conservan identidad, así que ni se remontan ni tiran
+   por la borda el foco de lo que haya dentro. */
+
+/** URL del avatar de Discord, o null si el usuario no tiene. */
+function avatarUrl(user: PanelUser): string | null {
+  if (!user.avatar) return null;
+  return `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png`;
+}
+
+/** Retrato del usuario, con iniciales cuando Discord no da avatar. */
+function Portrait({ user }: { user: PanelUser }) {
+  const url = avatarUrl(user);
+  return url ? (
+    <img src={url} alt="" className="h-8 w-8 shrink-0 rounded-full border border-line" />
+  ) : (
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-raised font-mono text-micro text-muted">
+      {user.username.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+/** Cabecera de bloque: título, recuento y, como mucho, una acción. */
+function Head({
+  title,
+  count,
+  action,
+}: {
+  title: string;
+  count?: number;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex items-baseline gap-2">
+        <h2 className="text-title font-semibold text-ink">{title}</h2>
+        {count !== undefined && <span className="num text-micro text-faint">{count}</span>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/** Selector de servidores compartido por el alta de invitación y el acceso. */
+function ServerPicker({
+  servers,
+  selected,
+  onToggle,
+}: {
+  servers: GameServer[];
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {servers.map((s) => {
+        const on = selected.includes(s.id);
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => onToggle(s.id)}
+            aria-pressed={on}
+            className={`tap rounded-md border px-2 py-1 text-meta transition-colors ${
+              on
+                ? "border-accent bg-accent/12 text-accent"
+                : "border-line bg-raised text-muted hover:text-ink"
+            }`}
+          >
+            {s.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function UsersTab() {
   const [users, setUsers] = useState<PanelUser[]>([]);
   const [invites, setInvites] = useState<InviteLinkInfo[]>([]);
@@ -183,81 +261,11 @@ export default function UsersTab() {
     setTimeout(() => setCopiedCode(null), 2000);
   }
 
-  function avatarUrl(user: PanelUser) {
-    if (!user.avatar) return null;
-    return `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png`;
-  }
-
   if (loading) {
     return <Loading className="py-8">Cargando usuarios</Loading>;
   }
 
   const stamp = (unix: number) => new Date(unix * 1000).toLocaleDateString();
-
-  /** Retrato del usuario, con iniciales cuando Discord no da avatar. */
-  function Portrait({ user }: { user: PanelUser }) {
-    const url = avatarUrl(user);
-    return url ? (
-      <img src={url} alt="" className="h-8 w-8 shrink-0 rounded-full border border-line" />
-    ) : (
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-raised font-mono text-micro text-muted">
-        {user.username.slice(0, 2).toUpperCase()}
-      </span>
-    );
-  }
-
-  /** Cabecera de bloque: título, recuento y, como mucho, una acción. */
-  function Head({
-    title,
-    count,
-    action,
-  }: {
-    title: string;
-    count?: number;
-    action?: React.ReactNode;
-  }) {
-    return (
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-title font-semibold text-ink">{title}</h2>
-          {count !== undefined && <span className="num text-micro text-faint">{count}</span>}
-        </div>
-        {action}
-      </div>
-    );
-  }
-
-  /** Selector de servidores compartido por el alta de invitación y el acceso. */
-  function ServerPicker({
-    selected,
-    onToggle,
-  }: {
-    selected: string[];
-    onToggle: (id: string) => void;
-  }) {
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {servers.map((s) => {
-          const on = selected.includes(s.id);
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onToggle(s.id)}
-              aria-pressed={on}
-              className={`tap rounded-md border px-2 py-1 text-meta transition-colors ${
-                on
-                  ? "border-accent bg-accent/12 text-accent"
-                  : "border-line bg-raised text-muted hover:text-ink"
-              }`}
-            >
-              {s.name}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -284,6 +292,7 @@ export default function UsersTab() {
               <div className="flex flex-col gap-1.5">
                 <span className="label">Servidores a los que da acceso</span>
                 <ServerPicker
+                  servers={servers}
                   selected={inviteServerIds}
                   onToggle={(id) =>
                     setInviteServerIds((prev) =>
@@ -500,7 +509,11 @@ export default function UsersTab() {
                 {editAccessId === u.discord_id && (
                   <div className="mt-3 flex flex-col gap-2.5 border-t border-line pt-3">
                     <span className="label">Servidores a los que puede entrar</span>
-                    <ServerPicker selected={editAccessServers} onToggle={toggleServerAccess} />
+                    <ServerPicker
+                      servers={servers}
+                      selected={editAccessServers}
+                      onToggle={toggleServerAccess}
+                    />
                     <div className="flex gap-1.5">
                       <Button tone="accent" size="sm" onClick={saveAccess} disabled={savingAccess}>
                         {savingAccess ? "Guardando" : "Guardar"}

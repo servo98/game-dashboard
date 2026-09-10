@@ -38,9 +38,17 @@ export function Modal({
 }) {
   const sheet = useRef<HTMLDivElement>(null);
 
+  // Los padres pasan `onClose={() => setAlgo(null)}`, una flecha nueva en cada
+  // render, y el panel re-renderiza sin parar por el stream de estadísticas. Si
+  // el efecto dependiera de ella se reejecutaría constantemente y el
+  // `focus()` de abajo te sacaría del campo mientras escribes. Por eso la
+  // función viaja en una ref y el efecto se monta una sola vez.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -50,7 +58,7 @@ export function Modal({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
