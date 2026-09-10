@@ -86,7 +86,7 @@ export default memo(function ServerCard({
   const isRunning = server.status === "running";
   const effectiveStatus = isRunning && server.joinable ? server.joinable : server.status;
   const status = STATUS[effectiveStatus] ?? STATUS.stopped;
-  const address = connectAddress(server.game_type, server.port, hostDomain);
+  const address = connectAddress(server.port, hostDomain);
 
   function handleCopy() {
     navigator.clipboard.writeText(address);

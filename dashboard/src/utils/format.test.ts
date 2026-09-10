@@ -3,19 +3,19 @@ import { connectAddress, formatDuration, formatLine, formatSize } from "./format
 
 describe("connectAddress", () => {
   it("returns mc.domain for port 25565", () => {
-    expect(connectAddress("sandbox", 25565, "aypapol.com")).toBe("mc.aypapol.com");
+    expect(connectAddress(25565, "aypapol.com")).toBe("mc.aypapol.com");
   });
 
   it("returns rolcito.domain for port 30000", () => {
-    expect(connectAddress("tabletop", 30000, "aypapol.com")).toBe("rolcito.aypapol.com");
+    expect(connectAddress(30000, "aypapol.com")).toBe("rolcito.aypapol.com");
   });
 
   it("returns desglosador3000.domain for port 8080", () => {
-    expect(connectAddress("tools", 8080, "aypapol.com")).toBe("desglosador3000.aypapol.com");
+    expect(connectAddress(8080, "aypapol.com")).toBe("desglosador3000.aypapol.com");
   });
 
   it("returns domain:port for unmapped ports", () => {
-    expect(connectAddress("fps", 27015, "aypapol.com")).toBe("aypapol.com:27015");
+    expect(connectAddress(27015, "aypapol.com")).toBe("aypapol.com:27015");
   });
 });
 

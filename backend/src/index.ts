@@ -4,13 +4,13 @@ import { logger } from "hono/logger";
 import { startAutoBackupTimer } from "./backup";
 import { sessionQueries } from "./db";
 import { docker } from "./docker";
+import { reconcileJoinableOnBoot } from "./joinable-status";
 import { startQuestPoller } from "./quest-poller";
 import authRoutes from "./routes/auth";
 import botSettingsRoutes from "./routes/bot-settings";
 import curseforgeRoutes from "./routes/curseforge";
 import fileRoutes from "./routes/files";
 import inviteRoutes from "./routes/invites";
-import invoiceRoutes from "./routes/invoices";
 import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
@@ -125,7 +125,6 @@ app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
 app.route("/api/users", userRoutes);
 app.route("/api/invites", inviteRoutes);
-app.route("/api/invoices", invoiceRoutes);
 app.route("/oauth", oauthRoutes);
 registerWellKnown(app);
 
@@ -137,6 +136,10 @@ startStatsCache();
 
 // Start quest completion poller
 startQuestPoller();
+
+// Recupera el estado de arranque de lo que ya estaba corriendo antes de este
+// reinicio; si no, sus tarjetas se quedan en "En marcha" para siempre.
+reconcileJoinableOnBoot();
 
 // Periodic cleanup (every hour)
 setInterval(

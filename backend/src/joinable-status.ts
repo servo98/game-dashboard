@@ -1,4 +1,5 @@
-import { getContainerStatus, streamContainerLogs } from "./docker";
+import { serverQueries } from "./db";
+import { getContainerStatus, getRunningGameServers, streamContainerLogs } from "./docker";
 
 type JoinableState = "starting" | "joinable";
 
@@ -123,4 +124,37 @@ export function stopJoinableWatcher(serverId: string): void {
     readyTimers.delete(serverId);
   }
   clearJoinable(serverId);
+}
+
+/**
+ * Reconstruye el estado de arranque al levantar el backend.
+ *
+ * El mapa vive en memoria, así que un reinicio (cada deploy) lo borra para los
+ * contenedores que ya estaban en marcha y sus tarjetas se quedan en "En marcha"
+ * aunque el servicio lleve horas sirviendo.
+ *
+ * Solo se reconstruye lo que se puede afirmar sin inventar: para una imagen de
+ * la que no sabemos leer el arranque, "el contenedor sigue en pie" ya es la
+ * definición de listo que usa beginLogWatching tras su margen, así que aplicarla
+ * aquí no añade ninguna suposición nueva. Minecraft y Valheim se quedan fuera a
+ * propósito: abren el puerto antes de aceptar jugadores y su única señal honesta
+ * es la línea de log, que a estas alturas ya se perdió. Para esos, "En marcha"
+ * es la verdad disponible.
+ */
+export async function reconcileJoinableOnBoot(): Promise<void> {
+  try {
+    const running = await getRunningGameServers();
+    if (running.length === 0) return;
+
+    const byId = new Map(serverQueries.getAll.all().map((s) => [s.id, s]));
+    for (const container of running) {
+      if (statusMap.has(container.id)) continue;
+      const server = byId.get(container.id);
+      if (!server || hasReadyPattern(server.docker_image)) continue;
+      statusMap.set(container.id, "joinable");
+    }
+  } catch (err) {
+    // Sin reconciliación las tarjetas se ven "En marcha": peor, pero no roto.
+    console.error("No se pudo reconstruir el estado de arranque:", err);
+  }
 }

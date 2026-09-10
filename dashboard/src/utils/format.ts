@@ -4,7 +4,12 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   "8080": "desglosador3000",
 };
 
-export function connectAddress(gameType: string, port: number, hostDomain: string): string {
+/**
+ * Dirección con la que se entra a un servidor. El subdominio se decide por
+ * puerto, no por juego: dos servidores del mismo juego en puertos distintos
+ * necesitan direcciones distintas.
+ */
+export function connectAddress(port: number, hostDomain: string): string {
   const sub = SUBDOMAIN_MAP[String(port)];
   if (sub) return `${sub}.${hostDomain}`;
   return `${hostDomain}:${port}`;

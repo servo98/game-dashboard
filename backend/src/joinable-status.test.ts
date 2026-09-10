@@ -3,9 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Mock docker before importing the module
 const mockStreamContainerLogs = vi.fn(async function* () {});
 const mockGetContainerStatus = vi.fn().mockResolvedValue("running");
+const mockGetRunningGameServers = vi.fn().mockResolvedValue([]);
 vi.mock("./docker", () => ({
   streamContainerLogs: (...a: unknown[]) => mockStreamContainerLogs(...(a as [])),
   getContainerStatus: (...a: unknown[]) => mockGetContainerStatus(...a),
+  getRunningGameServers: (...a: unknown[]) => mockGetRunningGameServers(...a),
+}));
+
+const mockServerGetAll = vi.fn(() => [] as Array<{ id: string; docker_image: string }>);
+vi.mock("./db", () => ({
+  db: { exec: vi.fn(), query: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })) },
+  serverQueries: { getAll: { all: () => mockServerGetAll() } },
 }));
 
 import {
@@ -14,6 +22,7 @@ import {
   getJoinableStatus,
   hasReadyPattern,
   isJoinableLine,
+  reconcileJoinableOnBoot,
   setStarting,
   stopJoinableWatcher,
 } from "./joinable-status";
@@ -135,5 +144,61 @@ describe("beginLogWatching — margen para imágenes desconocidas", () => {
 
     await vi.advanceTimersByTimeAsync(20_000);
     expect(getJoinableStatus("app")).toBeNull();
+  });
+});
+
+/**
+ * REGRESIÓN: el mapa de estados vive en memoria, así que cada deploy del
+ * backend dejaba en "En marcha" a los contenedores que ya estaban sirviendo.
+ */
+describe("reconcileJoinableOnBoot", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const id of ["app", "mc", "otro"]) clearJoinable(id);
+  });
+
+  it("da por listo lo que ya corría con una imagen sin patrón conocido", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "app", name: "app", memoryBytes: 0 }]);
+    mockServerGetAll.mockReturnValue([
+      { id: "app", docker_image: "ghcr.io/servo98/reelsgame:latest" },
+    ]);
+
+    await reconcileJoinableOnBoot();
+    expect(getJoinableStatus("app")).toBe("joinable");
+  });
+
+  it("no adivina con Minecraft: su línea de log ya se perdió", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "mc", name: "mc", memoryBytes: 0 }]);
+    mockServerGetAll.mockReturnValue([{ id: "mc", docker_image: "itzg/minecraft-server:java21" }]);
+
+    await reconcileJoinableOnBoot();
+    expect(getJoinableStatus("mc")).toBeNull();
+  });
+
+  it("no pisa un estado que ya se conoce", async () => {
+    setStarting("app");
+    mockGetRunningGameServers.mockResolvedValue([{ id: "app", name: "app", memoryBytes: 0 }]);
+    mockServerGetAll.mockReturnValue([
+      { id: "app", docker_image: "ghcr.io/servo98/reelsgame:latest" },
+    ]);
+
+    await reconcileJoinableOnBoot();
+    expect(getJoinableStatus("app")).toBe("starting");
+  });
+
+  it("ignora contenedores que no están en el panel", async () => {
+    mockGetRunningGameServers.mockResolvedValue([{ id: "otro", name: "otro", memoryBytes: 0 }]);
+    mockServerGetAll.mockReturnValue([]);
+
+    await reconcileJoinableOnBoot();
+    expect(getJoinableStatus("otro")).toBeNull();
+  });
+
+  it("no revienta si docker no responde", async () => {
+    mockGetRunningGameServers.mockRejectedValue(new Error("docker caído"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(reconcileJoinableOnBoot()).resolves.toBeUndefined();
+    spy.mockRestore();
   });
 });
