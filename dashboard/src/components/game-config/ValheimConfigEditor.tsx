@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   FieldRow,
+  SecretField,
   SectionHeading,
   SegmentedField,
   SelectField,
@@ -99,9 +100,7 @@ export function ValheimEnvSection({ section, envVars, onChange }: EnvProps) {
               ) : undefined
             }
           >
-            <TextField
-              type="password"
-              mono
+            <SecretField
               value={value}
               placeholder={field.placeholder}
               onChange={(v) => set(field.key, v)}

@@ -11,6 +11,7 @@ import {
   VALHEIM_SECTIONS,
   type ValheimSection,
 } from "./game-config/valheim-config";
+import { EyeIcon, EyeOffIcon } from "./Icons";
 import MinecraftConfigEditor from "./MinecraftConfigEditor";
 
 type Props = {
@@ -40,6 +41,9 @@ type Panel = {
   sublabel?: string;
   group: PanelGroup;
 };
+
+/** Claves cuyo valor no conviene dejar a la vista de quien pase por detrás. */
+const SECRET_KEY_RE = /(PASS|PASSWORD|SECRET|TOKEN|CREDENTIAL|API_?KEY|_KEY$)/i;
 
 function isMinecraftImage(image: string): boolean {
   return image.includes("itzg/minecraft-server");
@@ -134,6 +138,7 @@ export default function ConfigEditor({
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [panelId, setPanelId] = useState("general");
+  const [revealedEnv, setRevealedEnv] = useState<Set<string>>(new Set());
 
   // Ficheros de configuración descubiertos en los volúmenes del server
   const [configFiles, setConfigFiles] = useState<ConfigFileEntry[]>([]);
@@ -168,6 +173,7 @@ export default function ConfigEditor({
     setShowRestartPrompt(false);
     setRestarting(false);
     setPanelId("general");
+    setRevealedEnv(new Set());
     setFileState({});
     setConfigFiles([]);
     setFilesError(null);
@@ -368,6 +374,15 @@ export default function ConfigEditor({
     setEnvPairs((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: val } : p)));
   }
 
+  function toggleReveal(key: string) {
+    setRevealedEnv((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   function setFileContent(path: string, content: string) {
     setFileState((prev) => ({ ...prev, [path]: { ...prev[path], current: content } }));
   }
@@ -502,6 +517,10 @@ export default function ConfigEditor({
     );
   }
 
+  function isSecret(key: string): boolean {
+    return SECRET_KEY_RE.test(key) && !revealedEnv.has(key);
+  }
+
   function renderEnvPairs() {
     return (
       <div className="flex flex-col gap-3 max-w-3xl">
@@ -520,13 +539,32 @@ export default function ConfigEditor({
                 className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
               />
               <span className="text-gray-600">=</span>
-              <input
-                type="text"
-                placeholder="valor"
-                value={pair.value}
-                onChange={(e) => updateEnvPair(i, "value", e.target.value)}
-                className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500"
-              />
+              <div className="flex-1 min-w-0 relative">
+                <input
+                  type={isSecret(pair.key) ? "password" : "text"}
+                  placeholder="valor"
+                  value={pair.value}
+                  onChange={(e) => updateEnvPair(i, "value", e.target.value)}
+                  className={`w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500 ${
+                    SECRET_KEY_RE.test(pair.key) ? "pr-8" : ""
+                  }`}
+                />
+                {SECRET_KEY_RE.test(pair.key) && (
+                  <button
+                    type="button"
+                    onClick={() => toggleReveal(pair.key)}
+                    aria-label={revealedEnv.has(pair.key) ? "Ocultar" : "Mostrar"}
+                    title={revealedEnv.has(pair.key) ? "Ocultar" : "Mostrar"}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200 transition-colors p-0.5"
+                  >
+                    {revealedEnv.has(pair.key) ? (
+                      <EyeOffIcon className="w-3.5 h-3.5" />
+                    ) : (
+                      <EyeIcon className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => removeEnvPair(i)}
                 className="text-gray-600 hover:text-red-400 transition-colors shrink-0 px-1"

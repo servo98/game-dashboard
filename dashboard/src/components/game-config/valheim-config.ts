@@ -325,12 +325,12 @@ export const VALHEIM_MODIFIERS: ValheimModifier[] = [
   {
     key: "portals",
     label: "Portales",
-    description: "Qué se puede llevar por un portal",
+    description:
+      "Qué se puede llevar por un portal. Normal es la regla de siempre: minerales y lingotes no pasan",
     values: [
-      { value: "casual", label: "Todo" },
+      { value: "casual", label: "Todo pasa" },
       { value: "", label: "Normal" },
-      { value: "hard", label: "Restringido" },
-      { value: "veryhard", label: "Sin portales" },
+      { value: "veryhard", label: "Nada pasa" },
     ],
   },
 ];

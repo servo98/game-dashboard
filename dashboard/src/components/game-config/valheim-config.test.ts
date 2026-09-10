@@ -5,6 +5,7 @@ import {
   isEnvTrue,
   parseServerArgs,
   VALHEIM_FIELDS,
+  VALHEIM_MODIFIERS,
   writeEnvBool,
 } from "./valheim-config";
 
@@ -118,5 +119,16 @@ describe("getValheimKnownKeys", () => {
       expect(keys.has(field.key)).toBe(true);
     }
     expect(keys.has("SERVER_ARGS")).toBe(true);
+  });
+});
+
+describe("modificador de portales", () => {
+  it("no ofrece 'hard' como escalón aparte: es la regla vanilla, o sea Normal", () => {
+    const portals = VALHEIM_MODIFIERS.find((m) => m.key === "portals")!;
+    expect(portals.values.map((v) => v.value)).toEqual(["casual", "", "veryhard"]);
+  });
+
+  it("sigue leyendo un '-modifier portals hard' que ya estuviera escrito", () => {
+    expect(parseServerArgs("-modifier portals hard").modifiers).toEqual({ portals: "hard" });
   });
 });

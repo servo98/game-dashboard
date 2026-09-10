@@ -169,3 +169,44 @@ describe("ConfigEditor", () => {
     expect(screen.getByText("Guardar")).toBeInTheDocument();
   });
 });
+
+describe("ConfigEditor — valores secretos", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetServerConfig.mockResolvedValue({
+      ...VALHEIM_CONFIG,
+      env_vars: {
+        ...VALHEIM_CONFIG.env_vars,
+        SERVER_PASS: "supersecreto",
+        WORLD_NAME: "Dedicated",
+      },
+    });
+    mockListConfigFiles.mockResolvedValue([]);
+  });
+
+  it("tapa la contraseña en el formulario guiado y la descubre con el ojo", async () => {
+    renderEditor();
+    await waitFor(() => expect(screen.getByText("Mundo y dificultad")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Servidor"));
+
+    const input = screen.getByDisplayValue("supersecreto");
+    expect(input).toHaveAttribute("type", "password");
+
+    fireEvent.click(screen.getByLabelText("Mostrar"));
+    expect(screen.getByDisplayValue("supersecreto")).toHaveAttribute("type", "text");
+
+    fireEvent.click(screen.getByLabelText("Ocultar"));
+    expect(screen.getByDisplayValue("supersecreto")).toHaveAttribute("type", "password");
+  });
+
+  it("tapa también las variables secretas de la pestaña avanzada", async () => {
+    renderEditor();
+    await waitFor(() => expect(screen.getByText("Variables de entorno")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Variables de entorno"));
+
+    expect(screen.getByDisplayValue("supersecreto")).toHaveAttribute("type", "password");
+    // Una variable normal se queda como texto plano.
+    expect(screen.getByDisplayValue("Dedicated")).toHaveAttribute("type", "text");
+    expect(screen.getAllByLabelText("Mostrar")).toHaveLength(1);
+  });
+});

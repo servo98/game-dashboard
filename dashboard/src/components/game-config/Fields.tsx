@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
+import { EyeIcon, EyeOffIcon } from "../Icons";
 
 /** Controles compartidos por el editor guiado y por el de ficheros .cfg. */
 
@@ -173,6 +174,44 @@ export function TextField({
 }
 
 /**
+ * Campo para valores secretos (contraseñas, tokens). Va tapado por defecto,
+ * con un ojo para descubrirlo: si no, no hay forma de comprobar lo que hay
+ * guardado sin borrarlo y volver a escribirlo.
+ */
+export function SecretField({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  placeholder?: string;
+  onChange: (next: string) => void;
+}) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <div className="relative">
+      <input
+        type={revealed ? "text" : "password"}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${INPUT_CLASS} font-mono pr-10`}
+      />
+      <button
+        type="button"
+        onClick={() => setRevealed((prev) => !prev)}
+        aria-label={revealed ? "Ocultar" : "Mostrar"}
+        title={revealed ? "Ocultar" : "Mostrar"}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200 transition-colors p-1"
+      >
+        {revealed ? <EyeOffIcon /> : <EyeIcon />}
+      </button>
+    </div>
+  );
+}
+
+/**
  * Selector en fila de botones. Para escalas cortas y ordenadas (los world
  * modifiers de Valheim) se lee mucho mejor que un desplegable.
  */
@@ -185,9 +224,14 @@ export function SegmentedField({
   options: { value: string; label: string }[];
   onChange: (next: string) => void;
 }) {
+  // Un valor que no está entre las opciones (escrito a mano, o un alias que el
+  // juego acepta) se añade como chip extra en vez de quedarse sin seleccionar.
+  const known = options.some((o) => o.value === value);
+  const all = known ? options : [...options, { value, label: `${value} (actual)` }];
+
   return (
     <div className="flex flex-wrap gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1">
-      {options.map((opt) => (
+      {all.map((opt) => (
         <button
           key={opt.value || "__default"}
           type="button"
