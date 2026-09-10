@@ -157,7 +157,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
               {field.options?.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
-                  {opt.description ? ` — ${opt.description}` : ""}
+                  {opt.description ? ` · ${opt.description}` : ""}
                 </option>
               ))}
             </select>
@@ -250,9 +250,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
           if (fields.length === 0) return null;
           return (
             <div key={section}>
-              <h3 className="text-meta font-semibold text-faint uppercase tracking-wider mb-2">
-                {section}
-              </h3>
+              <h3 className="label mb-2">{section}</h3>
               <div className="flex flex-col gap-3">{fields.map(renderField)}</div>
             </div>
           );
@@ -269,7 +267,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
         {/* Current selection */}
         {currentSlug && (
           <div className="flex items-center gap-2 bg-surface border border-line rounded-lg px-3 py-2">
-            <span className="text-meta text-muted">Selected:</span>
+            <span className="text-meta text-muted">Elegido:</span>
             <span className="text-body font-mono text-ink">{currentSlug}</span>
             <button
               type="button"
@@ -297,7 +295,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
             <input
               type="text"
               value={cfQuery}
-              placeholder="e.g. all the mods"
+              placeholder="p. ej. all the mods"
               onChange={(e) => searchCurseForge(e.target.value)}
               className="w-full bg-surface border border-line rounded-lg px-3 py-2 text-body text-ink focus:outline-none focus:border-accent"
             />
@@ -418,9 +416,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
 
         {/* Common settings that work with modpacks */}
         <div>
-          <h3 className="text-meta font-semibold text-faint uppercase tracking-wider mb-2">
-            Common Settings
-          </h3>
+          <h3 className="label mb-2">Common Settings</h3>
           <div className="flex flex-col gap-3">{compatibleFields.map(renderField)}</div>
         </div>
       </div>
@@ -432,9 +428,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-meta font-semibold text-faint uppercase tracking-wider">
-            Other Variables
-          </h3>
+          <h3 className="label">Other Variables</h3>
         </div>
         <div className="flex flex-col gap-2">
           {unknownPairs.map((pair) => (
@@ -476,7 +470,7 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
             mode === "vanilla" ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
           }`}
         >
-          Vanilla / Custom
+          Vanilla o a medida
         </button>
         <button
           type="button"

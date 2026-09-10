@@ -93,7 +93,7 @@ export function SelectField({
       {all.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
-          {opt.description ? ` — ${opt.description}` : ""}
+          {opt.description ? ` · ${opt.description}` : ""}
         </option>
       ))}
     </select>
@@ -252,7 +252,7 @@ export function SegmentedField({
 export function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-3">
-      <h3 className="text-meta font-semibold text-faint uppercase tracking-wider">{title}</h3>
+      <h3 className="label">{title}</h3>
       {subtitle && <p className="text-meta text-faint mt-0.5">{subtitle}</p>}
     </div>
   );
