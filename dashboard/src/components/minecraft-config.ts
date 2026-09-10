@@ -4,7 +4,7 @@ export const SECTIONS = ["Server Type", "World", "Gameplay", "Network", "Advance
 
 export type Section = (typeof SECTIONS)[number];
 
-export type FieldType = "select" | "toggle" | "number" | "text" | "memory";
+export type FieldType = "select" | "toggle" | "number" | "slider" | "text" | "memory";
 
 export type FieldOption = {
   value: string;
@@ -21,6 +21,11 @@ export type MinecraftField = {
   default: string;
   options?: FieldOption[];
   modpackCompatible: boolean;
+  /** Sólo para `slider` */
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
 };
 
 // Maps MC version ranges to the required Java image tag
@@ -194,11 +199,15 @@ export const MINECRAFT_FIELDS: MinecraftField[] = [
   {
     key: "MAX_PLAYERS",
     label: "Max Players",
-    type: "number",
+    type: "slider",
     description: "Maximum concurrent players",
     section: "Network",
     default: "20",
     modpackCompatible: true,
+    min: 1,
+    max: 100,
+    step: 1,
+    unit: "jugadores",
   },
   {
     key: "MOTD",
@@ -221,11 +230,15 @@ export const MINECRAFT_FIELDS: MinecraftField[] = [
   {
     key: "VIEW_DISTANCE",
     label: "View Distance",
-    type: "number",
-    description: "Render distance in chunks (3-32)",
+    type: "slider",
+    description: "Render distance in chunks — subirlo cuesta RAM y CPU",
     section: "Network",
     default: "10",
     modpackCompatible: true,
+    min: 3,
+    max: 32,
+    step: 1,
+    unit: "chunks",
   },
 
   // ── Advanced ──
@@ -241,11 +254,15 @@ export const MINECRAFT_FIELDS: MinecraftField[] = [
   {
     key: "SPAWN_PROTECTION",
     label: "Spawn Protection",
-    type: "number",
+    type: "slider",
     description: "Radius around spawn where only ops can build (0 = off)",
     section: "Advanced",
     default: "16",
     modpackCompatible: true,
+    min: 0,
+    max: 64,
+    step: 1,
+    unit: "bloques",
   },
 ];
 

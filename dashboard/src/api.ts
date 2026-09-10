@@ -178,6 +178,13 @@ export type FileEntry = {
   modifiedAt: number;
 };
 
+export type ConfigFileEntry = {
+  path: string;
+  name: string;
+  size: number;
+  modifiedAt: number;
+};
+
 export type CreateServerRequest = {
   template_id?: string;
   id?: string;
@@ -413,6 +420,19 @@ export const api = {
   createDirectory: (serverId: string, path: string) =>
     request<{ ok: boolean }>(`/servers/${serverId}/files/mkdir?path=${encodeURIComponent(path)}`, {
       method: "POST",
+    }),
+
+  /** Config editor: ficheros de configuración editables y su contenido */
+  listConfigFiles: (serverId: string) =>
+    request<ConfigFileEntry[]>(`/servers/${serverId}/files/configs`),
+  readTextFile: (serverId: string, path: string) =>
+    request<{ path: string; content: string; size: number }>(
+      `/servers/${serverId}/files/read?path=${encodeURIComponent(path)}`,
+    ),
+  writeTextFile: (serverId: string, path: string, content: string) =>
+    request<{ ok: boolean }>(`/servers/${serverId}/files/write?path=${encodeURIComponent(path)}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
     }),
 
   /** CurseForge */

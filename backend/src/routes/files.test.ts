@@ -333,6 +333,163 @@ describe("files routes — path traversal protection", () => {
     });
   });
 
+  describe("config scan endpoint", () => {
+    const server = makeServer({ "/data/test": "/config" });
+
+    beforeEach(() => {
+      mockServerGetById.mockReturnValue(server);
+    });
+
+    /** Simula un árbol de ficheros: ruta -> hijos (dir) o `null` (fichero). */
+    function mockTree(tree: Record<string, string[] | null>, sizes: Record<string, number> = {}) {
+      mockReaddirSync.mockImplementation((dir: string) => tree[dir] ?? []);
+      mockStatSync.mockImplementation((p: string) => ({
+        isDirectory: () => Array.isArray(tree[p]),
+        size: sizes[p] ?? 100,
+        mtimeMs: 1000,
+      }));
+    }
+
+    it("encuentra los .cfg anidados y devuelve rutas usables por /files", async () => {
+      mockTree({
+        "/host-data/test": ["bepinex", "adminlist.txt"],
+        "/host-data/test/bepinex": ["config"],
+        "/host-data/test/bepinex/config": ["mimod.cfg"],
+        "/host-data/test/bepinex/config/mimod.cfg": null,
+        "/host-data/test/adminlist.txt": null,
+      });
+
+      const res = await app.request("/api/servers/test/files/configs");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { path: string; name: string }[];
+      expect(body.map((f) => f.path)).toEqual(["/adminlist.txt", "/bepinex/config/mimod.cfg"]);
+    });
+
+    it("se salta los directorios pesados del juego", async () => {
+      mockTree({
+        "/host-data/test": ["backups", "worlds_local", "cache"],
+        "/host-data/test/backups": ["algo.cfg"],
+        "/host-data/test/worlds_local": ["mundo.cfg"],
+        "/host-data/test/cache": ["x.cfg"],
+        "/host-data/test/backups/algo.cfg": null,
+        "/host-data/test/worlds_local/mundo.cfg": null,
+        "/host-data/test/cache/x.cfg": null,
+      });
+
+      const res = await app.request("/api/servers/test/files/configs");
+      expect(await res.json()).toEqual([]);
+    });
+
+    it("deja fuera los .txt que no son listas de config y los ficheros enormes", async () => {
+      mockTree(
+        {
+          "/host-data/test": ["steam_appid.txt", "adminlist.txt", "gordo.cfg", "notas.md"],
+          "/host-data/test/steam_appid.txt": null,
+          "/host-data/test/adminlist.txt": null,
+          "/host-data/test/gordo.cfg": null,
+          "/host-data/test/notas.md": null,
+        },
+        { "/host-data/test/gordo.cfg": 5 * 1024 * 1024 },
+      );
+
+      const res = await app.request("/api/servers/test/files/configs");
+      const body = (await res.json()) as { name: string }[];
+      expect(body.map((f) => f.name)).toEqual(["adminlist.txt"]);
+    });
+
+    it("prefija con el container path cuando hay varios volúmenes", async () => {
+      mockServerGetById.mockReturnValue(
+        makeServer({ "/data/test": "/config", "/data/test-data": "/opt/valheim" }),
+      );
+      mockTree({
+        "/host-data/test": ["valheim_plus.cfg"],
+        "/host-data/test/valheim_plus.cfg": null,
+        "/host-data/test-data": [],
+      });
+
+      const res = await app.request("/api/servers/test/files/configs");
+      const body = (await res.json()) as { path: string }[];
+      expect(body.map((f) => f.path)).toEqual(["config/valheim_plus.cfg"]);
+    });
+  });
+
+  describe("read endpoint", () => {
+    const server = makeServer({ "/data/test": "/data" });
+
+    beforeEach(() => {
+      mockServerGetById.mockReturnValue(server);
+      mockRealpathSync.mockImplementation((p: string) => p);
+    });
+
+    it("blocks traversal", async () => {
+      const res = await app.request("/api/servers/test/files/read?path=../../etc/passwd");
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 404 for a missing file", async () => {
+      mockStatSync.mockImplementation(() => {
+        throw new Error("ENOENT");
+      });
+      const res = await app.request("/api/servers/test/files/read?path=nope.cfg");
+      expect(res.status).toBe(404);
+    });
+
+    it("refuses a directory", async () => {
+      mockStatSync.mockReturnValue({ isDirectory: () => true, size: 0 });
+      const res = await app.request("/api/servers/test/files/read?path=config");
+      expect(res.status).toBe(400);
+    });
+
+    it("refuses a file too large to edit", async () => {
+      mockStatSync.mockReturnValue({ isDirectory: () => false, size: 50 * 1024 * 1024 });
+      const res = await app.request("/api/servers/test/files/read?path=huge.cfg");
+      expect(res.status).toBe(413);
+    });
+  });
+
+  describe("write endpoint", () => {
+    const server = makeServer({ "/data/test": "/data" });
+
+    function put(path: string, body: unknown) {
+      return app.request(`/api/servers/test/files/write?path=${encodeURIComponent(path)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    beforeEach(() => {
+      mockServerGetById.mockReturnValue(server);
+      mockRealpathSync.mockImplementation((p: string) => p);
+    });
+
+    it("blocks traversal", async () => {
+      const res = await put("../../etc/passwd", { content: "pwned" });
+      expect(res.status).toBe(403);
+      expect(mockMkdirSync).not.toHaveBeenCalled();
+    });
+
+    it("blocks writing to the multi-volume virtual root", async () => {
+      mockServerGetById.mockReturnValue(
+        makeServer({ "/data/test": "/config", "/data/test-data": "/opt/valheim" }),
+      );
+      const res = await put("/", { content: "x" });
+      expect(res.status).toBe(403);
+    });
+
+    it("refuses to overwrite a directory", async () => {
+      mockStatSync.mockReturnValue({ isDirectory: () => true });
+      const res = await put("config", { content: "x" });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects a body without a string content", async () => {
+      mockStatSync.mockReturnValue({ isDirectory: () => false });
+      const res = await put("mimod.cfg", { content: 42 });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe("server not found", () => {
     it("returns 404 for unknown server", async () => {
       mockServerGetById.mockReturnValue(undefined);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CurseForgeModpack } from "../api";
+import { SliderField } from "./game-config/Fields";
 import {
   getAllKnownKeys,
   getModpackEnvKeys,
@@ -186,6 +187,24 @@ export default function MinecraftConfigEditor({ envVars, onChange }: Props) {
           </div>
         );
       }
+
+      case "slider":
+        return (
+          <div key={field.key}>
+            <label className="block text-xs text-gray-400 mb-1">
+              {field.label}
+              <span className="ml-1.5 text-gray-600 font-normal">{field.description}</span>
+            </label>
+            <SliderField
+              value={value}
+              min={field.min ?? 0}
+              max={field.max ?? 100}
+              step={field.step ?? 1}
+              unit={field.unit}
+              onChange={(v) => set(field.key, v)}
+            />
+          </div>
+        );
 
       case "number":
         return (

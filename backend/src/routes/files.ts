@@ -302,4 +302,223 @@ files.post("/:id/files/mkdir", requireAuth, requireApproved, requireAdmin, (c) =
   }
 });
 
+// ── Text config files ──────────────────────────────────────────────────────
+
+/** Ficheros de texto que el editor de config sabe abrir. */
+const CONFIG_EXTENSIONS = new Set([
+  ".cfg",
+  ".conf",
+  ".ini",
+  ".properties",
+  ".toml",
+  ".yml",
+  ".yaml",
+  ".json",
+  ".xml",
+]);
+
+/** `.txt` es demasiado genérico: sólo dejamos pasar los que son config de verdad. */
+const CONFIG_TXT_NAMES = new Set([
+  "adminlist.txt",
+  "bannedlist.txt",
+  "permittedlist.txt",
+  "ops.txt",
+  "whitelist.txt",
+  "banned-players.txt",
+  "banned-ips.txt",
+  "eula.txt",
+]);
+
+/** Nunca son config editable: instalaciones del juego, mundos, caches, backups. */
+const SCAN_SKIP_DIRS = new Set([
+  ".git",
+  "backups",
+  "cache",
+  "crash-reports",
+  "dl",
+  "libraries",
+  "logs",
+  "mods",
+  "node_modules",
+  "resourcepacks",
+  "saves",
+  "server",
+  "steamapps",
+  "versions",
+  "world",
+  "world_nether",
+  "world_the_end",
+  "worlds_local",
+]);
+
+const SCAN_SKIP_FILES = new Set(["usercache.json", "usernamecache.json", "steam_appid.txt"]);
+
+/** Un config de verdad no pesa megas; por encima de esto casi seguro es un dump. */
+const CONFIG_MAX_BYTES = 512 * 1024;
+/** Límite de lectura/escritura para el editor de texto. */
+const TEXT_MAX_BYTES = 2 * 1024 * 1024;
+const SCAN_MAX_DEPTH = 4;
+const SCAN_MAX_RESULTS = 400;
+
+function isConfigFileName(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (SCAN_SKIP_FILES.has(lower)) return false;
+  if (lower.endsWith(".txt")) return CONFIG_TXT_NAMES.has(lower);
+  const dot = lower.lastIndexOf(".");
+  if (dot < 0) return false;
+  return CONFIG_EXTENSIONS.has(lower.slice(dot));
+}
+
+type ConfigCandidate = {
+  /** Ruta tal y como la espera el resto de endpoints de /files */
+  path: string;
+  name: string;
+  size: number;
+  modifiedAt: number;
+};
+
+/**
+ * Recorre un volumen buscando ficheros de configuración editables.
+ * Va acotado en profundidad, tamaño y número de resultados para que un volumen
+ * con la instalación entera del juego dentro no tumbe la petición.
+ */
+function scanConfigs(
+  fsDir: string,
+  virtualDir: string,
+  depth: number,
+  out: ConfigCandidate[],
+): void {
+  if (depth > SCAN_MAX_DEPTH || out.length >= SCAN_MAX_RESULTS) return;
+
+  let names: string[];
+  try {
+    names = readdirSync(fsDir);
+  } catch {
+    return;
+  }
+
+  for (const name of names) {
+    if (out.length >= SCAN_MAX_RESULTS) return;
+    if (name.startsWith(".")) continue;
+
+    let s: ReturnType<typeof statSync>;
+    try {
+      s = statSync(join(fsDir, name));
+    } catch {
+      continue;
+    }
+
+    if (s.isDirectory()) {
+      if (SCAN_SKIP_DIRS.has(name.toLowerCase())) continue;
+      scanConfigs(join(fsDir, name), `${virtualDir}/${name}`, depth + 1, out);
+      continue;
+    }
+
+    if (!isConfigFileName(name) || s.size > CONFIG_MAX_BYTES) continue;
+    out.push({
+      path: `${virtualDir}/${name}`,
+      name,
+      size: s.size,
+      modifiedAt: Math.floor(s.mtimeMs / 1000),
+    });
+  }
+}
+
+// Discover editable config files across all volumes
+files.get("/:id/files/configs", requireAuth, requireApproved, requireAdmin, (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const volumes = parseVolumes(server.volumes);
+  if (volumes.length === 0) return c.json({ error: "No volumes configured" }, 400);
+
+  const out: ConfigCandidate[] = [];
+  for (const vol of volumes) {
+    // Con un solo volumen las rutas cuelgan de su raíz; con varios llevan
+    // delante el container path, igual que hace resolveSafePath.
+    const virtualRoot = volumes.length === 1 ? "" : vol.containerPath.replace(/^\/+/, "");
+    scanConfigs(vol.accessPath, virtualRoot, 0, out);
+  }
+
+  out.sort((a, b) => a.path.localeCompare(b.path));
+  return c.json(out);
+});
+
+// Read a text file
+files.get("/:id/files/read", requireAuth, requireApproved, requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const volumes = parseVolumes(server.volumes);
+  if (volumes.length === 0) return c.json({ error: "No volumes configured" }, 400);
+
+  const requestedPath = c.req.query("path") ?? "";
+  const resolved = resolveSafePath(volumes, requestedPath);
+  if (!resolved || resolved.isVirtualRoot) return c.json({ error: "Invalid path" }, 403);
+
+  let stat: ReturnType<typeof statSync>;
+  try {
+    stat = statSync(resolved.fsPath);
+  } catch {
+    return c.json({ error: "File not found" }, 404);
+  }
+  if (stat.isDirectory()) return c.json({ error: "Not a file" }, 400);
+  if (stat.size > TEXT_MAX_BYTES) return c.json({ error: "File too large to edit" }, 413);
+
+  try {
+    const content = await Bun.file(resolved.fsPath).text();
+    return c.json({ path: requestedPath, content, size: stat.size });
+  } catch {
+    return c.json({ error: "Failed to read file" }, 500);
+  }
+});
+
+// Write a text file
+files.put("/:id/files/write", requireAuth, requireApproved, requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  const server = serverQueries.getById.get(id);
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const volumes = parseVolumes(server.volumes);
+  if (volumes.length === 0) return c.json({ error: "No volumes configured" }, 400);
+
+  const requestedPath = c.req.query("path") ?? "";
+  const resolved = resolveSafePath(volumes, requestedPath);
+  if (!resolved || resolved.isVirtualRoot) return c.json({ error: "Invalid path" }, 403);
+
+  // Escribir sobre un directorio lo dejaría inservible.
+  try {
+    if (statSync(resolved.fsPath).isDirectory()) {
+      return c.json({ error: "Not a file" }, 400);
+    }
+  } catch {
+    // No existe todavía: lo creamos.
+  }
+
+  let content: string;
+  try {
+    const body = (await c.req.json()) as { content?: unknown };
+    if (typeof body.content !== "string") {
+      return c.json({ error: "Expected { content: string }" }, 400);
+    }
+    content = body.content;
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (Buffer.byteLength(content, "utf8") > TEXT_MAX_BYTES) {
+    return c.json({ error: "Content too large" }, 413);
+  }
+
+  try {
+    mkdirSync(dirname(resolved.fsPath), { recursive: true });
+    await Bun.write(resolved.fsPath, content);
+    return c.json({ ok: true });
+  } catch {
+    return c.json({ error: "Failed to write file" }, 500);
+  }
+});
+
 export default files;
