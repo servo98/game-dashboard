@@ -41,7 +41,14 @@ describe("OnlinePlayers", () => {
     expect(mockGetPlayers).not.toHaveBeenCalled();
   });
 
-  it("does not poll when joinable is null", () => {
+  /**
+   * REGRESIÓN: el estado joinable vive en memoria del backend, así que un
+   * reinicio (cada deploy) lo borra para los contenedores que ya estaban
+   * corriendo. Cuando eso pasa llega null, y exigir "joinable" dejaba el
+   * contador de jugadores oculto para siempre.
+   */
+  it("consulta aunque joinable sea null, porque el backend pudo reiniciarse", () => {
+    mockGetPlayers.mockResolvedValue({ online: [], count: 0, max: 20 });
     render(
       <OnlinePlayers
         serverId="minecraft"
@@ -49,14 +56,13 @@ describe("OnlinePlayers", () => {
         joinable={null}
       />,
     );
-    vi.advanceTimersByTime(20_000);
-    expect(mockGetPlayers).not.toHaveBeenCalled();
+    expect(mockGetPlayers).toHaveBeenCalledWith("minecraft");
   });
 
-  it("does not poll when joinable is undefined", () => {
+  it("consulta aunque joinable no venga", () => {
+    mockGetPlayers.mockResolvedValue({ online: [], count: 0, max: 20 });
     render(<OnlinePlayers serverId="minecraft" dockerImage="itzg/minecraft-server:java21" />);
-    vi.advanceTimersByTime(20_000);
-    expect(mockGetPlayers).not.toHaveBeenCalled();
+    expect(mockGetPlayers).toHaveBeenCalledWith("minecraft");
   });
 
   it("does not poll a Valheim server that is still starting", () => {

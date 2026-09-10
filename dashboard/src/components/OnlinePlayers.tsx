@@ -17,7 +17,14 @@ export default function OnlinePlayers({ serverId, dockerImage, joinable }: Props
   const isMinecraft = dockerImage?.includes("itzg/minecraft-server") ?? false;
   const isValheim = dockerImage?.includes("valheim-server") ?? false;
   const isSupported = isMinecraft || isValheim;
-  const isReady = joinable === "joinable";
+
+  // Se consulta salvo que sepamos que el server está arrancando. Antes exigía
+  // joinable === "joinable", y ese estado vive en memoria del backend: al
+  // reiniciarse (cada deploy) se pierde para los contenedores que ya estaban
+  // en marcha, y el contador no volvía a aparecer nunca. El endpoint solo pide
+  // que el contenedor corra, que es lo que ya garantiza la tarjeta al pintar
+  // este componente; mientras el juego no responda, no se muestra nada.
+  const isReady = joinable !== "starting";
 
   useEffect(() => {
     if (!isSupported || !isReady) return;
