@@ -210,3 +210,29 @@ describe("ConfigEditor — valores secretos", () => {
     expect(screen.getAllByLabelText("Mostrar")).toHaveLength(1);
   });
 });
+
+describe("ConfigEditor — autosave del mundo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetServerConfig.mockResolvedValue(VALHEIM_CONFIG);
+    mockListConfigFiles.mockResolvedValue([]);
+    mockUpdateServerConfig.mockResolvedValue({ ok: true });
+  });
+
+  it("guarda el autosave en SERVER_ARGS en segundos sin pisar el preset", async () => {
+    renderEditor();
+    await waitFor(() => expect(screen.getByText("Backups")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Backups"));
+
+    // Arranca en el default del juego (30 min) porque no hay -saveinterval.
+    const slider = screen.getAllByRole("slider")[0];
+    expect(slider).toHaveValue("30");
+
+    fireEvent.change(slider, { target: { value: "10" } });
+    fireEvent.click(screen.getByText("Guardar"));
+
+    await waitFor(() => expect(mockUpdateServerConfig).toHaveBeenCalled());
+    const sent = mockUpdateServerConfig.mock.calls[0][1] as { env_vars: Record<string, string> };
+    expect(sent.env_vars.SERVER_ARGS).toBe("-preset hard -setkey nomap -saveinterval 600");
+  });
+});

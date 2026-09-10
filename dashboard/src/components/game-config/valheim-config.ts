@@ -21,7 +21,15 @@ export const VALHEIM_SECTIONS = [
 
 export type ValheimSection = (typeof VALHEIM_SECTIONS)[number];
 
-export type ValheimFieldType = "text" | "password" | "toggle" | "number" | "slider" | "select";
+export type ValheimFieldType =
+  | "text"
+  | "password"
+  | "toggle"
+  | "number"
+  | "slider"
+  | "select"
+  /** Slider que no vive en una env var sino dentro de SERVER_ARGS */
+  | "argSlider";
 
 export type ValheimField = {
   key: string;
@@ -36,6 +44,9 @@ export type ValheimField = {
   max?: number;
   step?: number;
   unit?: string;
+  /** Sólo para `argSlider`: nombre del flag y factor a aplicar al valor */
+  flag?: string;
+  scale?: number;
 };
 
 export const VALHEIM_FIELDS: ValheimField[] = [
@@ -82,6 +93,21 @@ export const VALHEIM_FIELDS: ValheimField[] = [
   },
 
   // ── Backups ──
+  {
+    key: "SAVE_INTERVAL",
+    label: "Autosave del mundo",
+    type: "argSlider",
+    description:
+      "Cada cuánto graba Valheim el mundo. Por defecto 30 min; guardar cuesta ~130 ms, así que bajarlo sale barato",
+    section: "Backups",
+    default: "30",
+    min: 5,
+    max: 60,
+    step: 5,
+    unit: "min",
+    flag: "saveinterval",
+    scale: 60,
+  },
   {
     key: "BACKUPS",
     label: "Backups automáticos",
@@ -360,11 +386,16 @@ export const VALHEIM_KEY_TOGGLES: ValheimKeyToggle[] = [
   },
 ];
 
+/** Flags de `SERVER_ARGS` con valor propio, que no son modificadores de mundo. */
+export const VALHEIM_ARG_FLAGS = ["saveinterval"] as const;
+
 export type WorldModifiers = {
   preset: string;
   /** clave -> valor; "" significa el valor normal (no se escribe) */
   modifiers: Record<string, string>;
   keys: string[];
+  /** `-flag valor` reconocidos, p.ej. saveinterval */
+  flags: Record<string, string>;
   /** Argumentos que no reconocemos: se conservan tal cual */
   extraArgs: string[];
 };
@@ -372,6 +403,7 @@ export type WorldModifiers = {
 const MODIFIER_KEYS = new Set(VALHEIM_MODIFIERS.map((m) => m.key));
 const TOGGLE_KEYS = new Set(VALHEIM_KEY_TOGGLES.map((k) => k.key));
 const PRESET_VALUES = new Set(VALHEIM_PRESETS.map((p) => p.value).filter(Boolean));
+const ARG_FLAGS = new Set<string>(VALHEIM_ARG_FLAGS);
 
 /** Trocea una línea de argumentos respetando las comillas dobles. */
 function tokenize(raw: string): string[] {
@@ -390,7 +422,13 @@ function quoteIfNeeded(token: string): string {
 
 export function parseServerArgs(raw: string): WorldModifiers {
   const tokens = tokenize(raw ?? "");
-  const result: WorldModifiers = { preset: "", modifiers: {}, keys: [], extraArgs: [] };
+  const result: WorldModifiers = {
+    preset: "",
+    modifiers: {},
+    keys: [],
+    flags: {},
+    extraArgs: [],
+  };
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
@@ -411,6 +449,15 @@ export function parseServerArgs(raw: string): WorldModifiers {
       } else {
         result.extraArgs.push(token);
       }
+      continue;
+    }
+
+    if (
+      token.startsWith("-") &&
+      ARG_FLAGS.has(token.slice(1).toLowerCase()) &&
+      i + 1 < tokens.length
+    ) {
+      result.flags[token.slice(1).toLowerCase()] = tokens[++i];
       continue;
     }
 
@@ -446,6 +493,11 @@ export function buildServerArgs(state: WorldModifiers): string {
     if (state.keys.includes(key.key)) parts.push("-setkey", key.key);
   }
 
+  for (const flag of VALHEIM_ARG_FLAGS) {
+    const value = state.flags[flag];
+    if (value) parts.push(`-${flag}`, value);
+  }
+
   parts.push(...state.extraArgs);
 
   return parts.map(quoteIfNeeded).join(" ");
@@ -467,4 +519,18 @@ export function isEnvTrue(value: string | undefined): boolean {
 export function writeEnvBool(current: string | undefined, on: boolean): string {
   if (current !== undefined && NUMERIC_BOOL.has(current.trim())) return on ? "1" : "0";
   return on ? "true" : "false";
+}
+
+/** Lee un flag con valor de un `SERVER_ARGS` crudo. */
+export function getServerArgFlag(raw: string, flag: string): string {
+  return parseServerArgs(raw).flags[flag] ?? "";
+}
+
+/** Escribe (o borra, con "") un flag con valor sobre un `SERVER_ARGS` crudo. */
+export function setServerArgFlag(raw: string, flag: string, value: string): string {
+  const state = parseServerArgs(raw);
+  const flags = { ...state.flags };
+  if (value) flags[flag] = value;
+  else delete flags[flag];
+  return buildServerArgs({ ...state, flags });
 }

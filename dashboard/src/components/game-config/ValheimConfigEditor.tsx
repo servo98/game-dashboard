@@ -11,8 +11,10 @@ import {
 } from "./Fields";
 import {
   buildServerArgs,
+  getServerArgFlag,
   isEnvTrue,
   parseServerArgs,
+  setServerArgFlag,
   VALHEIM_FIELDS,
   VALHEIM_KEY_TOGGLES,
   VALHEIM_MODIFIERS,
@@ -37,9 +39,53 @@ export function ValheimEnvSection({ section, envVars, onChange }: EnvProps) {
     onChange({ ...envVars, [key]: value });
   }
 
+  /** Flags que viven dentro de SERVER_ARGS: el valor va en segundos, la UI en minutos. */
+  function setArgFlag(field: ValheimField, minutes: string) {
+    const scale = field.scale ?? 1;
+    const seconds = Number(minutes) * scale;
+    const next = setServerArgFlag(
+      envVars.SERVER_ARGS ?? "",
+      field.flag!,
+      Number.isFinite(seconds) && seconds > 0 ? String(Math.round(seconds)) : "",
+    );
+    const env = { ...envVars };
+    if (next) env.SERVER_ARGS = next;
+    else delete env.SERVER_ARGS;
+    onChange(env);
+  }
+
   function renderField(field: ValheimField) {
     const raw = envVars[field.key];
     const value = raw ?? field.default;
+
+    if (field.type === "argSlider") {
+      const seconds = getServerArgFlag(envVars.SERVER_ARGS ?? "", field.flag!);
+      const scale = field.scale ?? 1;
+      const minutes = seconds ? String(Number(seconds) / scale) : field.default;
+      return (
+        <FieldRow
+          key={field.key}
+          label={field.label}
+          description={field.description}
+          hint={
+            seconds ? undefined : (
+              <span className="text-[10px] uppercase tracking-wide text-gray-600 border border-gray-800 rounded px-1 py-px">
+                por defecto
+              </span>
+            )
+          }
+        >
+          <SliderField
+            value={minutes}
+            min={field.min ?? 5}
+            max={field.max ?? 60}
+            step={field.step ?? 5}
+            unit={field.unit}
+            onChange={(v) => setArgFlag(field, v)}
+          />
+        </FieldRow>
+      );
+    }
 
     switch (field.type) {
       case "toggle":

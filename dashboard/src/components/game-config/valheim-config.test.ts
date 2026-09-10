@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServerArgs,
+  getServerArgFlag,
   getValheimKnownKeys,
   isEnvTrue,
   parseServerArgs,
+  setServerArgFlag,
   VALHEIM_FIELDS,
   VALHEIM_MODIFIERS,
   writeEnvBool,
@@ -43,7 +45,7 @@ describe("parseServerArgs", () => {
 
   it("una cadena vacía no rompe nada", () => {
     const state = parseServerArgs("");
-    expect(state).toEqual({ preset: "", modifiers: {}, keys: [], extraArgs: [] });
+    expect(state).toEqual({ preset: "", modifiers: {}, keys: [], flags: {}, extraArgs: [] });
   });
 });
 
@@ -53,6 +55,7 @@ describe("buildServerArgs", () => {
       preset: "casual",
       modifiers: { raids: "less" },
       keys: [],
+      flags: {},
       extraArgs: [],
     });
     expect(args.indexOf("-preset")).toBeLessThan(args.indexOf("-modifier"));
@@ -63,13 +66,16 @@ describe("buildServerArgs", () => {
       preset: "",
       modifiers: { raids: "", combat: "hard" },
       keys: [],
+      flags: {},
       extraArgs: [],
     });
     expect(args).toBe("-modifier combat hard");
   });
 
   it("devuelve vacío cuando no hay nada configurado", () => {
-    expect(buildServerArgs({ preset: "", modifiers: {}, keys: [], extraArgs: [] })).toBe("");
+    expect(buildServerArgs({ preset: "", modifiers: {}, keys: [], flags: {}, extraArgs: [] })).toBe(
+      "",
+    );
   });
 
   it("vuelve a poner comillas en los argumentos con espacios", () => {
@@ -77,6 +83,7 @@ describe("buildServerArgs", () => {
       preset: "",
       modifiers: {},
       keys: [],
+      flags: {},
       extraArgs: ["-name", "Mi Server"],
     });
     expect(args).toBe('-name "Mi Server"');
@@ -130,5 +137,41 @@ describe("modificador de portales", () => {
 
   it("sigue leyendo un '-modifier portals hard' que ya estuviera escrito", () => {
     expect(parseServerArgs("-modifier portals hard").modifiers).toEqual({ portals: "hard" });
+  });
+});
+
+describe("flags con valor dentro de SERVER_ARGS", () => {
+  it("lee -saveinterval sin confundirlo con un argumento desconocido", () => {
+    const state = parseServerArgs("-saveinterval 600 -preset hard");
+    expect(state.flags).toEqual({ saveinterval: "600" });
+    expect(state.extraArgs).toEqual([]);
+    expect(state.preset).toBe("hard");
+  });
+
+  it("round-trip conservando modificadores y flags a la vez", () => {
+    const original = "-preset hard -modifier raids more -setkey nomap -saveinterval 600";
+    expect(buildServerArgs(parseServerArgs(original))).toBe(original);
+  });
+
+  it("escribe el flag sin tocar el resto de argumentos", () => {
+    const out = setServerArgFlag("-modifier combat hard -crossplay", "saveinterval", "600");
+    expect(out).toBe("-modifier combat hard -saveinterval 600 -crossplay");
+  });
+
+  it("sobrescribe el valor si el flag ya estaba", () => {
+    expect(
+      getServerArgFlag(
+        setServerArgFlag("-saveinterval 1800", "saveinterval", "300"),
+        "saveinterval",
+      ),
+    ).toBe("300");
+  });
+
+  it("un valor vacío borra el flag y puede dejar SERVER_ARGS a cero", () => {
+    expect(setServerArgFlag("-saveinterval 600", "saveinterval", "")).toBe("");
+  });
+
+  it("devuelve cadena vacía cuando el flag no está puesto", () => {
+    expect(getServerArgFlag("-preset hard", "saveinterval")).toBe("");
   });
 });
