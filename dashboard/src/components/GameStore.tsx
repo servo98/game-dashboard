@@ -12,11 +12,11 @@ type Props = {
 type Category = "all" | "fps" | "survival" | "sandbox" | "other";
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  all: "All",
-  fps: "FPS",
-  survival: "Survival",
+  all: "Todos",
+  fps: "Disparos",
+  survival: "Supervivencia",
   sandbox: "Sandbox",
-  other: "Other",
+  other: "Otros",
 };
 
 export default function GameStore({ open, onClose, onCreated }: Props) {
@@ -216,7 +216,12 @@ export default function GameStore({ open, onClose, onCreated }: Props) {
                       <p className="text-body font-medium text-ink truncate group-hover:text-accent transition-colors">
                         {template.name}
                       </p>
-                      <p className="text-meta text-faint capitalize">{template.category}</p>
+                      {/* La categoría viene cruda de la API ("fps"): se traduce
+                          con el mismo diccionario que las pestañas para no
+                          acabar mostrando "Fps". */}
+                      <p className="text-meta text-faint">
+                        {CATEGORY_LABELS[template.category as Category] ?? template.category}
+                      </p>
                     </div>
                   </div>
                 </button>

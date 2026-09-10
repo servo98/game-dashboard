@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type BackupRecord, type GameServer, type PanelSettings } from "../api";
 import { formatSize } from "../utils/format";
+import { Empty, Panel, StatusMark } from "./ui";
 
 type Props = {
   servers: GameServer[];
@@ -84,35 +85,42 @@ export default function BackupsTab({ servers }: Props) {
     return <div className="text-body text-faint tick py-8 text-center">Cargando copias</div>;
   }
 
-  const autoBackupHours = settings ? Number(settings.auto_backup_interval_hours) : 0;
-  const maxPerServer = settings ? Number(settings.max_backups_per_server) : 0;
+  // Number("") y Number(undefined) dan NaN, y eso acababa impreso en la tarjeta
+  // como "Max NaN per server". Ante un ajuste ausente o ilegible, cero.
+  const asCount = (value: unknown) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const autoBackupHours = asCount(settings?.auto_backup_interval_hours);
+  const maxPerServer = asCount(settings?.max_backups_per_server);
 
   return (
     <div className="space-y-6">
       {/* Auto-backup config summary */}
       {settings && (
-        <div className="bg-surface border border-line rounded-lg px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-block w-2 h-2 rounded-full ${autoBackupHours > 0 ? "bg-ok" : "bg-line-strong"}`}
-              />
-              <span className="text-body text-muted">
-                Auto-backup: {autoBackupHours > 0 ? `every ${autoBackupHours}h` : "disabled"}
-              </span>
-            </div>
-            <span className="text-body text-faint">|</span>
-            <span className="text-body text-muted">Max {maxPerServer} per server</span>
+        <Panel className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <StatusMark
+              tone={autoBackupHours > 0 ? "ok" : "idle"}
+              label={
+                autoBackupHours > 0
+                  ? `Copia automática cada ${autoBackupHours}h`
+                  : "Sin copia automática"
+              }
+            />
+            <span className="text-body text-muted">
+              {maxPerServer === 1 ? "1 copia por servidor" : `${maxPerServer} copias por servidor`}
+            </span>
           </div>
           <span className="text-meta text-faint">Se cambia en Ajustes</span>
-        </div>
+        </Panel>
       )}
 
       {/* Summary */}
       <div className="flex items-center justify-between">
         <p className="text-body text-muted">
-          {backups.length} backup{backups.length !== 1 ? "s" : ""} &middot; {formatSize(totalSize)}{" "}
-          total
+          {backups.length === 1 ? "1 copia" : `${backups.length} copias`} · {formatSize(totalSize)}{" "}
+          en total
         </p>
       </div>
 
@@ -123,9 +131,7 @@ export default function BackupsTab({ servers }: Props) {
       )}
 
       {backups.length === 0 ? (
-        <div className="text-center text-faint py-12">
-          No backups yet. Create backups from each game server's card.
-        </div>
+        <Empty title="Todavía no hay copias. Se crean desde la tarjeta de cada servidor." />
       ) : (
         Object.entries(grouped)
           .sort(([a], [b]) => {

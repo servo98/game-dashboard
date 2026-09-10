@@ -282,6 +282,7 @@ export default function LogViewer({ title, streamFactory, onClose, serverId, doc
       subtitle="Registro en vivo"
       size="lg"
       padded={false}
+      fill
       onClose={onClose}
       toolbar={
         <div className="flex items-center gap-2">

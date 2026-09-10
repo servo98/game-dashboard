@@ -401,7 +401,7 @@ export default function ConfigEditor({
       <div className="flex flex-col gap-4 max-w-2xl">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
-            <label className="block text-meta text-faint mb-1.5">Nombre del panel</label>
+            <label className="label mb-1.5 block">Nombre del panel</label>
             <input
               type="text"
               value={name}
@@ -410,7 +410,7 @@ export default function ConfigEditor({
             />
           </div>
           <div className="sm:w-32">
-            <label className="block text-meta text-faint mb-1.5">Puerto</label>
+            <label className="label mb-1.5 block">Puerto</label>
             <input
               type="number"
               value={port}
@@ -421,7 +421,7 @@ export default function ConfigEditor({
         </div>
 
         <div>
-          <label className="block text-meta text-faint mb-1.5">Imagen Docker</label>
+          <label className="label mb-1.5 block">Imagen Docker</label>
           {isMinecraft ? (
             <div className="w-full bg-surface/50 border border-line/50 rounded-lg px-3 py-2 text-body font-mono text-muted break-all">
               {dockerImage}
@@ -747,12 +747,19 @@ export default function ConfigEditor({
                           <button
                             key={panel.id}
                             onClick={() => setPanelId(panel.id)}
-                            className={`tap text-left px-2.5 py-1.5 rounded-md text-body transition-colors whitespace-nowrap md:whitespace-normal ${
+                            aria-current={panelId === panel.id ? "page" : undefined}
+                            className={`tap relative whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-body transition-colors md:whitespace-normal ${
                               panelId === panel.id
-                                ? "bg-raised text-ink"
-                                : "text-muted hover:text-ink hover:bg-surface"
+                                ? "bg-raised font-medium text-ink"
+                                : "text-muted hover:bg-surface hover:text-ink"
                             }`}
                           >
+                            {panelId === panel.id && (
+                              <span
+                                aria-hidden
+                                className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-accent"
+                              />
+                            )}
                             <span className="flex items-center gap-1.5">
                               <span className="truncate">{panel.label}</span>
                               {dirty && (

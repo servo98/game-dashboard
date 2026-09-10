@@ -607,13 +607,11 @@ export default function FileManager({ serverId, serverName, onClose }: Props) {
         ) : (
           <table className="w-full text-body">
             <thead>
-              <tr className="text-faint text-meta border-b border-line">
-                <th className="text-left px-5 py-2 font-medium">Nombre</th>
-                <th className="text-right px-3 py-2 font-medium w-24">Tamaño</th>
-                <th className="text-right px-3 py-2 font-medium w-40 hidden sm:table-cell">
-                  Modificado
-                </th>
-                <th className="text-right px-5 py-2 font-medium w-20">Acciones</th>
+              <tr className="border-b border-line">
+                <th className="label px-5 py-2 text-left">Nombre</th>
+                <th className="label w-24 px-3 py-2 text-right">Tamaño</th>
+                <th className="label hidden w-40 px-3 py-2 text-right sm:table-cell">Modificado</th>
+                <th className="label w-20 px-5 py-2 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
