@@ -1,3 +1,5 @@
+import { isValheimImage } from "./adapters/valheim/build-status";
+import { clearSteamUpdateState } from "./adapters/valheim/force-update";
 import { createBackup } from "./backup";
 import { findTemplateByImage } from "./catalog";
 import {
@@ -336,6 +338,65 @@ export async function restartServer(
 
   // Arranca (= start si estaba parado)
   return startServer(id);
+}
+
+// ─── forceUpdateServer ───────────────────────────────────────────────────────
+/**
+ * Fuerza la actualización de un server de Valheim desatascando steamcmd.
+ *
+ * Un reinicio normal NO sirve cuando el update quedó a medias: el contenedor
+ * relee el mismo appmanifest roto, aborta en segundos y loguea que ya está al
+ * día. Hay que borrar ese estado con el contenedor parado y volver a arrancar,
+ * que es cuando el updater baja la build buena.
+ */
+export async function forceUpdateServer(
+  id: string,
+): Promise<ActionResult<{ serverId: string; removed: string[] }>> {
+  const server = serverQueries.getById.get(id);
+  if (!server) return { ok: false, code: "not_found", error: `Server "${id}" not found.` };
+
+  if (!isValheimImage(server.docker_image)) {
+    return {
+      ok: false,
+      code: "invalid",
+      error: "Forzar actualización solo aplica a servidores de Valheim.",
+    };
+  }
+
+  const status = await getContainerStatus(id);
+  const isRunning = status === "running";
+
+  // El mundo vive en otro volumen del que vamos a tocar, pero esto reinicia el
+  // server: si hay gente dentro, un backup fresco cuesta segundos.
+  if (isRunning) {
+    try {
+      await createBackup(id);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "backup_failed",
+        error: `Backup failed before update: ${(err as Error).message}`,
+      };
+    }
+
+    const stopped = await stopServer(id, "restart");
+    if (!stopped.ok) return stopped;
+  }
+
+  let removed: string[];
+  try {
+    ({ removed } = clearSteamUpdateState(JSON.parse(server.volumes) as Record<string, string>));
+  } catch (err) {
+    // Si la limpieza falla dejamos el server como estaba: parado sin motivo es
+    // peor que viejo. Lo devolvemos a arrancar antes de reportar el error.
+    if (isRunning) await startServer(id);
+    return { ok: false, code: "invalid", error: (err as Error).message };
+  }
+
+  const started = await startServer(id);
+  if (!started.ok) return started;
+
+  return { ok: true, data: { serverId: id, removed } };
 }
 
 // ─── Alta de servidores ─────────────────────────────────────────────────────

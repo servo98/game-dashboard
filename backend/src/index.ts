@@ -20,6 +20,7 @@ import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
 import userRoutes from "./routes/users";
 import { getCachedStats, startStatsCache } from "./stats-cache";
+import { startValheimUpdatePoller } from "./valheim-update-poller";
 
 const app = new Hono();
 
@@ -136,6 +137,9 @@ startStatsCache();
 
 // Start quest completion poller
 startQuestPoller();
+
+// Vigila que los servers de Valheim no se queden atrás de versión
+startValheimUpdatePoller();
 
 // Recupera el estado de arranque de lo que ya estaba corriendo antes de este
 // reinicio; si no, sus tarjetas se quedan en "En marcha" para siempre.

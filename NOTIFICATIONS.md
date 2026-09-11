@@ -59,7 +59,35 @@ Potential uses:
 
 ---
 
-## 5. Deploy Notifications (GitHub Actions)
+## 5. Update Notifications (`updates_channel_id`)
+
+**Warns when a Valheim server falls behind on version — with a button to fix it.**
+
+- **Who sends it**: The backend (`valheim-update-poller.ts`), NOT the discord.js bot process
+- **Why it exists**: `lloesche/valheim-server` updates itself on boot and every 15 min by cron,
+  but when steamcmd gets stuck mid-update it falls back to the old copy and logs
+  `Valheim Server is already the latest version`. Restarting does not fix it, so the server can
+  sit on an old build for days until a player hits "incompatible version".
+- **How it works**:
+  1. Every 10 min the poller reads Steam's `appmanifest_896660.acf` inside each running
+     Valheim server's data volume
+  2. Compares `buildid` (installed) against `TargetBuildID` (what Steam offers), and checks
+     `UpdateResult` for a failed attempt
+  3. A failed update warns immediately (steamcmd won't retry on its own); a merely pending one
+     waits 45 min, long enough for the container's own cron to install it
+  4. Posts to `updates_channel_id`, falling back to `crashes_channel_id` if unset
+  5. Only one warning per build — it won't nag every cycle
+- **Embed**: Orange "atascada" or blue "versión nueva", showing installed vs available build
+- **Button**: "Actualizar ahora" (`custom_id: valheim-update:<serverId>`). The discord.js bot
+  handles the click (`bot/src/buttons/valheim-update.ts`) and calls
+  `POST /api/servers/:id/force-update`, which clears the stuck steamcmd state and restarts.
+  Worlds live in a different volume and are never touched.
+- **Note**: the message must come from the bot API, not a webhook — webhook messages can't
+  have working buttons.
+
+---
+
+## 6. Deploy Notifications (GitHub Actions)
 
 **Sends an alert when a deploy succeeds or fails.**
 
@@ -83,6 +111,7 @@ Potential uses:
 | Crashes | Backend | Container dies unexpectedly | Backend → Discord API |
 | Errors | Dashboard → Backend | JS error in browser | Dashboard POST → Backend → Discord API |
 | Logs | — (future) | — | — |
+| Updates | Backend | Valheim build behind Steam's | Backend → Discord API (with button) |
 | Deploys | GitHub Actions | Push to main | curl → Discord API |
 
 All messages use `DISCORD_BOT_TOKEN` and appear as **El Pepe Bot**.

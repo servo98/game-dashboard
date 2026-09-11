@@ -28,6 +28,11 @@ const CHANNEL_FIELDS = [
     label: "Avisos de misiones",
     desc: "Anuncios de misiones completadas.",
   },
+  {
+    key: "updates_channel_id" as const,
+    label: "Avisos de versión",
+    desc: "Cuando un servidor se queda atrás de versión. En blanco, va al de caídas.",
+  },
 ];
 
 export default function BotSettings() {
@@ -49,6 +54,7 @@ export default function BotSettings() {
           crashes_channel_id: s.crashes_channel_id,
           logs_channel_id: s.logs_channel_id,
           quests_channel_id: s.quests_channel_id,
+          updates_channel_id: s.updates_channel_id,
         });
       })
       .catch((err: Error) => setError(err.message));

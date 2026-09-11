@@ -7,7 +7,8 @@ import { createMinecraftAdapter } from "../adapters/minecraft/index";
 import { sanitize } from "../adapters/minecraft/sanitize";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
 import { getContainerStatus, getRunningGameServers } from "../docker";
-import { isAdminDiscordId } from "../middleware/auth";
+import { MCP_TOOL_LABELS } from "../mcp-catalog";
+import { isAdminDiscordId, requireApproved, requireAuth } from "../middleware/auth";
 import {
   createServer as createServerRow,
   IMAGE_REF_RE,
@@ -1036,6 +1037,38 @@ mcpRoute.post("/mcp", async (c) => {
 
   return transport.handleRequest(c.req.raw);
 });
+
+/**
+ * Catálogo de herramientas para la pestaña MCP del panel.
+ *
+ * Se deriva de los servidores MCP de verdad en vez de mantener una lista a
+ * mano, que es justo como la pestaña se quedó enseñando 7 de 18. Qué exige
+ * llave de administrador sale de la diferencia entre ambos modos, así que
+ * tampoco hay que declararlo en ningún sitio.
+ */
+type RegisteredTools = Record<string, { description?: string }>;
+
+/** Las herramientas que un modo de servidor deja registradas en el SDK. */
+function registeredTools(adminMode: boolean): RegisteredTools {
+  const server = createMcpServer(null, adminMode) as unknown as {
+    _registeredTools?: RegisteredTools;
+  };
+  return server._registeredTools ?? {};
+}
+
+export function listMcpTools(): Array<{ name: string; description: string; admin: boolean }> {
+  const readOnly = new Set(Object.keys(registeredTools(false)));
+
+  return Object.entries(registeredTools(true)).map(([name, tool]) => ({
+    name,
+    // Sin traducción cae la descripción inglesa del propio MCP: un texto tosco
+    // se lee mejor que una herramienta invisible.
+    description: MCP_TOOL_LABELS[name] ?? tool.description ?? "",
+    admin: !readOnly.has(name),
+  }));
+}
+
+mcpRoute.get("/mcp/tools", requireAuth, requireApproved, (c) => c.json(listMcpTools()));
 
 mcpRoute.get("/mcp", async (c) => {
   return c.json(

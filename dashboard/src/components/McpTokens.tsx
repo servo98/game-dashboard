@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type McpTokenRecord } from "../api";
+import { api, type McpTokenRecord, type McpTool } from "../api";
 import { TrashIcon } from "./Icons";
 import { Button, Checkbox, Divider, Field, Input, Notice, Panel, Tag } from "./ui";
+
+/** Un bloque de herramientas del MCP con su nombre técnico y qué hace. */
+function ToolList({ title, hint, tools }: { title: string; hint: string; tools: McpTool[] }) {
+  if (tools.length === 0) return null;
+  return (
+    <div>
+      <p className="label mb-0.5">{title}</p>
+      <p className="mb-2 text-meta text-faint">{hint}</p>
+      <dl className="flex flex-col gap-1">
+        {tools.map((tool) => (
+          <div key={tool.name} className="flex flex-wrap items-baseline gap-x-2">
+            <dt className="num text-meta text-accent">{tool.name}</dt>
+            <dd className="m-0 text-meta text-faint">{tool.description}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 
 export default function McpTokens() {
   const [tokens, setTokens] = useState<McpTokenRecord[]>([]);
@@ -14,6 +33,10 @@ export default function McpTokens() {
   const [label, setLabel] = useState("");
   const [isAdminToken, setIsAdminToken] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Herramientas que el MCP expone. Se piden al backend en vez de mantener una
+  // lista aquí: escrita a mano se quedó enseñando 7 de las 18 que existen.
+  const [tools, setTools] = useState<McpTool[]>([]);
 
   // Newly created token (show once)
   const [newToken, setNewToken] = useState<string | null>(null);
@@ -33,6 +56,12 @@ export default function McpTokens() {
 
   useEffect(() => {
     fetchTokens();
+    // Si falla, la sección de herramientas simplemente no se pinta: es
+    // documentación, no debe tumbar la pestaña de llaves.
+    api
+      .listMcpTools()
+      .then(setTools)
+      .catch(() => {});
   }, [fetchTokens]);
 
   const handleCreate = async () => {
@@ -149,8 +178,9 @@ export default function McpTokens() {
                   <>
                     <span className="font-medium text-ink">Llave de administrador.</span> Habilita
                     las herramientas que tocan el servidor de verdad: arrancar, detener, reiniciar,
-                    cambiar variables de entorno y actualizar la imagen de Docker. Dásela solo a
-                    clientes en los que confíes.
+                    ejecutar órdenes por RCON, cambiar variables de entorno, actualizar la imagen de
+                    Docker y dar de alta servidores nuevos. Dásela solo a clientes en los que
+                    confíes.
                   </>
                 }
               />
@@ -239,25 +269,22 @@ export default function McpTokens() {
             </code>
           </div>
 
-          <div>
-            <p className="label mb-2">Herramientas disponibles</p>
-            <dl className="flex flex-col gap-1">
-              {[
-                ["server_status", "Estado del servidor y quién está dentro"],
-                ["list_quests", "Capítulos y misiones del modpack"],
-                ["get_quest_progress", "Tu progreso en las misiones"],
-                ["suggest_next", "Qué misiones puedes hacer ahora"],
-                ["search_recipes", "Busca recetas en los scripts del modpack"],
-                ["player_stats", "Estadísticas de Minecraft: bajas, minería y demás"],
-                ["list_mods", "Lista de mods instalados"],
-              ].map(([name, desc]) => (
-                <div key={name} className="flex flex-wrap items-baseline gap-x-2">
-                  <dt className="num text-meta text-accent">{name}</dt>
-                  <dd className="m-0 text-meta text-faint">{desc}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          {tools.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {/* Separadas por lo único que le cambia la vida a quien crea una
+                  llave: si la suya podrá usarlas o le dirá que no tiene permiso. */}
+              <ToolList
+                title="Herramientas de consulta"
+                hint="Disponibles con cualquier llave."
+                tools={tools.filter((t) => !t.admin)}
+              />
+              <ToolList
+                title="Herramientas de administración"
+                hint="Solo con llave de administrador."
+                tools={tools.filter((t) => t.admin)}
+              />
+            </div>
+          )}
         </div>
       </Panel>
     </div>

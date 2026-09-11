@@ -10,6 +10,8 @@ export type GameServer = {
   port: number;
   status: ServerStatus;
   joinable?: "starting" | "joinable" | null;
+  /** Estado de la versión instalada. Solo Valheim lo reporta; null en el resto. */
+  update_state?: "up-to-date" | "update-pending" | "update-failed" | "unknown" | null;
   banner_path?: string | null;
   accent_color?: string | null;
   icon?: string | null;
@@ -86,7 +88,16 @@ export type BotSettings = {
   crashes_channel_id: string | null;
   logs_channel_id: string | null;
   quests_channel_id: string | null;
+  updates_channel_id: string | null;
   commands: Array<{ name: string; description: string }>;
+};
+
+/** Una herramienta del MCP, tal y como la registra el backend. */
+export type McpTool = {
+  name: string;
+  description: string;
+  /** Solo disponible para llaves de administrador. */
+  admin: boolean;
 };
 
 export type DiscordChannel = {
@@ -226,6 +237,9 @@ export const api = {
     request<{ ok: boolean; message: string }>(`/servers/${id}/start`, { method: "POST" }),
   stopServer: (id: string) =>
     request<{ ok: boolean; message: string }>(`/servers/${id}/stop`, { method: "POST" }),
+  /** Desatasca steamcmd y reinstala la última versión (solo Valheim). */
+  forceUpdateServer: (id: string) =>
+    request<{ ok: boolean; message: string }>(`/servers/${id}/force-update`, { method: "POST" }),
 
   /** Server config */
   getServerConfig: (id: string) => request<ServerConfig>(`/servers/${id}/config`),
@@ -255,6 +269,8 @@ export const api = {
     }),
 
   /** Bot settings */
+  listMcpTools: () => request<McpTool[]>("/mcp/tools"),
+
   getBotSettings: () => request<BotSettings>("/bot/settings"),
   updateBotSettings: (settings: Partial<Omit<BotSettings, "commands">>) =>
     request<{ ok: boolean }>("/bot/settings", {

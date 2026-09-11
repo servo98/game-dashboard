@@ -52,6 +52,7 @@ const defaultProps = {
   onEditConfig: vi.fn(),
   onOpenFiles: vi.fn(),
   onDelete: vi.fn(),
+  onForceUpdate: vi.fn(),
   loading: false,
   hostDomain: "example.com",
 };
@@ -147,5 +148,63 @@ describe("ServerCard", () => {
     // Second click confirms deletion
     fireEvent.click(screen.getByTitle("Confirmar borrado del servidor y sus ficheros"));
     expect(defaultProps.onDelete).toHaveBeenCalledWith("minecraft", true);
+  });
+
+  /**
+   * El aviso de versión es la única señal de que un server se quedó atrás: el
+   * contenedor no lo dice (loguea que está al día aunque no lo esté).
+   */
+  it("no dice nada de versiones cuando la instalada es la última", () => {
+    render(
+      <ServerCard
+        server={{ ...runningServer, update_state: "up-to-date" }}
+        {...defaultProps}
+        isActive
+      />,
+    );
+    expect(screen.queryByText(/versión/i)).toBeNull();
+  });
+
+  it("avisa de una versión pendiente y ofrece actualizar", () => {
+    const onForceUpdate = vi.fn();
+    render(
+      <ServerCard
+        server={{ ...runningServer, update_state: "update-pending" }}
+        {...defaultProps}
+        onForceUpdate={onForceUpdate}
+        isActive
+      />,
+    );
+
+    expect(screen.getByText(/versión nueva que el servidor aún no ha instalado/i)).toBeTruthy();
+    fireEvent.click(screen.getByText("Actualizar"));
+    expect(onForceUpdate).toHaveBeenCalledWith("minecraft");
+  });
+
+  it("dice explícitamente que reiniciar no arregla un update atascado", () => {
+    render(
+      <ServerCard
+        server={{ ...runningServer, update_state: "update-failed" }}
+        {...defaultProps}
+        isActive
+      />,
+    );
+
+    expect(screen.getByText(/reiniciar no lo arregla/i)).toBeTruthy();
+    expect(screen.getByText("Reparar")).toBeTruthy();
+  });
+
+  it("no ofrece reparar a quien no es admin", () => {
+    render(
+      <ServerCard
+        server={{ ...runningServer, update_state: "update-failed" }}
+        {...defaultProps}
+        isAdmin={false}
+        isActive
+      />,
+    );
+
+    expect(screen.getByText(/reiniciar no lo arregla/i)).toBeTruthy();
+    expect(screen.queryByText("Reparar")).toBeNull();
   });
 });

@@ -141,6 +141,14 @@ vi.mock("../backup", () => ({
   restoreBackup: vi.fn(),
 }));
 
+// Mock de la limpieza de steamcmd: toca disco de verdad
+const mockClearSteamUpdateState = vi.fn(() => ({
+  removed: ["/host-data/valheim/.../appmanifest_896660.acf"],
+}));
+vi.mock("../adapters/valheim/force-update", () => ({
+  clearSteamUpdateState: (...args: unknown[]) => mockClearSteamUpdateState(...args),
+}));
+
 // Mock joinable-status
 const mockBeginLogWatching = vi.fn();
 const mockStopJoinableWatcher = vi.fn();
@@ -1035,5 +1043,109 @@ describe("J — Env Var Passthrough", () => {
     });
     const envArg = mockStartGameContainer.mock.calls[0][3] as Record<string, string>;
     expect(envArg.MOTD).toBe("Hello World");
+  });
+});
+
+// ─── Actualización forzada de Valheim ──────────────────────────────
+
+const valheimServer = makeServer({
+  id: "valheim",
+  name: "Valheim",
+  game_type: "survival",
+  docker_image: "lloesche/valheim-server:latest",
+  port: 2456,
+  volumes: JSON.stringify({
+    "/data/valheim/config": "/config",
+    "/data/valheim/data": "/opt/valheim",
+  }),
+});
+
+describe("POST /:id/force-update", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BOT_API_KEY = "test-bot-key";
+    mockSessionGet.mockReturnValue(session);
+    mockServerGetById.mockReturnValue(valheimServer);
+    mockGetContainerStatus.mockResolvedValue("stopped");
+    mockGetRunningGameServers.mockResolvedValue([]);
+    mockStartGameContainer.mockResolvedValue(undefined);
+    mockStopGameContainer.mockResolvedValue(undefined);
+    mockFindTemplateByImage.mockReturnValue(undefined);
+    mockClearSteamUpdateState.mockReturnValue({ removed: ["appmanifest_896660.acf"] });
+  });
+
+  it("returns 401 without auth", async () => {
+    const res = await servers.request("/valheim/force-update", { method: "POST" });
+    expect(res.status).toBe(401);
+  });
+
+  it("limpia el estado de steamcmd y vuelve a arrancar el server", async () => {
+    const res = await servers.request("/valheim/force-update", {
+      method: "POST",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockClearSteamUpdateState).toHaveBeenCalledWith({
+      "/data/valheim/config": "/config",
+      "/data/valheim/data": "/opt/valheim",
+    });
+    expect(mockStartGameContainer).toHaveBeenCalled();
+  });
+
+  it("para el server antes de limpiar cuando está corriendo", async () => {
+    mockGetContainerStatus.mockResolvedValue("running");
+
+    const res = await servers.request("/valheim/force-update", {
+      method: "POST",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+
+    expect(res.status).toBe(200);
+    // Borrar el manifest con steamcmd vivo no sirve de nada: lo reescribiría.
+    expect(mockStopGameContainer).toHaveBeenCalled();
+    expect(mockStopGameContainer.mock.invocationCallOrder[0]).toBeLessThan(
+      mockClearSteamUpdateState.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("rechaza juegos que no son Valheim en vez de borrar nada", async () => {
+    mockServerGetById.mockReturnValue(server);
+
+    const res = await servers.request("/minecraft/force-update", {
+      method: "POST",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockClearSteamUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("devuelve 404 para un server que no existe", async () => {
+    mockServerGetById.mockReturnValue(undefined);
+
+    const res = await servers.request("/fantasma/force-update", {
+      method: "POST",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("no deja el server parado si la limpieza falla", async () => {
+    silenceConsole();
+    mockGetContainerStatus.mockResolvedValue("running");
+    mockClearSteamUpdateState.mockImplementation(() => {
+      throw new Error("volumen no montado");
+    });
+
+    const res = await servers.request("/valheim/force-update", {
+      method: "POST",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+
+    expect(res.status).toBe(400);
+    // Se para para limpiar; si la limpieza revienta hay que devolverlo a la vida.
+    expect(mockStartGameContainer).toHaveBeenCalled();
   });
 });

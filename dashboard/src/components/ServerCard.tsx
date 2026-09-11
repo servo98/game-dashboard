@@ -28,7 +28,11 @@ type Props = {
   onEditConfig: (id: string) => void;
   onOpenFiles: (id: string) => void;
   onDelete: (id: string, deleteFiles: boolean) => void;
+  /** Reinstala el juego desde Steam. Solo lo ofrecen los servers que reportan versión. */
+  onForceUpdate: (id: string) => void;
   loading: boolean;
+  /** Hay una reinstalación en marcha para este server. */
+  updating?: boolean;
   hostMemTotalMB?: number;
   hostDomain?: string;
   iconUrl?: string;
@@ -44,6 +48,26 @@ const STATUS: Record<string, { tone: Tone; label: string; live?: boolean }> = {
   starting: { tone: "warn", label: "Arrancando", live: true },
   stopped: { tone: "idle", label: "Parado" },
   missing: { tone: "idle", label: "Parado" },
+};
+
+/**
+ * Qué decir cuando la versión instalada no es la última.
+ *
+ * Un update pendiente se resuelve solo en minutos, así que se cuenta sin
+ * alarma. Uno fallido no: steamcmd no reintenta y reiniciar tampoco sirve, de
+ * ahí que lo diga explícitamente — es justo lo que uno prueba primero.
+ */
+const UPDATE_WARNING: Record<string, { text: string; action: string; emphasis: string }> = {
+  "update-pending": {
+    text: "Hay una versión nueva que el servidor aún no ha instalado.",
+    action: "Actualizar",
+    emphasis: "text-muted",
+  },
+  "update-failed": {
+    text: "Actualización atascada: Steam falló y reiniciar no lo arregla.",
+    action: "Reparar",
+    emphasis: "text-warn",
+  },
 };
 
 const STOP_REASON: Record<string, { tone: Tone; label: string }> = {
@@ -66,7 +90,9 @@ export default memo(function ServerCard({
   onEditConfig,
   onOpenFiles,
   onDelete,
+  onForceUpdate,
   loading,
+  updating = false,
   hostMemTotalMB,
   hostDomain = "aypapol.com",
   iconUrl,
@@ -87,6 +113,7 @@ export default memo(function ServerCard({
   const effectiveStatus = isRunning && server.joinable ? server.joinable : server.status;
   const status = STATUS[effectiveStatus] ?? STATUS.stopped;
   const address = connectAddress(server.port, hostDomain);
+  const updateWarning = server.update_state ? UPDATE_WARNING[server.update_state] : undefined;
 
   function handleCopy() {
     navigator.clipboard.writeText(address);
@@ -225,6 +252,32 @@ export default memo(function ServerCard({
           className={banner ? "pt-4" : "mt-0.5"}
         />
       </div>
+
+      {/* Versión pendiente. Sale antes que nada porque explica el síntoma que
+          trae aquí al jugador: "me dice versión incompatible y no entro". */}
+      {updateWarning && (
+        <>
+          <Divider />
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5">
+            <span className="label shrink-0">Versión</span>
+            <span className={`min-w-0 flex-1 text-body ${updateWarning.emphasis}`}>
+              {updateWarning.text}
+            </span>
+            {isAdmin && (
+              <Button
+                tone="accent"
+                size="sm"
+                onClick={() => onForceUpdate(server.id)}
+                disabled={loading || updating}
+                title="Reinstala Valheim desde Steam y deja el servidor arrancado. El mundo no se toca."
+                className="shrink-0"
+              >
+                {updating ? "Actualizando" : updateWarning.action}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Dirección de conexión: lo primero que alguien viene a buscar */}
       {isRunning && (

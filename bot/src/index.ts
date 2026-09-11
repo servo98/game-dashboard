@@ -5,6 +5,7 @@ import {
   Collection,
   GatewayIntentBits,
 } from "discord.js";
+import * as valheimUpdate from "./buttons/valheim-update";
 import * as ip from "./commands/ip";
 import * as start from "./commands/start";
 import * as status from "./commands/status";
@@ -72,6 +73,18 @@ client.on("interactionCreate", async (interaction) => {
       } catch (err) {
         console.error(`Error in autocomplete for /${interaction.commandName}:`, err);
       }
+    }
+    return;
+  }
+
+  // Botones de los avisos que publica el panel. No pasan por el guard de canal:
+  // el mensaje lo puso el propio panel en el canal que tiene configurado.
+  if (interaction.isButton()) {
+    if (!valheimUpdate.parseCustomId(interaction.customId)) return;
+    try {
+      await valheimUpdate.execute(interaction);
+    } catch (err) {
+      console.error("Error handling button:", err);
     }
     return;
   }

@@ -63,7 +63,8 @@ vi.mock("../adapters/minecraft/index", () => ({
   createMinecraftAdapter: vi.fn().mockResolvedValue(null),
 }));
 
-const { default: mcpRoute } = await import("./mcp");
+const { default: mcpRoute, listMcpTools } = await import("./mcp");
+const { MCP_TOOL_LABELS } = await import("../mcp-catalog");
 
 const session = makeSession();
 
@@ -88,6 +89,7 @@ async function rpc(auth: string, body: unknown) {
 }
 
 const ADMIN_TOOLS = [
+  "run_command",
   "start_server",
   "stop_server",
   "restart_server",
@@ -428,5 +430,38 @@ describe("MCP admin tools — gating via admin MCP token", () => {
     const payload = JSON.parse(json.result.content[0].text as string);
     expect(mockStartServer).toHaveBeenCalledWith("minecraft");
     expect(payload.success).toBe(true);
+  });
+});
+
+// ─── Catálogo para la pestaña MCP del panel ────────────────────────────
+// La pestaña llegó a enseñar 7 de 18 herramientas porque la lista se escribía
+// a mano. Ahora se deriva del MCP; esto vigila que la traducción no se quede
+// corta cuando alguien añada una herramienta nueva.
+
+describe("catálogo de herramientas del panel", () => {
+  it("lista todas las herramientas que el MCP registra de verdad", () => {
+    const tools = listMcpTools();
+    expect(tools.length).toBeGreaterThanOrEqual(18);
+    expect(tools.map((t) => t.name)).toContain("server_status");
+  });
+
+  it("tiene texto en castellano para cada herramienta", () => {
+    const sinTraducir = listMcpTools()
+      .filter((t) => !MCP_TOOL_LABELS[t.name])
+      .map((t) => t.name);
+    expect(sinTraducir).toEqual([]);
+  });
+
+  it("marca como admin exactamente las que el MCP esconde a una llave normal", () => {
+    const admin = listMcpTools()
+      .filter((t) => t.admin)
+      .map((t) => t.name)
+      .sort();
+    expect(admin).toEqual([...ADMIN_TOOLS].sort());
+  });
+
+  it("no arrastra textos de herramientas que ya no existen", () => {
+    const vivas = new Set(listMcpTools().map((t) => t.name));
+    expect(Object.keys(MCP_TOOL_LABELS).filter((n) => !vivas.has(n))).toEqual([]);
   });
 });

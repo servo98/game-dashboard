@@ -73,6 +73,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [servers, setServers] = useState<GameServer[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logTarget, setLogTarget] = useState<{
     title: string;
     factory: () => EventSource;
@@ -209,6 +210,27 @@ export default function Home() {
         setError((err as Error).message);
       } finally {
         setLoadingId(null);
+      }
+    },
+    [fetchServers],
+  );
+
+  /**
+   * Reinstala el juego desde Steam. Tarda minutos (baja un par de gigas), así
+   * que lleva su propio indicador en vez del de arrancar/parar: la tarjeta
+   * tiene que seguir contando qué pasa mientras tanto.
+   */
+  const handleForceUpdate = useCallback(
+    async (id: string) => {
+      setUpdatingId(id);
+      setError(null);
+      try {
+        await api.forceUpdateServer(id);
+        await fetchServers();
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setUpdatingId(null);
       }
     },
     [fetchServers],
@@ -394,6 +416,7 @@ export default function Home() {
                         server={server}
                         isActive={server.status === "running"}
                         loading={loadingId === server.id}
+                        updating={updatingId === server.id}
                         hostMemTotalMB={hostMemTotalMB}
                         hostDomain={hostDomain}
                         iconUrl={server.icon || gameIcons[server.id]}
@@ -407,6 +430,7 @@ export default function Home() {
                         onViewLogs={handleViewLogs}
                         onEditConfig={handleEditConfig}
                         onOpenFiles={handleOpenFiles}
+                        onForceUpdate={handleForceUpdate}
                       />
                     </div>
                   ))}

@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "fs";
 import { Hono } from "hono";
 import { execRconCommand } from "../adapters/minecraft/rcon";
 import { getValheimPlayers } from "../adapters/valheim";
+import { isValheimImage, readValheimBuildStatus } from "../adapters/valheim/build-status";
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
@@ -20,7 +21,7 @@ import {
   requireAuthOrBotKey,
   requireServerAccess,
 } from "../middleware/auth";
-import { createServer, startServer, stopServer } from "../server-actions";
+import { createServer, forceUpdateServer, startServer, stopServer } from "../server-actions";
 
 const servers = new Hono<{
   Variables: { session: Session; isBotRequest?: boolean; role?: string; discordId?: string };
@@ -177,6 +178,11 @@ servers.get("/", requireAuthOrBotKey, requireApproved, async (c) => {
         port: row.port,
         status,
         joinable: status === "running" ? getJoinableStatus(row.id) : null,
+        // Solo Valheim sabe decir su versión: el resto de imágenes no dejan
+        // rastro legible de qué build tienen instalada.
+        update_state: isValheimImage(row.docker_image)
+          ? readValheimBuildStatus(JSON.parse(row.volumes) as Record<string, string>).state
+          : null,
         banner_path: row.banner_path ?? null,
         accent_color: row.accent_color ?? null,
         icon: row.icon ?? null,
@@ -243,6 +249,28 @@ servers.post(
       return c.json({ error: "Failed to stop server" }, 500);
     }
     return c.json({ ok: true, message: `${server.name} stopped` });
+  },
+);
+
+// Fuerza la actualización de Valheim (desatasca steamcmd y reinicia)
+servers.post(
+  "/:id/force-update",
+  requireAuthOrBotKey,
+  requireApproved,
+  requireServerAccess(),
+  async (c) => {
+    const { id } = c.req.param();
+
+    const result = await forceUpdateServer(id);
+    if (!result.ok) {
+      if (result.code === "not_found") return c.json({ error: "Server not found" }, 404);
+      if (result.code === "invalid") return c.json({ error: result.error }, 400);
+      if (result.code === "backup_failed") return c.json({ error: result.error }, 500);
+      console.error("Force update error:", result.error);
+      return c.json({ error: "Failed to update server" }, 500);
+    }
+
+    return c.json({ ok: true, message: "Actualización forzada: el servidor está reinstalando." });
   },
 );
 
