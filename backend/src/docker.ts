@@ -3,7 +3,10 @@ import { chmodSync, chownSync, mkdirSync } from "fs";
 import { createConnection } from "net";
 import { getPanelSetting } from "./db";
 
-export const docker = new Dockerode({ socketPath: "/var/run/docker.sock" });
+/** Configurable solo para poder apuntar los tests a un socket falso. */
+const DOCKER_SOCKET = process.env.DOCKER_SOCKET ?? "/var/run/docker.sock";
+
+export const docker = new Dockerode({ socketPath: DOCKER_SOCKET });
 
 const CONTAINER_PREFIX = "game-panel-";
 
@@ -315,12 +318,28 @@ export function formatLogLine(raw: string): string {
  * Stream logs via raw Unix socket to work around Bun's broken HTTP streaming
  * from Docker socket (follow=true response body never yields data via fetch/dockerode).
  */
-async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
-  const container = docker.getContainer(containerName);
-  const info = await container.inspect();
-  const isTty = info.Config.Tty;
+export type ContainerStats = {
+  cpuPercent: number;
+  cpuCores: number;
+  memUsageMB: number;
+  memLimitMB: number;
+};
 
-  const sock = createConnection("/var/run/docker.sock");
+/**
+ * Abre una petición GET de larga duración contra el socket de Docker y va
+ * entregando el cuerpo ya sin la codificación chunked.
+ *
+ * Va por socket crudo y no por dockerode a propósito. En Bun, los streams que
+ * devuelve dockerode (`container.stats({ stream: true })`) no sueltan la
+ * conexión al abandonarlos, ni siquiera con `destroy()`. Cada stream de stats
+ * que se abría y se cerraba dejaba una conexión colgada en el agente HTTP; al
+ * llegar a 256 (el tope del agente) toda llamada a Docker se quedaba en cola
+ * para siempre y el panel dejaba de listar servers y de mostrar el estado,
+ * mientras las rutas que no tocan Docker seguían contestando. Con un socket
+ * propio `destroy()` cierra de verdad y no pasa por el agente.
+ */
+async function* streamDockerBody(path: string, signal: AbortSignal): AsyncGenerator<Buffer> {
+  const sock = createConnection(DOCKER_SOCKET);
   const cleanup = () => {
     try {
       sock.destroy();
@@ -329,34 +348,36 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
   signal.addEventListener("abort", cleanup, { once: true });
 
   try {
-    // Wait for connection
     await new Promise<void>((resolve, reject) => {
       sock.once("connect", resolve);
       sock.once("error", reject);
     });
 
-    // Send raw HTTP request to Docker API
-    const query = `follow=1&stdout=1&stderr=1&timestamps=1&tail=500`;
-    sock.write(
-      `GET /containers/${encodeURIComponent(containerName)}/logs?${query} HTTP/1.1\r\nHost: localhost\r\n\r\n`,
-    );
+    sock.write(`GET ${path} HTTP/1.1\r\nHost: localhost\r\n\r\n`);
 
-    // Read response with async iterator via a queue
+    // Cola de trozos: el socket empuja y el generador consume a su ritmo.
     const queue: Buffer[] = [];
     let resolve: (() => void) | null = null;
     let ended = false;
+    const wake = () => resolve?.();
 
     sock.on("data", (chunk: Buffer) => {
       queue.push(chunk);
-      resolve?.();
+      wake();
     });
     sock.on("end", () => {
       ended = true;
-      resolve?.();
+      wake();
     });
     sock.on("error", () => {
       ended = true;
-      resolve?.();
+      wake();
+    });
+    // destroy() (por abort) solo emite "close": sin esto el lector se quedaría
+    // esperando un dato que ya no va a llegar.
+    sock.on("close", () => {
+      ended = true;
+      wake();
     });
 
     async function nextChunk(): Promise<Buffer | null> {
@@ -369,10 +390,9 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
       return queue.shift() ?? null;
     }
 
-    // Parse chunked transfer encoding + Docker multiplexed frames
     let rawBuf = Buffer.alloc(0);
 
-    // Skip HTTP headers — keep everything as raw Buffer to avoid corruption
+    // Saltar las cabeceras HTTP, todo como Buffer para no corromper bytes.
     {
       let headerRaw = Buffer.alloc(0);
       const CRLFCRLF = Buffer.from("\r\n\r\n");
@@ -382,7 +402,6 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
         headerRaw = Buffer.concat([headerRaw, chunk]);
         const idx = headerRaw.indexOf(CRLFCRLF);
         if (idx >= 0) {
-          // Everything after \r\n\r\n is the start of the body
           rawBuf = headerRaw.subarray(idx + 4);
           break;
         }
@@ -390,7 +409,7 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
     }
 
     function dechunk(): Buffer {
-      // Parse chunked transfer encoding: "<hex-size>\r\n<data>\r\n"
+      // Chunked transfer encoding: "<tamaño-hex>\r\n<datos>\r\n"
       let result = Buffer.alloc(0);
       let pos = 0;
       const CRLF = Buffer.from("\r\n");
@@ -409,60 +428,27 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
         }
         const dataStart = crlfIdx + 2;
         if (dataStart + chunkSize + 2 > rawBuf.length) {
-          // Incomplete chunk — keep remainder for next iteration
+          // Trozo incompleto: se guarda para la siguiente vuelta.
           break;
         }
         result = Buffer.concat([result, rawBuf.subarray(dataStart, dataStart + chunkSize)]);
-        pos = dataStart + chunkSize + 2; // skip trailing \r\n
+        pos = dataStart + chunkSize + 2; // saltar el \r\n final
       }
       rawBuf = rawBuf.subarray(pos);
       return result;
     }
 
-    function* extractLines(data: Buffer, tty: boolean): Generator<string> {
-      if (tty) {
-        const text = data.toString("utf8");
-        for (const line of text.split("\n")) {
-          const trimmed = line.trimEnd();
-          if (trimmed) yield trimmed;
-        }
-      } else {
-        // Docker multiplexed: [1 byte type][3 pad][4 bytes BE length][payload]
-        let pos = 0;
-        while (pos + 8 <= data.length) {
-          const payloadLen = data.readUInt32BE(pos + 4);
-          if (pos + 8 + payloadLen > data.length) break;
-          const payload = data.subarray(pos + 8, pos + 8 + payloadLen).toString("utf8");
-          pos += 8 + payloadLen;
-          for (const line of payload.split("\n")) {
-            const trimmed = line.trimEnd();
-            if (trimmed) yield trimmed;
-          }
-        }
-      }
-    }
-
-    // Process initial body remainder
     if (rawBuf.length > 0) {
       const decoded = dechunk();
-      for (const line of extractLines(decoded, isTty)) {
-        const formatted = formatLogLine(line);
-        if (formatted) yield formatted;
-      }
+      if (decoded.length > 0) yield decoded;
     }
 
-    // Stream ongoing chunks
     while (!signal.aborted && !ended) {
       const chunk = await nextChunk();
       if (!chunk) break;
       rawBuf = Buffer.concat([rawBuf, chunk]);
       const decoded = dechunk();
-      if (decoded.length > 0) {
-        for (const line of extractLines(decoded, isTty)) {
-          const formatted = formatLogLine(line);
-          if (formatted) yield formatted;
-        }
-      }
+      if (decoded.length > 0) yield decoded;
     }
   } finally {
     signal.removeEventListener("abort", cleanup);
@@ -470,55 +456,86 @@ async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGe
   }
 }
 
+function* extractLogLines(data: Buffer, tty: boolean): Generator<string> {
+  if (tty) {
+    const text = data.toString("utf8");
+    for (const line of text.split("\n")) {
+      const trimmed = line.trimEnd();
+      if (trimmed) yield trimmed;
+    }
+  } else {
+    // Docker multiplexado: [1 byte tipo][3 relleno][4 bytes BE tamaño][carga]
+    let pos = 0;
+    while (pos + 8 <= data.length) {
+      const payloadLen = data.readUInt32BE(pos + 4);
+      if (pos + 8 + payloadLen > data.length) break;
+      const payload = data.subarray(pos + 8, pos + 8 + payloadLen).toString("utf8");
+      pos += 8 + payloadLen;
+      for (const line of payload.split("\n")) {
+        const trimmed = line.trimEnd();
+        if (trimmed) yield trimmed;
+      }
+    }
+  }
+}
+
+async function* _streamLogs(containerName: string, signal: AbortSignal): AsyncGenerator<string> {
+  const info = await docker.getContainer(containerName).inspect();
+  const isTty = info.Config.Tty;
+
+  const query = "follow=1&stdout=1&stderr=1&timestamps=1&tail=500";
+  const path = `/containers/${encodeURIComponent(containerName)}/logs?${query}`;
+  for await (const data of streamDockerBody(path, signal)) {
+    for (const line of extractLogLines(data, isTty)) {
+      const formatted = formatLogLine(line);
+      if (formatted) yield formatted;
+    }
+  }
+}
+
+/** Una línea JSON del stream de stats de Docker convertida a lo que pinta el panel. */
+function parseStatsLine(line: string): ContainerStats | null {
+  try {
+    const s = JSON.parse(line);
+    const cpuDelta = s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
+    const systemDelta =
+      (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
+    const numCpus = s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
+    const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+    return {
+      cpuPercent: Math.max(0, cpuPercent),
+      cpuCores: numCpus,
+      memUsageMB: containerMemUsageBytes(s.memory_stats) / 1024 / 1024,
+      memLimitMB: (s.memory_stats.limit ?? 0) / 1024 / 1024,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function* _streamStats(
   containerName: string,
   signal: AbortSignal,
-): AsyncGenerator<{
-  cpuPercent: number;
-  cpuCores: number;
-  memUsageMB: number;
-  memLimitMB: number;
-}> {
-  const container = docker.getContainer(containerName);
+): AsyncGenerator<ContainerStats> {
+  const path = `/containers/${encodeURIComponent(containerName)}/stats?stream=1`;
 
-  const stream = (await container.stats({ stream: true })) as unknown as NodeJS.ReadableStream;
-
-  // Use Buffer queue instead of string concatenation to avoid O(n) copying
+  // Docker manda un JSON por línea; una línea puede venir partida entre trozos.
   let remainder = Buffer.alloc(0);
   const NEWLINE = 0x0a; // '\n'
 
-  for await (const chunk of stream as AsyncIterable<Buffer>) {
-    if (signal.aborted) break;
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    const combined = remainder.length > 0 ? Buffer.concat([remainder, buf]) : buf;
+  for await (const chunk of streamDockerBody(path, signal)) {
+    const combined = remainder.length > 0 ? Buffer.concat([remainder, chunk]) : chunk;
 
     let start = 0;
     for (let i = 0; i < combined.length; i++) {
-      if (combined[i] === NEWLINE) {
-        const line = combined.subarray(start, i).toString("utf8").trim();
-        start = i + 1;
-        if (!line) continue;
-        try {
-          const s = JSON.parse(line);
-          const cpuDelta = s.cpu_stats.cpu_usage.total_usage - s.precpu_stats.cpu_usage.total_usage;
-          const systemDelta =
-            (s.cpu_stats.system_cpu_usage ?? 0) - (s.precpu_stats.system_cpu_usage ?? 0);
-          const numCpus =
-            s.cpu_stats.online_cpus ?? s.cpu_stats.cpu_usage.percpu_usage?.length ?? 1;
-          const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
-          const memUsageMB = containerMemUsageBytes(s.memory_stats) / 1024 / 1024;
-          const memLimitMB = (s.memory_stats.limit ?? 0) / 1024 / 1024;
-
-          yield {
-            cpuPercent: Math.max(0, cpuPercent),
-            cpuCores: numCpus,
-            memUsageMB,
-            memLimitMB,
-          };
-        } catch {
-          // Ignore parse errors
-        }
-      }
+      if (combined[i] !== NEWLINE) continue;
+      const line = combined.subarray(start, i).toString("utf8").trim();
+      start = i + 1;
+      if (!line) continue;
+      // Lo que quedaba en memoria ya no le interesa a nadie tras abortar.
+      if (signal.aborted) return;
+      const parsed = parseStatsLine(line);
+      if (parsed) yield parsed;
     }
     remainder = start < combined.length ? Buffer.from(combined.subarray(start)) : Buffer.alloc(0);
   }
@@ -575,12 +592,7 @@ export async function* streamContainerLogs(
 export async function* streamContainerStats(
   serverId: string,
   signal: AbortSignal,
-): AsyncGenerator<{
-  cpuPercent: number;
-  cpuCores: number;
-  memUsageMB: number;
-  memLimitMB: number;
-}> {
+): AsyncGenerator<ContainerStats> {
   yield* _streamStats(gameContainerName(serverId), signal);
 }
 
@@ -597,12 +609,7 @@ export async function* streamServiceLogs(
 export async function* streamServiceStats(
   serviceName: string,
   signal: AbortSignal,
-): AsyncGenerator<{
-  cpuPercent: number;
-  cpuCores: number;
-  memUsageMB: number;
-  memLimitMB: number;
-}> {
+): AsyncGenerator<ContainerStats> {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
   yield* _streamStats(`${projectName}-${serviceName}-1`, signal);
 }
