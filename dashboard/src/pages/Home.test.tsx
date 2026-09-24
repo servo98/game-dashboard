@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithRouter } from "../__tests__/render-with-router";
 
@@ -117,17 +117,26 @@ describe("Home page", () => {
     expect(statusBtn.closest("aside, header")).not.toBeNull();
   });
 
-  it("renders Infrastructure section with 6 services", async () => {
+  it("renders Sitios y servicios section with all 8 always-on services", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
-      expect(screen.getByText("Infraestructura")).toBeInTheDocument();
+      expect(screen.getByText("testuser")).toBeInTheDocument();
     });
-    expect(screen.getByText("backend")).toBeInTheDocument();
-    expect(screen.getByText("bot")).toBeInTheDocument();
-    expect(screen.getByText("dashboard")).toBeInTheDocument();
-    expect(screen.getByText("nginx")).toBeInTheDocument();
-    expect(screen.getByText("chatpapol")).toBeInTheDocument();
-    expect(screen.getByText("livekit")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Sitios y servicios"));
+    expect(screen.getByText("Sitios")).toBeInTheDocument();
+    expect(screen.getByText("Infraestructura del panel")).toBeInTheDocument();
+    for (const id of [
+      "backend",
+      "bot",
+      "dashboard",
+      "nginx",
+      "chatpapol",
+      "livekit",
+      "filebrowser",
+      "koff",
+    ]) {
+      expect(screen.getByText(id)).toBeInTheDocument();
+    }
   });
 
   it("shows error banner when API fails", async () => {

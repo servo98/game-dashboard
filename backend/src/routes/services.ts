@@ -1,14 +1,12 @@
 import { Hono } from "hono";
+import { COMPOSE_SERVICES, type ComposeServiceName } from "../compose-services";
 import { docker, streamHostStats, streamServiceLogs, streamServiceStats } from "../docker";
 import { requireAdmin, requireApproved, requireAuth } from "../middleware/auth";
 
 const services = new Hono();
 
-const ALLOWED_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
-type ServiceName = (typeof ALLOWED_SERVICES)[number];
-
-function isAllowed(name: string): name is ServiceName {
-  return ALLOWED_SERVICES.includes(name as ServiceName);
+function isAllowed(name: string): name is ComposeServiceName {
+  return COMPOSE_SERVICES.includes(name as ComposeServiceName);
 }
 
 function sseResponse(
@@ -64,7 +62,7 @@ services.get("/stats", requireAuth, requireApproved, requireAdmin, async (c) => 
       const encoder = new TextEncoder();
       const signal = abortController.signal;
 
-      const promises = ALLOWED_SERVICES.map(async (name) => {
+      const promises = COMPOSE_SERVICES.map(async (name) => {
         try {
           for await (const stats of streamServiceStats(name, signal)) {
             if (signal.aborted) break;
@@ -101,7 +99,7 @@ services.post("/:name/restart", requireAuth, requireApproved, requireAdmin, asyn
   const { name } = c.req.param();
 
   if (!isAllowed(name)) {
-    return c.json({ error: `Unknown service. Allowed: ${ALLOWED_SERVICES.join(", ")}` }, 400);
+    return c.json({ error: `Unknown service. Allowed: ${COMPOSE_SERVICES.join(", ")}` }, 400);
   }
 
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";
@@ -121,7 +119,7 @@ services.post("/:name/restart", requireAuth, requireApproved, requireAdmin, asyn
 services.get("/:name/logs", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { name } = c.req.param();
   if (!isAllowed(name)) {
-    return c.json({ error: `Unknown service. Allowed: ${ALLOWED_SERVICES.join(", ")}` }, 400);
+    return c.json({ error: `Unknown service. Allowed: ${COMPOSE_SERVICES.join(", ")}` }, 400);
   }
   return sseResponse(c.req.raw, (signal) => streamServiceLogs(name, signal));
 });

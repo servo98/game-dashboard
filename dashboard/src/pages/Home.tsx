@@ -19,10 +19,9 @@ import HostStatsBar from "../components/HostStatsBar";
 import {
   BotIcon,
   BoxIcon,
+  GlobeIcon,
   KeyIcon,
-  LogsIcon,
   PlusIcon,
-  RestoreIcon,
   ServersIcon,
   SettingsIcon,
   UsersIcon,
@@ -31,9 +30,9 @@ import LogViewer from "../components/LogViewer";
 import McpTokens from "../components/McpTokens";
 import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
-import ServiceStatsBar from "../components/ServiceStatsBar";
+import SitesTab from "../components/SitesTab";
 import UsersTab from "../components/UsersTab";
-import { Button, Divider, Empty, Notice, Panel, SectionRule, StatusMark } from "../components/ui";
+import { Button, Empty, Notice, SectionRule } from "../components/ui";
 import {
   applyAccent,
   applyMode,
@@ -44,14 +43,11 @@ import {
   watchSystemMode,
 } from "../theme";
 
-type Tab = "servers" | "bot" | "mcp" | "backups" | "settings" | "users";
-
-const INFRA_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
-// nginx/dashboard sirven el propio panel → reiniciarlos cortaría esta sesión; sin botón.
-const RESTARTABLE_SERVICES = ["backend", "bot", "chatpapol", "livekit"] as const;
+type Tab = "servers" | "sites" | "bot" | "mcp" | "backups" | "settings" | "users";
 
 const TAB_LABEL: Record<Tab, string> = {
   servers: "Servidores",
+  sites: "Sitios y servicios",
   bot: "Bot",
   mcp: "MCP",
   backups: "Copias",
@@ -61,6 +57,7 @@ const TAB_LABEL: Record<Tab, string> = {
 
 const TAB_ICON: Record<Tab, React.ReactNode> = {
   servers: <ServersIcon className="h-4 w-4" />,
+  sites: <GlobeIcon className="h-4 w-4" />,
   bot: <BotIcon className="h-4 w-4" />,
   mcp: <KeyIcon className="h-4 w-4" />,
   backups: <BoxIcon className="h-4 w-4" />,
@@ -254,7 +251,7 @@ export default function Home() {
     navigate("/login", { replace: true });
   };
 
-  const handleRestartService = async (name: (typeof RESTARTABLE_SERVICES)[number]) => {
+  const handleRestartService = async (name: string) => {
     setRestartingService(name);
     setRestartMsg(null);
     setError(null);
@@ -329,7 +326,7 @@ export default function Home() {
 
   const nav: NavItem[] = useMemo(() => {
     const ids: Tab[] = isAdmin
-      ? ["servers", "bot", "mcp", "backups", "users", "settings"]
+      ? ["servers", "sites", "bot", "mcp", "backups", "users", "settings"]
       : ["servers"];
     return ids.map((id) => ({ id, label: TAB_LABEL[id], icon: TAB_ICON[id] }));
   }, [isAdmin]);
@@ -376,123 +373,80 @@ export default function Home() {
         {restartMsg && <Notice tone="ok">{restartMsg}</Notice>}
 
         {tab === "servers" && (
-          <>
-            <section className="flex flex-col gap-3">
-              <SectionRule
-                right={
-                  <span className="num shrink-0 text-micro text-faint">
-                    {runningServers.length}/{servers.length}
-                  </span>
+          <section className="flex flex-col gap-3">
+            <SectionRule
+              right={
+                <span className="num shrink-0 text-micro text-faint">
+                  {runningServers.length}/{servers.length}
+                </span>
+              }
+            >
+              Servidores
+            </SectionRule>
+
+            {servers.length === 0 ? (
+              <Empty
+                title={
+                  isAdmin
+                    ? "Todavía no hay ningún servidor configurado."
+                    : "No tienes servidores asignados. Pide acceso a un administrador."
                 }
-              >
-                Servidores
-              </SectionRule>
-
-              {servers.length === 0 ? (
-                <Empty
-                  title={
-                    isAdmin
-                      ? "Todavía no hay ningún servidor configurado."
-                      : "No tienes servidores asignados. Pide acceso a un administrador."
-                  }
-                  action={
-                    isAdmin ? (
-                      <Button tone="accent" onClick={() => setShowGameStore(true)}>
-                        <PlusIcon className="h-3.5 w-3.5" />
-                        Añadir el primero
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              ) : (
-                <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
-                  {sortedServers.map((server, i) => (
-                    <div
-                      key={server.id}
-                      className="row-in"
-                      style={{ animationDelay: `${Math.min(i, 8) * 70}ms` }}
-                    >
-                      <ServerCard
-                        server={server}
-                        isActive={server.status === "running"}
-                        loading={loadingId === server.id}
-                        updating={updatingId === server.id}
-                        hostMemTotalMB={hostMemTotalMB}
-                        hostDomain={hostDomain}
-                        iconUrl={server.icon || gameIcons[server.id]}
-                        banner={
-                          resolveTheme(server.game_type, { banner_path: server.banner_path }).banner
-                        }
-                        isAdmin={isAdmin}
-                        onStart={handleStart}
-                        onStop={handleStop}
-                        onDelete={handleDelete}
-                        onViewLogs={handleViewLogs}
-                        onEditConfig={handleEditConfig}
-                        onOpenFiles={handleOpenFiles}
-                        onForceUpdate={handleForceUpdate}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {isAdmin && (
-              <section className="flex flex-col gap-3">
-                <SectionRule>Infraestructura</SectionRule>
-                <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {INFRA_SERVICES.map((svc) => {
-                    const stats = serviceStats[svc] ?? null;
-                    return (
-                      <Panel key={svc} className="flex flex-col" as="article">
-                        <div className="flex items-center justify-between px-3.5 py-2.5">
-                          <span className="text-body font-medium text-ink">{svc}</span>
-                          <StatusMark
-                            tone={stats ? "ok" : "idle"}
-                            label={stats ? "Activo" : "Sin dato"}
-                          />
-                        </div>
-                        <Divider />
-                        <div className="px-3.5 py-2.5">
-                          <ServiceStatsBar stats={stats} />
-                        </div>
-                        <Divider />
-                        <div className="flex items-center gap-1 px-3.5 py-2">
-                          <Button
-                            tone="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setLogTarget({
-                                title: svc,
-                                factory: () => createServiceLogStream(svc),
-                              })
-                            }
-                          >
-                            <LogsIcon className="h-3.5 w-3.5" />
-                            Registro
-                          </Button>
-                          {(RESTARTABLE_SERVICES as readonly string[]).includes(svc) && (
-                            <Button
-                              tone="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleRestartService(svc as (typeof RESTARTABLE_SERVICES)[number])
-                              }
-                              disabled={restartingService === svc}
-                            >
-                              <RestoreIcon className="h-3.5 w-3.5" />
-                              {restartingService === svc ? "Reiniciando" : "Reiniciar"}
-                            </Button>
-                          )}
-                        </div>
-                      </Panel>
-                    );
-                  })}
-                </div>
-              </section>
+                action={
+                  isAdmin ? (
+                    <Button tone="accent" onClick={() => setShowGameStore(true)}>
+                      <PlusIcon className="h-3.5 w-3.5" />
+                      Añadir el primero
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+                {sortedServers.map((server, i) => (
+                  <div
+                    key={server.id}
+                    className="row-in"
+                    style={{ animationDelay: `${Math.min(i, 8) * 70}ms` }}
+                  >
+                    <ServerCard
+                      server={server}
+                      isActive={server.status === "running"}
+                      loading={loadingId === server.id}
+                      updating={updatingId === server.id}
+                      hostMemTotalMB={hostMemTotalMB}
+                      hostDomain={hostDomain}
+                      iconUrl={server.icon || gameIcons[server.id]}
+                      banner={
+                        resolveTheme(server.game_type, { banner_path: server.banner_path }).banner
+                      }
+                      isAdmin={isAdmin}
+                      onStart={handleStart}
+                      onStop={handleStop}
+                      onDelete={handleDelete}
+                      onViewLogs={handleViewLogs}
+                      onEditConfig={handleEditConfig}
+                      onOpenFiles={handleOpenFiles}
+                      onForceUpdate={handleForceUpdate}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
-          </>
+          </section>
+        )}
+
+        {tab === "sites" && (
+          <SitesTab
+            serviceStats={serviceStats}
+            restartingService={restartingService}
+            onViewLogs={(name) =>
+              setLogTarget({
+                title: name,
+                factory: () => createServiceLogStream(name),
+              })
+            }
+            onRestart={handleRestartService}
+          />
         )}
 
         {tab === "bot" && (

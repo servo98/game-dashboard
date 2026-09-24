@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { startAutoBackupTimer } from "./backup";
+import { COMPOSE_SERVICES } from "./compose-services";
 import { sessionQueries } from "./db";
 import { docker } from "./docker";
 import { reconcileJoinableOnBoot } from "./joinable-status";
@@ -43,7 +44,6 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 // Detailed health/status — public, no auth
 const BOOT_TIME = Date.now();
-const COMPOSE_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 
 app.get("/api/health/status", async (c) => {
   const projectName = process.env.COMPOSE_PROJECT_NAME ?? "game-panel";

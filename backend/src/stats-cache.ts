@@ -1,6 +1,5 @@
+import { COMPOSE_SERVICES } from "./compose-services";
 import { containerMemUsageBytes, docker } from "./docker";
-
-const COMPOSE_SERVICES = ["backend", "bot", "dashboard", "nginx", "chatpapol", "livekit"] as const;
 
 export type ServiceStats = {
   memUsageMB: number;

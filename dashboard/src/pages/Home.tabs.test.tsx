@@ -71,11 +71,20 @@ describe("Home tabs", () => {
     vi.clearAllMocks();
   });
 
-  it("defaults to servers tab with Infrastructure visible", async () => {
+  it("defaults to servers tab, sin la sección de sitios y servicios", async () => {
     renderWithRouter(<Home />);
     await waitFor(() => {
-      expect(screen.getByText("Infraestructura")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Servidores" })).toBeInTheDocument();
     });
+    expect(screen.queryByText("Infraestructura del panel")).not.toBeInTheDocument();
+  });
+
+  it("switches to Sitios y servicios tab", async () => {
+    renderWithRouter(<Home />);
+    await waitFor(() => screen.getByText("Sitios y servicios"));
+    fireEvent.click(screen.getByText("Sitios y servicios"));
+    expect(screen.getByText("Sitios")).toBeInTheDocument();
+    expect(screen.getByText("Infraestructura del panel")).toBeInTheDocument();
   });
 
   it("switches to Bot tab", async () => {
@@ -83,8 +92,8 @@ describe("Home tabs", () => {
     await waitFor(() => screen.getByText("Bot"));
     fireEvent.click(screen.getByText("Bot"));
     expect(screen.getByTestId("bot-settings")).toBeInTheDocument();
-    // Infrastructure should NOT be visible on Bot tab
-    expect(screen.queryByText("Infraestructura")).not.toBeInTheDocument();
+    // La sección de sitios y servicios NO debe verse en el tab de Bot
+    expect(screen.queryByText("Infraestructura del panel")).not.toBeInTheDocument();
   });
 
   it("switches to Backups tab", async () => {

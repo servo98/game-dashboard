@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { GamepadIcon } from "../components/Icons";
 import { Divider, Meter, Panel, SectionRule, StatusMark, Tag } from "../components/ui";
 import { Wordmark } from "../components/Wordmark";
+import { SERVICE_CATALOG } from "../serviceCatalog";
 
 type ServiceHealth = {
   name: string;
@@ -42,14 +43,11 @@ function formatUptime(isoDate: string): string {
   return formatSeconds(Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000));
 }
 
-const SERVICE_LABELS: Record<string, string> = {
-  backend: "API del panel",
-  bot: "Bot de Discord",
-  dashboard: "Panel web",
-  nginx: "Proxy inverso",
-  chatpapol: "ChatPapol",
-  livekit: "LiveKit (voz y vídeo)",
-};
+// El catálogo de serviceCatalog.ts es la única fuente de nombres bonitos:
+// así un servicio nuevo aparece aquí y en "Sitios y servicios" a la vez.
+const SERVICE_LABELS: Record<string, string> = Object.fromEntries(
+  SERVICE_CATALOG.map((s) => [s.id, s.name]),
+);
 
 /** Dato suelto de una ficha: etiqueta arriba, valor en mono debajo. */
 function Readout({

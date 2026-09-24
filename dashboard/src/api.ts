@@ -262,8 +262,8 @@ export const api = {
       body: JSON.stringify({ command }),
     }),
 
-  /** Infrastructure */
-  restartService: (name: "backend" | "bot" | "chatpapol" | "livekit") =>
+  /** Infrastructure: nombre del servicio tal y como aparece en el catálogo. */
+  restartService: (name: string) =>
     request<{ ok: boolean; message: string }>(`/services/${name}/restart`, {
       method: "POST",
     }),
