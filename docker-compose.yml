@@ -148,6 +148,30 @@ services:
     networks:
       - panel
 
+  # ─── KOFF (coffeekoff.com) ───────────────────────────────────────────────
+  # Landing + tarjeta de lealtad + admin de tickets en un binario Go con SQLite.
+  # Un solo contenedor sirve los tres hosts (coffeekoff.com, api., admin.) según
+  # el Host que le pasa nginx. Imagen privada en GHCR (repo servo98/koff).
+  # Datos en /data/koff del host (koff.db + backups/ diarios, 14 días).
+  # OJO: la CI NO arranca servicios nuevos → primer `up -d koff` manual
+  # (ver DEPLOY-KOFF.md). El dir del host debe ser del uid 65532 (nonroot).
+  koff:
+    image: ghcr.io/servo98/koff:latest
+    environment:
+      - KOFF_SITE_HOST=coffeekoff.com
+      - KOFF_API_HOST=api.coffeekoff.com
+      - KOFF_ADMIN_HOST=admin.coffeekoff.com
+      - KOFF_TRUST_PROXY=1  # solo nginx llega al puerto; confía en su X-Real-IP
+    ports:
+      - "127.0.0.1:3300:8080"  # nginx (host net) proxya los 3 hosts de coffeekoff aquí
+    volumes:
+      - /data/koff:/data
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *default-logging
+    networks:
+      - panel
+
 volumes:
   backend-data:
   chatpapol-data:
