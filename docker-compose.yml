@@ -166,6 +166,17 @@ services:
       - "127.0.0.1:3300:8080"  # nginx (host net) proxya los 3 hosts de coffeekoff aquí
     volumes:
       - /data/koff:/data
+    # Endurecido: sin escritura fuera de /data, sin capacidades de Linux y con tope de
+    # CPU y procesos, para que un abuso no afecte a los demás servicios del server.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    cpus: 0.5
     restart: unless-stopped
     mem_limit: 128m
     logging: *default-logging
