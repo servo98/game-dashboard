@@ -17,6 +17,20 @@ describe("connectAddress", () => {
   it("returns domain:port for unmapped ports", () => {
     expect(connectAddress(27015, "aypapol.com")).toBe("aypapol.com:27015");
   });
+
+  it("keeps game-client types without scheme", () => {
+    expect(connectAddress(25565, "aypapol.com", "sandbox")).toBe("mc.aypapol.com");
+    expect(connectAddress(2456, "aypapol.com", "survival")).toBe("aypapol.com:2456");
+  });
+
+  it("prefixes https:// for anything opened in a browser", () => {
+    expect(connectAddress(3400, "aypapol.com", "tools")).toBe("https://aypapol.com:3400");
+    expect(connectAddress(8787, "aypapol.com", "other")).toBe("https://aypapol.com:8787");
+    expect(connectAddress(30000, "aypapol.com", "tabletop")).toBe("https://rolcito.aypapol.com");
+    expect(connectAddress(8080, "aypapol.com", "tools")).toBe(
+      "https://desglosador3000.aypapol.com",
+    );
+  });
 });
 
 describe("formatDuration", () => {

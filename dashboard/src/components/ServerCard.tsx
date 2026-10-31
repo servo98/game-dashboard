@@ -112,7 +112,7 @@ export default memo(function ServerCard({
   const isRunning = server.status === "running";
   const effectiveStatus = isRunning && server.joinable ? server.joinable : server.status;
   const status = STATUS[effectiveStatus] ?? STATUS.stopped;
-  const address = connectAddress(server.port, hostDomain);
+  const address = connectAddress(server.port, hostDomain, server.game_type);
   const updateWarning = server.update_state ? UPDATE_WARNING[server.update_state] : undefined;
 
   function handleCopy() {

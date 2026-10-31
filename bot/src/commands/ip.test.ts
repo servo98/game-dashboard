@@ -6,8 +6,13 @@ describe("connectAddress", () => {
     expect(connectAddress("sandbox", 25565, "aypapol.com")).toBe("mc.aypapol.com");
   });
 
-  it("returns domain:port for non-sandbox game types", () => {
-    expect(connectAddress("fps", 27015, "aypapol.com")).toBe("aypapol.com:27015");
+  it("returns domain:port for game-client types", () => {
+    expect(connectAddress("survival", 2456, "aypapol.com")).toBe("aypapol.com:2456");
+  });
+
+  it("prefixes https:// for web apps", () => {
+    expect(connectAddress("tools", 3400, "aypapol.com")).toBe("https://aypapol.com:3400");
+    expect(connectAddress("other", 8787, "aypapol.com")).toBe("https://aypapol.com:8787");
   });
 
   it("returns domain:port for sandbox on non-standard port", () => {

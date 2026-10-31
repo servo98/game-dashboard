@@ -16,10 +16,15 @@ export const data = new SlashCommandBuilder()
   .setName("ip")
   .setDescription("Show the connect address for the active game server");
 
+/** Tipos cuyo cliente es el propio juego (Minecraft, Valheim): la dirección va sin esquema. */
+const GAME_CLIENT_TYPES = new Set(["sandbox", "survival"]);
+
 export function connectAddress(gameType: string, port: number, domain: string): string {
   if (gameType === "sandbox" && port === 25565) {
     return `mc.${domain}`;
   }
+  // Todo lo que se abre en el navegador va con https://, sin excepción (igual que el dashboard).
+  if (!GAME_CLIENT_TYPES.has(gameType)) return `https://${domain}:${port}`;
   return `${domain}:${port}`;
 }
 

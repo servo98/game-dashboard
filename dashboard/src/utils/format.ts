@@ -4,15 +4,21 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   "8080": "desglosador3000",
 };
 
+/** Tipos cuyo cliente es el propio juego (Minecraft, Valheim): la dirección va sin esquema. */
+const GAME_CLIENT_TYPES = new Set(["sandbox", "survival"]);
+
 /**
  * Dirección con la que se entra a un servidor. El subdominio se decide por
  * puerto, no por juego: dos servidores del mismo juego en puertos distintos
- * necesitan direcciones distintas.
+ * necesitan direcciones distintas. Todo lo que se abre en el navegador (tools,
+ * tabletop, other…) va con `https://`, sin excepción: así el navegador no
+ * prueba http al pegar la dirección.
  */
-export function connectAddress(port: number, hostDomain: string): string {
+export function connectAddress(port: number, hostDomain: string, gameType?: string): string {
   const sub = SUBDOMAIN_MAP[String(port)];
-  if (sub) return `${sub}.${hostDomain}`;
-  return `${hostDomain}:${port}`;
+  const address = sub ? `${sub}.${hostDomain}` : `${hostDomain}:${port}`;
+  if (gameType && !GAME_CLIENT_TYPES.has(gameType)) return `https://${address}`;
+  return address;
 }
 
 export function formatDuration(seconds: number): string {
