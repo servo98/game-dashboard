@@ -314,6 +314,24 @@ export function CopyIcon({ className = "w-4 h-4" }: IconProps) {
   );
 }
 
+export function ExternalLinkIcon({ className = "w-4 h-4" }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10.5 13.5" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className = "w-4 h-4" }: IconProps) {
   return (
     <svg

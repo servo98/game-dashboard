@@ -6,6 +6,7 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FolderIcon,
   GamepadIcon,
   LogsIcon,
@@ -300,6 +301,21 @@ export default memo(function ServerCard({
               )}
               {copied ? "Copiado" : "Copiar"}
             </Button>
+            {/* Solo las webs se abren en el navegador; una dirección de juego no */}
+            {address.startsWith("https://") && (
+              <ButtonLink
+                tone="ghost"
+                size="sm"
+                href={address}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir en una pestaña nueva"
+                className="shrink-0"
+              >
+                <ExternalLinkIcon className="h-3.5 w-3.5" />
+                Abrir
+              </ButtonLink>
+            )}
           </div>
         </>
       )}
