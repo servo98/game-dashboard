@@ -16,6 +16,7 @@ import mcpRoutes from "./routes/mcp";
 import mcpTokenRoutes from "./routes/mcp-tokens";
 import notificationRoutes from "./routes/notifications";
 import oauthRoutes, { oauthCodeQueries, registerWellKnown } from "./routes/oauth";
+import packRoutes from "./routes/packs";
 import serverRoutes from "./routes/servers";
 import serviceRoutes from "./routes/services";
 import settingsRoutes from "./routes/settings";
@@ -121,6 +122,8 @@ app.route("/api/services", serviceRoutes);
 app.route("/api/bot", botSettingsRoutes);
 app.route("/api/curseforge", curseforgeRoutes);
 app.route("/api/notifications", notificationRoutes);
+// Público: resource packs por servidor de Minecraft (ver routes/packs.ts)
+app.route("/api/packs", packRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api", mcpRoutes);
 app.route("/api/mcp-tokens", mcpTokenRoutes);
