@@ -13,6 +13,7 @@ export function makeServer(overrides: Partial<Server> = {}): Server {
     banner_path: null,
     accent_color: null,
     icon: null,
+    memory_limit_gb: null,
     ...overrides,
   };
 }

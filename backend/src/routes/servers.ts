@@ -6,7 +6,13 @@ import { isValheimImage, readValheimBuildStatus } from "../adapters/valheim/buil
 import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
 import { findTemplate, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
-import { backupQueries, serverQueries, serverSessionQueries, userServerAccessQueries } from "../db";
+import {
+  backupQueries,
+  getPanelSetting,
+  serverQueries,
+  serverSessionQueries,
+  userServerAccessQueries,
+} from "../db";
 import {
   getContainerStatus,
   getRunningGameServers,
@@ -386,8 +392,20 @@ servers.get("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
     volumes: JSON.parse(server.volumes) as Record<string, string>,
     banner_path: server.banner_path ?? null,
     accent_color: server.accent_color ?? null,
+    memory_limit_gb: server.memory_limit_gb ?? null,
+    // Para que el editor muestre qué valor aplica cuando el propio está vacío
+    default_memory_limit_gb: Number(getPanelSetting("game_memory_limit_gb")),
   });
 });
+
+/** RAM máxima por servidor: null/"" = usa la general; si no, número en (0, 64]. */
+const MAX_SERVER_MEMORY_GB = 64;
+function parseMemoryLimit(value: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (value === null || value === "") return { ok: true, value: null };
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_SERVER_MEMORY_GB) return { ok: false };
+  return { ok: true, value: n };
+}
 
 // Update editable config for a server (admin only)
 servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c) => {
@@ -402,7 +420,23 @@ servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
     env_vars: Record<string, string>;
     volumes?: Record<string, string>;
     accent_color?: string | null;
+    memory_limit_gb?: number | string | null;
   }>();
+
+  // Valida antes de escribir nada para no dejar la config a medias
+  let memoryLimit: number | null | undefined;
+  if (body.memory_limit_gb !== undefined) {
+    const parsed = parseMemoryLimit(body.memory_limit_gb);
+    if (!parsed.ok) {
+      return c.json(
+        {
+          error: `La RAM máxima debe ser un número mayor que 0 y hasta ${MAX_SERVER_MEMORY_GB} GB`,
+        },
+        400,
+      );
+    }
+    memoryLimit = parsed.value;
+  }
 
   const name = body.name?.trim() || server.name;
   const port = body.port ?? server.port;
@@ -419,6 +453,10 @@ servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
   // Update theme accent color if provided
   if (body.accent_color !== undefined) {
     serverQueries.updateTheme.run(server.banner_path, body.accent_color, id);
+  }
+
+  if (memoryLimit !== undefined) {
+    serverQueries.updateMemoryLimit.run(memoryLimit, id);
   }
 
   return c.json({ ok: true });

@@ -149,6 +149,7 @@ export async function startGameContainer(
   _port: number,
   envVars: Record<string, string>,
   volumes: Record<string, string>,
+  memoryLimitGb: number,
 ): Promise<void> {
   const containerName = gameContainerName(serverId);
 
@@ -261,8 +262,8 @@ export async function startGameContainer(
       NetworkMode: "host", // zero network overhead — game binds directly to host ports
       Binds: binds,
       RestartPolicy: { Name: "unless-stopped" },
-      // Resource limits from panel settings
-      Memory: Number(getPanelSetting("game_memory_limit_gb")) * 1024 * 1024 * 1024,
+      // RAM: la propia del servidor o, si no tiene, la general (ver effectiveMemoryLimitGb)
+      Memory: Math.round(memoryLimitGb * 1024 * 1024 * 1024),
       MemoryReservation: 512 * 1024 * 1024, // 512 MB guaranteed
       NanoCpus: Number(getPanelSetting("game_cpu_limit")) * 1e9,
       // Log rotation — máx 150 MB por juego (3 × 50 MB)

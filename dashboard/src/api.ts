@@ -80,6 +80,10 @@ export type ServerConfig = {
   volumes: Record<string, string>;
   banner_path: string | null;
   accent_color: string | null;
+  /** RAM máxima propia en GB; null = usa la general. */
+  memory_limit_gb?: number | null;
+  /** Valor general (Ajustes) que aplica cuando memory_limit_gb es null. */
+  default_memory_limit_gb?: number;
 };
 
 export type BotSettings = {

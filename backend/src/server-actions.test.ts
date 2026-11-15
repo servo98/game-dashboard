@@ -261,6 +261,37 @@ describe("startServer", () => {
     expect(mockStartGameContainer).not.toHaveBeenCalled();
   });
 
+  it("F7: servidor con RAM propia → crea el contenedor con ese límite", async () => {
+    // General = 6 GB, propia = 5 GB → el contenedor va con 5
+    const r = await start({ memory_limit_gb: 5 });
+    expect(r.ok).toBe(true);
+    expect(mockStartGameContainer.mock.calls[0][5]).toBe(5);
+  });
+
+  it("F8: sin RAM propia → usa la general", async () => {
+    const r = await start({ memory_limit_gb: null });
+    expect(r.ok).toBe(true);
+    expect(mockStartGameContainer.mock.calls[0][5]).toBe(6);
+  });
+
+  it("F9: el guard de RAM cuenta la RAM propia, no la general", async () => {
+    // 5 GB reservados + tope host 8: con la general (6) no cabría, con 3 propios sí
+    mockGetRunningGameServers.mockResolvedValue([
+      { id: "abc", name: "valheim", memoryBytes: 5 * 1024 ** 3 },
+    ]);
+    mockGetPanelSetting.mockImplementation((key: string) =>
+      key === "host_memory_limit_gb" ? "8" : "6",
+    );
+    mockServerGetById.mockImplementation((id: string) =>
+      id === "valheim"
+        ? makeServer({ id: "valheim", port: 2456 })
+        : makeServer({ id: "minecraft", port: 25565, memory_limit_gb: 3 }),
+    );
+    const r = await startServer("minecraft");
+    expect(r.ok).toBe(true);
+    expect(mockStartGameContainer.mock.calls[0][5]).toBe(3);
+  });
+
   it("F5/F6: docker throws → code 'docker', no session/watcher", async () => {
     silenceConsole();
     mockStartGameContainer.mockRejectedValue(new Error("boom"));

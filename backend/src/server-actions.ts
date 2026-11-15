@@ -30,6 +30,15 @@ export type ActionResult<T = unknown> =
       code: "not_found" | "invalid" | "backup_failed" | "docker" | "resource";
     };
 
+// ─── Helper: RAM máxima del contenedor ───────────────────────────────────────
+/** RAM máxima (GB) con la que se crea el contenedor: la propia del servidor si
+ * la tiene, si no el ajuste general `game_memory_limit_gb`. */
+export function effectiveMemoryLimitGb(server: Pick<Server, "memory_limit_gb">): number {
+  const own = server.memory_limit_gb;
+  if (own != null && Number.isFinite(own) && own > 0) return own;
+  return Number(getPanelSetting("game_memory_limit_gb"));
+}
+
 // ─── Helper: resolución de parámetros de arranque ────────────────────────────
 // Puro (salvo el side-effect de persistir volúmenes auto-arreglados): produce la
 // imagen/env/volúmenes ya procesados para una fila de servidor. NO toca contenedores.
@@ -139,7 +148,7 @@ export async function startServer(
     }
 
     const reservedBytes = running.reduce((sum, r) => sum + r.memoryBytes, 0);
-    const perServerGb = Number(getPanelSetting("game_memory_limit_gb"));
+    const perServerGb = effectiveMemoryLimitGb(server);
     const hostLimitGb = Number(getPanelSetting("host_memory_limit_gb"));
     const newBytes = perServerGb * 1024 ** 3;
     const hostLimitBytes = hostLimitGb * 1024 ** 3;
@@ -152,7 +161,7 @@ export async function startServer(
       };
     }
 
-    await startGameContainer(server.id, image, server.port, env, volumes);
+    await startGameContainer(server.id, image, server.port, env, volumes, perServerGb);
 
     // Registra la nueva sesión
     serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));

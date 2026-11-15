@@ -8,6 +8,8 @@ const mockServerInsert = vi.fn();
 const mockServerDeleteById = vi.fn();
 const mockGetContainerStatus = vi.fn();
 const mockDeleteByServerId = vi.fn();
+const mockServerUpdate = vi.fn();
+const mockUpdateMemoryLimit = vi.fn();
 
 vi.mock("../db", () => ({
   db: { exec: vi.fn(), query: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })) },
@@ -22,8 +24,9 @@ vi.mock("../db", () => ({
     getById: { get: mockServerGetById },
     insert: { run: mockServerInsert },
     deleteById: { run: mockServerDeleteById },
-    update: { run: vi.fn() },
+    update: { run: mockServerUpdate },
     updateTheme: { run: vi.fn() },
+    updateMemoryLimit: { run: mockUpdateMemoryLimit },
   },
   serverSessionQueries: {
     start: { run: vi.fn() },
@@ -268,5 +271,55 @@ describe("DELETE /:id", () => {
     expect((await res.json()).ok).toBe(true);
     expect(mockDeleteByServerId).toHaveBeenCalledWith("minecraft");
     expect(mockServerDeleteById).toHaveBeenCalledWith("minecraft");
+  });
+});
+
+describe("RAM máxima por servidor en /:id/config", () => {
+  const auth = { cookie: "panel_session=valid-token" };
+  const put = (body: Record<string, unknown>) =>
+    servers.request("/minecraft/config", {
+      method: "PUT",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ docker_image: "itzg/minecraft-server", env_vars: {}, ...body }),
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSessionGet.mockReturnValue(session);
+    mockServerGetById.mockReturnValue(makeServer({ memory_limit_gb: 5 }));
+  });
+
+  it("GET devuelve la RAM propia y la general", async () => {
+    const res = await servers.request("/minecraft/config", { headers: auth });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.memory_limit_gb).toBe(5);
+    expect(body.default_memory_limit_gb).toBe(6);
+  });
+
+  it("PUT guarda un número válido", async () => {
+    const res = await put({ memory_limit_gb: 5 });
+    expect(res.status).toBe(200);
+    expect(mockUpdateMemoryLimit).toHaveBeenCalledWith(5, "minecraft");
+  });
+
+  it("PUT con null o vacío vuelve a la general", async () => {
+    await put({ memory_limit_gb: null });
+    expect(mockUpdateMemoryLimit).toHaveBeenCalledWith(null, "minecraft");
+    await put({ memory_limit_gb: "" });
+    expect(mockUpdateMemoryLimit).toHaveBeenLastCalledWith(null, "minecraft");
+  });
+
+  it("PUT sin el campo no lo toca", async () => {
+    const res = await put({});
+    expect(res.status).toBe(200);
+    expect(mockUpdateMemoryLimit).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 65, "abc"])("PUT rechaza %s sin guardar nada", async (value) => {
+    const res = await put({ memory_limit_gb: value });
+    expect(res.status).toBe(400);
+    expect(mockServerUpdate).not.toHaveBeenCalled();
+    expect(mockUpdateMemoryLimit).not.toHaveBeenCalled();
   });
 });

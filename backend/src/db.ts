@@ -158,6 +158,12 @@ try {
 } catch (_) {
   /* column already exists */
 }
+// Migration: RAM máxima propia del servidor (GB). NULL = usa game_memory_limit_gb.
+try {
+  db.exec(`ALTER TABLE servers ADD COLUMN memory_limit_gb REAL`);
+} catch (_) {
+  /* column already exists */
+}
 
 export type Server = {
   id: string;
@@ -171,6 +177,8 @@ export type Server = {
   banner_path: string | null;
   accent_color: string | null;
   icon: string | null;
+  /** RAM máxima propia del contenedor en GB; null = usa el ajuste general. */
+  memory_limit_gb: number | null;
 };
 
 export type Session = {
@@ -201,6 +209,9 @@ export const serverQueries = {
   ),
   updateTheme: db.query<void, [string | null, string | null, string]>(
     "UPDATE servers SET banner_path = ?, accent_color = ? WHERE id = ?",
+  ),
+  updateMemoryLimit: db.query<void, [number | null, string]>(
+    "UPDATE servers SET memory_limit_gb = ? WHERE id = ?",
   ),
 };
 

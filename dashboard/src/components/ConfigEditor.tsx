@@ -131,6 +131,9 @@ export default function ConfigEditor({
 }: Props) {
   const [name, setName] = useState("");
   const [port, setPort] = useState(0);
+  // Texto libre: "" = usa la RAM general del panel
+  const [memoryLimit, setMemoryLimit] = useState("");
+  const [defaultMemoryLimit, setDefaultMemoryLimit] = useState<number | null>(null);
   const [dockerImage, setDockerImage] = useState("");
   const [envPairs, setEnvPairs] = useState<EnvPair[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,6 +187,8 @@ export default function ConfigEditor({
       .then((cfg: ServerConfig) => {
         setName(cfg.name);
         setPort(cfg.port);
+        setMemoryLimit(cfg.memory_limit_gb != null ? String(cfg.memory_limit_gb) : "");
+        setDefaultMemoryLimit(cfg.default_memory_limit_gb ?? null);
         setDockerImage(cfg.docker_image);
         setEnvPairs(Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value })));
         setBannerPath(cfg.banner_path);
@@ -280,6 +285,7 @@ export default function ConfigEditor({
         docker_image: dockerImage,
         env_vars,
         accent_color: accentColor,
+        memory_limit_gb: memoryLimit.trim() === "" ? null : Number(memoryLimit),
       } as ServerConfig);
 
       for (const path of dirtyPaths) {
@@ -418,6 +424,27 @@ export default function ConfigEditor({
               className={`${INPUT_CLASS} font-mono`}
             />
           </div>
+        </div>
+
+        <div className="sm:w-48">
+          <label htmlFor="config-memory-limit" className="label mb-1.5 block">
+            RAM máxima (GB)
+          </label>
+          <input
+            id="config-memory-limit"
+            type="number"
+            min="0.5"
+            max="64"
+            step="0.5"
+            value={memoryLimit}
+            onChange={(e) => setMemoryLimit(e.target.value)}
+            placeholder={defaultMemoryLimit != null ? String(defaultMemoryLimit) : ""}
+            className={`${INPUT_CLASS} font-mono`}
+          />
+          <p className="text-meta text-faint mt-1.5">
+            Vacío usa la general
+            {defaultMemoryLimit != null ? ` (${defaultMemoryLimit} GB)` : ""}. Aplica al reiniciar.
+          </p>
         </div>
 
         <div>
