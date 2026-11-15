@@ -43,8 +43,10 @@ packs.get("/:serverId/:file", (c) => {
   const { serverId, file } = c.req.param();
   if (!SERVER_ID_RE.test(serverId) || !FILE_RE.test(file)) return c.notFound();
 
+  // Por la imagen y no por game_type: hay servers de Minecraft dados de alta
+  // con game_type "sandbox" (p. ej. el id "minecraft" en prod).
   const server = serverQueries.getById.get(serverId);
-  if (!server || server.game_type !== "minecraft") return c.notFound();
+  if (!server || !server.docker_image.startsWith("itzg/minecraft-server")) return c.notFound();
 
   const dir = packsDir(server.volumes);
   if (!dir) return c.notFound();

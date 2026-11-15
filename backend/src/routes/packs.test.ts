@@ -32,7 +32,9 @@ function app() {
 function server(over: Record<string, unknown> = {}) {
   return {
     id: "minecraft",
-    game_type: "minecraft",
+    // Como en prod: el server "minecraft" está dado de alta como "sandbox".
+    game_type: "sandbox",
+    docker_image: "itzg/minecraft-server:java21",
     volumes: JSON.stringify({ "/data/minecraft": "/data" }),
     ...over,
   };
@@ -85,7 +87,9 @@ describe("GET /api/packs/:serverId/:file", () => {
   it("404 si el servidor no existe o no es de Minecraft", async () => {
     mockServerGetById.mockReturnValueOnce(undefined);
     expect((await app().request("/api/packs/nope/pack.zip")).status).toBe(404);
-    mockServerGetById.mockReturnValueOnce(server({ game_type: "valheim" }));
+    mockServerGetById.mockReturnValueOnce(
+      server({ game_type: "valheim", docker_image: "lloesche/valheim-server" }),
+    );
     expect((await app().request("/api/packs/minecraft/pack.zip")).status).toBe(404);
     expect(mockReadFileSync).not.toHaveBeenCalled();
   });
