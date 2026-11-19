@@ -84,6 +84,28 @@ export type ServerConfig = {
   memory_limit_gb?: number | null;
   /** Valor general (Ajustes) que aplica cuando memory_limit_gb es null. */
   default_memory_limit_gb?: number;
+  /** Rutas del host (dentro de sus volúmenes) que las copias se saltan. */
+  backup_exclude?: string[];
+};
+
+/** Restos en el host de servidores que ya no están en el panel. */
+export type Orphans = {
+  containers: { name: string; image: string; status: string; running: boolean }[];
+  backup_dirs: { server_id: string; files: number; bytes: number }[];
+  banners: string[];
+  db_rows: { table: string; server_id: string; rows: number }[];
+  dangling_images: number;
+};
+
+export type OrphanCleanup = {
+  containers_removed: string[];
+  containers_skipped: string[];
+  images_removed: number;
+  backup_dirs_removed: string[];
+  banners_removed: string[];
+  db_rows_removed: number;
+  bytes_reclaimed: number;
+  warnings: string[];
 };
 
 export type BotSettings = {
@@ -299,6 +321,10 @@ export const api = {
     request<{ ok: boolean }>(`/servers/${id}${deleteFiles ? "?deleteFiles=true" : ""}`, {
       method: "DELETE",
     }),
+
+  /** Restos de servidores borrados */
+  getOrphans: () => request<Orphans>("/servers/orphans"),
+  cleanupOrphans: () => request<OrphanCleanup>("/servers/orphans/cleanup", { method: "POST" }),
 
   /** Backups */
   listAllBackups: () => request<BackupRecord[]>("/servers/backups/all"),

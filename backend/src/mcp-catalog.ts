@@ -32,4 +32,5 @@ export const MCP_TOOL_LABELS: Record<string, string> = {
   update_server_env: "Cambia las variables de entorno",
   update_server_image: "Cambia la imagen de Docker",
   create_server: "Da de alta un servidor nuevo",
+  set_backup_exclude: "Elige qué rutas se saltan las copias de un servidor",
 };

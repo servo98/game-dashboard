@@ -14,6 +14,7 @@ export function makeServer(overrides: Partial<Server> = {}): Server {
     accent_color: null,
     icon: null,
     memory_limit_gb: null,
+    backup_exclude: "[]",
     ...overrides,
   };
 }

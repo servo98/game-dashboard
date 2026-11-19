@@ -1,9 +1,15 @@
-import { existsSync, rmSync } from "fs";
+import { existsSync } from "fs";
 import { Hono } from "hono";
 import { execRconCommand } from "../adapters/minecraft/rcon";
 import { getValheimPlayers } from "../adapters/valheim";
 import { isValheimImage, readValheimBuildStatus } from "../adapters/valheim/build-status";
-import { createBackup, deleteBackupFile, getBackupFilePath, restoreBackup } from "../backup";
+import {
+  createBackup,
+  deleteBackupFile,
+  getBackupFilePath,
+  parseBackupExclude,
+  restoreBackup,
+} from "../backup";
 import { findTemplate, GAME_CATALOG } from "../catalog";
 import type { Session } from "../db";
 import {
@@ -28,6 +34,7 @@ import {
   requireServerAccess,
 } from "../middleware/auth";
 import { createServer, forceUpdateServer, startServer, stopServer } from "../server-actions";
+import { deleteServer, findOrphans, removeOrphans } from "../server-cleanup";
 
 const servers = new Hono<{
   Variables: { session: Session; isBotRequest?: boolean; role?: string; discordId?: string };
@@ -130,33 +137,39 @@ servers.post("/", requireAuth, requireApproved, requireAdmin, async (c) => {
   return c.json({ ok: true, server: created.data });
 });
 
-// Delete a server — only when stopped (admin only)
+// Restos de servidores que ya no existen (admin). Van antes de las rutas /:id.
+servers.get("/orphans", requireAuth, requireApproved, requireAdmin, async (c) => {
+  try {
+    return c.json(await findOrphans());
+  } catch (err) {
+    console.error("Orphans error:", err);
+    return c.json({ error: "No se pudieron listar los restos" }, 500);
+  }
+});
+
+servers.post("/orphans/cleanup", requireAuth, requireApproved, requireAdmin, async (c) => {
+  try {
+    return c.json(await removeOrphans());
+  } catch (err) {
+    console.error("Orphan cleanup error:", err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
+});
+
+// Delete a server — only when stopped (admin only). No deja nada: contenedor,
+// imagen sin uso, datos, respaldos, banner y filas (ver server-cleanup.ts).
 servers.delete("/:id", requireAuth, requireApproved, requireAdmin, async (c) => {
   const { id } = c.req.param();
-  const server = serverQueries.getById.get(id);
-  if (!server) return c.json({ error: "Server not found" }, 404);
 
-  const status = await getContainerStatus(id);
-  if (status === "running") {
-    return c.json({ error: "Cannot delete a running server. Stop it first." }, 400);
+  const result = await deleteServer(id);
+  if (!result.ok) {
+    if (result.code === "not_found") return c.json({ error: "Server not found" }, 404);
+    if (result.code === "invalid") return c.json({ error: result.error }, 400);
+    console.error("Delete error:", result.error);
+    return c.json({ error: result.error }, 500);
   }
 
-  serverSessionQueries.deleteByServerId.run(id);
-  serverQueries.deleteById.run(id);
-
-  // Always remove volume data from disk
-  const volumes = JSON.parse(server.volumes) as Record<string, string>;
-  for (const hostPath of Object.keys(volumes)) {
-    if (!hostPath.startsWith("/data/")) continue;
-    const accessPath = `/host-data/${hostPath.replace(/^\/data\//, "")}`;
-    try {
-      rmSync(accessPath, { recursive: true });
-    } catch {
-      // best-effort — directory may not exist
-    }
-  }
-
-  return c.json({ ok: true });
+  return c.json({ ok: true, removed: result.data });
 });
 
 // Both dashboard users and bot can list servers (filtered by access for regular users)
@@ -395,8 +408,18 @@ servers.get("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
     memory_limit_gb: server.memory_limit_gb ?? null,
     // Para que el editor muestre qué valor aplica cuando el propio está vacío
     default_memory_limit_gb: Number(getPanelSetting("game_memory_limit_gb")),
+    backup_exclude: readBackupExclude(server.backup_exclude),
   });
 });
+
+function readBackupExclude(stored: string | null | undefined): string[] {
+  try {
+    const parsed = JSON.parse(stored || "[]");
+    return Array.isArray(parsed) ? parsed.filter((p) => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 /** RAM máxima por servidor: null/"" = usa la general; si no, número en (0, 64]. */
 const MAX_SERVER_MEMORY_GB = 64;
@@ -421,6 +444,7 @@ servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
     volumes?: Record<string, string>;
     accent_color?: string | null;
     memory_limit_gb?: number | string | null;
+    backup_exclude?: string[];
   }>();
 
   // Valida antes de escribir nada para no dejar la config a medias
@@ -441,6 +465,15 @@ servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
   const name = body.name?.trim() || server.name;
   const port = body.port ?? server.port;
   const volumes = body.volumes ?? (JSON.parse(server.volumes) as Record<string, string>);
+
+  // Las exclusiones se validan contra los volúmenes que van a quedar guardados
+  let backupExclude: string[] | undefined;
+  if (body.backup_exclude !== undefined) {
+    const parsed = parseBackupExclude(body.backup_exclude, volumes);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    backupExclude = parsed.paths;
+  }
+
   serverQueries.update.run(
     name,
     port,
@@ -457,6 +490,10 @@ servers.put("/:id/config", requireAuth, requireApproved, requireAdmin, async (c)
 
   if (memoryLimit !== undefined) {
     serverQueries.updateMemoryLimit.run(memoryLimit, id);
+  }
+
+  if (backupExclude !== undefined) {
+    serverQueries.updateBackupExclude.run(JSON.stringify(backupExclude), id);
   }
 
   return c.json({ ok: true });

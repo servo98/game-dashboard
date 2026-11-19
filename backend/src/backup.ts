@@ -1,14 +1,92 @@
-import { existsSync, mkdirSync, unlinkSync } from "fs";
-import { join } from "path";
+import { existsSync, mkdirSync, rmSync, unlinkSync } from "fs";
+import { join, posix } from "path";
 import { execRconCommand } from "./adapters/minecraft/rcon";
 import { backupQueries, getPanelSetting, serverQueries } from "./db";
 import { getContainerStatus, getRunningGameServers } from "./docker";
 
-const BACKUP_DIR = "/data/backups";
-const HOST_DATA_DIR = "/host-data";
+/** Configurables solo para poder apuntar los tests a carpetas temporales. */
+export const BACKUP_DIR = process.env.BACKUP_DIR ?? "/data/backups";
+const HOST_DATA_DIR = process.env.HOST_DATA_DIR ?? "/host-data";
 
 export function backupDir(serverId: string): string {
   return join(BACKUP_DIR, serverId);
+}
+
+/**
+ * Valida las rutas que un servidor quiere dejar fuera de sus respaldos.
+ *
+ * Se escriben como rutas del host, igual que los volúmenes (`/data/svr2007/disc`),
+ * y tienen que caer DENTRO de alguno de los volúmenes del servidor: excluir el
+ * volumen entero o algo de fuera no tiene sentido y casi seguro es un error.
+ * Admiten `*` como comodín (lo interpreta tar).
+ */
+export function parseBackupExclude(
+  input: unknown,
+  volumes: Record<string, string>,
+): { ok: true; paths: string[] } | { ok: false; error: string } {
+  if (!Array.isArray(input)) {
+    return { ok: false, error: "Las rutas excluidas deben ir en una lista." };
+  }
+  const roots = Object.keys(volumes)
+    .filter((p) => p.startsWith("/data/"))
+    .map((p) => posix.normalize(p).replace(/\/+$/, ""));
+
+  const paths: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") {
+      return { ok: false, error: "Cada ruta excluida debe ser un texto." };
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const path = posix.normalize(trimmed).replace(/\/+$/, "");
+    if (!roots.some((root) => path.startsWith(`${root}/`))) {
+      return {
+        ok: false,
+        error: `"${trimmed}" no está dentro de ningún volumen de este servidor (${roots.join(", ") || "no tiene"}).`,
+      };
+    }
+    if (!paths.includes(path)) paths.push(path);
+  }
+  return { ok: true, paths };
+}
+
+/** Las exclusiones guardadas de un servidor, como patrones relativos para tar. */
+function excludePatterns(server: { backup_exclude?: string | null; volumes: string }): string[] {
+  let stored: unknown;
+  try {
+    stored = JSON.parse(server.backup_exclude || "[]");
+  } catch {
+    return [];
+  }
+  // Se revalida al usar: los volúmenes pueden haber cambiado desde que se guardó.
+  const parsed = parseBackupExclude(stored, JSON.parse(server.volumes) as Record<string, string>);
+  if (!parsed.ok) return [];
+  return parsed.paths.map((p) => p.replace(/^\/data\//, ""));
+}
+
+/**
+ * El comando tar de un respaldo (sin el ionice/nice de delante).
+ *
+ * Las rutas excluidas van con --anchored para que el patrón solo case desde la
+ * raíz del archivo: sin eso, excluir `svr2007/disc` también se saltaría
+ * cualquier `disc` que hubiera más adentro.
+ */
+export function backupTarArgs(
+  server: { backup_exclude?: string | null; volumes: string },
+  outputPath: string,
+  relativeDirs: string[],
+): string[] {
+  const excludes = excludePatterns(server);
+  return [
+    "tar",
+    "--zstd",
+    ...(excludes.length > 0 ? ["--anchored", ...excludes.map((p) => `--exclude=${p}`)] : []),
+    "-cf",
+    outputPath,
+    "-C",
+    HOST_DATA_DIR,
+    ...relativeDirs,
+  ];
 }
 
 export function timestamp(): string {
@@ -67,20 +145,7 @@ export async function createBackup(serverId: string): Promise<{
     // nice -n 19 = lowest CPU priority
     // --zstd = zstandard compression (3-5x faster than gzip, similar ratio)
     const proc = Bun.spawn(
-      [
-        "ionice",
-        "-c3",
-        "nice",
-        "-n",
-        "19",
-        "tar",
-        "--zstd",
-        "-cf",
-        outputPath,
-        "-C",
-        HOST_DATA_DIR,
-        ...relativeDirs,
-      ],
+      ["ionice", "-c3", "nice", "-n", "19", ...backupTarArgs(server, outputPath, relativeDirs)],
       { stdout: "ignore", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -158,6 +223,23 @@ export function deleteBackupFile(backupId: number): void {
     // File may already be gone
   }
   backupQueries.deleteById.run(backupId);
+}
+
+/**
+ * Borra TODOS los respaldos de un servidor: los archivos, su carpeta y las filas
+ * de la base. Es lo que hace el borrado de un servidor; antes se quedaban.
+ */
+export function deleteServerBackups(serverId: string): { files: number; bytes: number } {
+  const rows = backupQueries.list.all(serverId);
+  const bytes = rows.reduce((sum, b) => sum + b.size_bytes, 0);
+
+  // El id acaba en una ruta: sin esta comprobación un id vacío borraría la
+  // carpeta de respaldos de todos los servidores.
+  if (/^[A-Za-z0-9_-]+$/.test(serverId)) {
+    rmSync(backupDir(serverId), { recursive: true, force: true });
+  }
+  backupQueries.deleteByServerId.run(serverId);
+  return { files: rows.length, bytes };
 }
 
 export async function pruneOldBackups(serverId: string): Promise<void> {

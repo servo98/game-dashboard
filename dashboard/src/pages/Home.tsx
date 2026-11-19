@@ -28,6 +28,7 @@ import {
 } from "../components/Icons";
 import LogViewer from "../components/LogViewer";
 import McpTokens from "../components/McpTokens";
+import OrphansPanel from "../components/OrphansPanel";
 import PanelSettings from "../components/PanelSettings";
 import ServerCard from "../components/ServerCard";
 import SitesTab from "../components/SitesTab";
@@ -466,8 +467,9 @@ export default function Home() {
         {tab === "users" && <UsersTab />}
 
         {tab === "settings" && (
-          <div className="max-w-xl">
+          <div className="flex max-w-xl flex-col gap-6">
             <PanelSettings />
+            <OrphansPanel />
           </div>
         )}
       </div>

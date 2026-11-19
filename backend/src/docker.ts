@@ -141,8 +141,98 @@ export function markIntentionalStop(serverId: string): void {
   }
 }
 
+// --- Limpieza de imágenes ---
+
+/**
+ * Deja una referencia de imagen en la forma en que Docker la lista en RepoTags:
+ * sin `docker.io/` ni `library/`, y con `:latest` si no trae tag ni digest.
+ */
+export function normalizeImageRef(ref: string): string {
+  let r = ref.trim().replace(/^docker\.io\//, "");
+  r = r.replace(/^library\//, "");
+  if (r.includes("@")) return r;
+  const lastSegment = r.slice(r.lastIndexOf("/") + 1);
+  return lastSegment.includes(":") ? r : `${r}:latest`;
+}
+
+export type ImageRemoval = "removed" | "in-use" | "missing" | "error";
+
+/**
+ * Borra una imagen solo si nadie la necesita: ningún contenedor (corriendo o
+ * parado) creado a partir de ella y ninguna de sus etiquetas en `keepRefs`
+ * (las imágenes de otros servidores del panel, tengan contenedor o no).
+ *
+ * Nunca fuerza el borrado: si Docker dice que está en uso, se queda.
+ */
+export async function removeImageIfUnused(
+  idOrRef: string,
+  keepRefs: string[] = [],
+): Promise<ImageRemoval> {
+  let info: { Id: string; RepoTags?: string[] | null };
+  try {
+    info = await docker.getImage(idOrRef).inspect();
+  } catch {
+    return "missing";
+  }
+
+  try {
+    const containers = await docker.listContainers({ all: true });
+    if (containers.some((c) => c.ImageID === info.Id)) return "in-use";
+
+    const tags = info.RepoTags ?? [];
+    const keep = new Set(keepRefs.map(normalizeImageRef));
+    if (tags.some((t) => keep.has(normalizeImageRef(t)))) return "in-use";
+
+    if (tags.length <= 1) {
+      await docker.getImage(info.Id).remove();
+    } else {
+      // Con varias etiquetas Docker no deja borrar por ID sin forzar: se quita
+      // etiqueta a etiqueta y la última se lleva las capas.
+      for (const tag of tags) await docker.getImage(tag).remove();
+    }
+    return "removed";
+  } catch (err) {
+    // 409 = Docker la considera en uso (p. ej. un contenedor creado entre el
+    // listado y el borrado). No es un fallo.
+    if ((err as { statusCode?: number }).statusCode === 409) return "in-use";
+    console.warn(`[docker] no se pudo borrar la imagen ${idOrRef}: ${(err as Error).message}`);
+    return "error";
+  }
+}
+
+/**
+ * Quita el contenedor de un servidor (esté parado o no exista) y devuelve el ID
+ * de la imagen con la que se creó, para poder limpiarla después.
+ */
+export async function removeGameContainer(
+  serverId: string,
+): Promise<{ removed: boolean; imageId: string | null }> {
+  const container = docker.getContainer(gameContainerName(serverId));
+  let imageId: string | null = null;
+  try {
+    const info = await container.inspect();
+    imageId = info.Image ?? null;
+  } catch {
+    return { removed: false, imageId: null };
+  }
+  await container.remove({ force: true, v: true });
+  return { removed: true, imageId };
+}
+
+async function imageIdOf(ref: string): Promise<string | null> {
+  try {
+    return (await docker.getImage(ref).inspect()).Id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Start a game container. Multiple game containers may run concurrently;
- * caller (server-actions) enforces port + RAM guard-rails beforehand. */
+ * caller (server-actions) enforces port + RAM guard-rails beforehand.
+ *
+ * `opts.keepImageRefs` son las imágenes de los demás servidores del panel: al
+ * actualizar, la versión anterior de la imagen se borra salvo que sea una de
+ * esas o que la use otro contenedor. */
 export async function startGameContainer(
   serverId: string,
   image: string,
@@ -150,13 +240,22 @@ export async function startGameContainer(
   envVars: Record<string, string>,
   volumes: Record<string, string>,
   memoryLimitGb: number,
+  opts: { keepImageRefs?: string[] } = {},
 ): Promise<void> {
   const containerName = gameContainerName(serverId);
 
+  // Imágenes que pueden quedar sin dueño tras este arranque: la del contenedor
+  // que se va a reemplazar y la que tenía la etiqueta antes del pull. Cada
+  // actualización dejaba la anterior como <none> para siempre (en prod se
+  // juntaron 32 versiones de una sola imagen, ~8 GB).
+  const previousImageIds = new Set<string>();
+  const taggedBefore = await imageIdOf(image);
+  if (taggedBefore) previousImageIds.add(taggedBefore);
+
   // Remove existing stopped container if present
   try {
-    const existing = docker.getContainer(containerName);
-    await existing.remove({ force: true, v: true });
+    const existing = await removeGameContainer(serverId);
+    if (existing.imageId) previousImageIds.add(existing.imageId);
   } catch {
     // Container doesn't exist, that's fine
   }
@@ -278,6 +377,17 @@ export async function startGameContainer(
   });
 
   await container.start();
+
+  // Solo tras un arranque correcto: si el contenedor nuevo no llega a crearse,
+  // la imagen anterior se conserva. La imagen actual nunca entra aquí.
+  const current = await imageIdOf(image);
+  for (const id of previousImageIds) {
+    if (id === current) continue;
+    const result = await removeImageIfUnused(id, opts.keepImageRefs);
+    if (result === "removed") {
+      console.log(`[docker] imagen anterior de ${serverId} borrada (${id.slice(7, 19)})`);
+    }
+  }
 }
 
 /** Stop a game container (does NOT remove it — removal happens on next start) */

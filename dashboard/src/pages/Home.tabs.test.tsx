@@ -24,6 +24,9 @@ vi.mock("../components/BotSettings", () => ({
 vi.mock("../components/BackupsTab", () => ({
   default: () => <div data-testid="backups-tab" />,
 }));
+vi.mock("../components/OrphansPanel", () => ({
+  default: () => <div data-testid="orphans-panel" />,
+}));
 vi.mock("../components/PanelSettings", () => ({
   default: () => <div data-testid="panel-settings" />,
 }));

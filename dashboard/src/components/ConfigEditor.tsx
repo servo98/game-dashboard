@@ -134,6 +134,9 @@ export default function ConfigEditor({
   // Texto libre: "" = usa la RAM general del panel
   const [memoryLimit, setMemoryLimit] = useState("");
   const [defaultMemoryLimit, setDefaultMemoryLimit] = useState<number | null>(null);
+  // Una ruta por línea; lo que las copias de este servidor se saltan
+  const [backupExclude, setBackupExclude] = useState("");
+  const [volumeRoots, setVolumeRoots] = useState<string[]>([]);
   const [dockerImage, setDockerImage] = useState("");
   const [envPairs, setEnvPairs] = useState<EnvPair[]>([]);
   const [loading, setLoading] = useState(false);
@@ -189,6 +192,8 @@ export default function ConfigEditor({
         setPort(cfg.port);
         setMemoryLimit(cfg.memory_limit_gb != null ? String(cfg.memory_limit_gb) : "");
         setDefaultMemoryLimit(cfg.default_memory_limit_gb ?? null);
+        setBackupExclude((cfg.backup_exclude ?? []).join("\n"));
+        setVolumeRoots(Object.keys(cfg.volumes ?? {}));
         setDockerImage(cfg.docker_image);
         setEnvPairs(Object.entries(cfg.env_vars).map(([key, value]) => ({ key, value })));
         setBannerPath(cfg.banner_path);
@@ -286,6 +291,10 @@ export default function ConfigEditor({
         env_vars,
         accent_color: accentColor,
         memory_limit_gb: memoryLimit.trim() === "" ? null : Number(memoryLimit),
+        backup_exclude: backupExclude
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
       } as ServerConfig);
 
       for (const path of dirtyPaths) {
@@ -466,6 +475,26 @@ export default function ConfigEditor({
               La imagen la elige el editor de Minecraft según la versión.
             </p>
           )}
+        </div>
+
+        <div>
+          <label htmlFor="config-backup-exclude" className="label mb-1.5 block">
+            Fuera de las copias
+          </label>
+          <textarea
+            id="config-backup-exclude"
+            rows={3}
+            spellCheck={false}
+            value={backupExclude}
+            onChange={(e) => setBackupExclude(e.target.value)}
+            placeholder={volumeRoots[0] ? `${volumeRoots[0]}/carpeta-grande` : ""}
+            className={`${INPUT_CLASS} font-mono resize-y`}
+          />
+          <p className="text-meta text-faint mt-1.5">
+            Una ruta por línea, dentro de{" "}
+            {volumeRoots.length > 0 ? volumeRoots.join(" o ") : "sus volúmenes"}. Para lo que pesa y
+            nunca cambia: cada copia se lo salta. Admite * como comodín.
+          </p>
         </div>
       </div>
     );

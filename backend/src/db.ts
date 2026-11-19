@@ -165,6 +165,14 @@ try {
   /* column already exists */
 }
 
+// Migration: rutas que el respaldo de este servidor se salta (JSON, rutas del
+// host bajo alguno de sus volúmenes). Para datos grandes que nunca cambian.
+try {
+  db.exec(`ALTER TABLE servers ADD COLUMN backup_exclude TEXT NOT NULL DEFAULT '[]'`);
+} catch (_) {
+  /* column already exists */
+}
+
 export type Server = {
   id: string;
   name: string;
@@ -179,6 +187,8 @@ export type Server = {
   icon: string | null;
   /** RAM máxima propia del contenedor en GB; null = usa el ajuste general. */
   memory_limit_gb: number | null;
+  /** JSON con las rutas del host que el respaldo se salta; "[]" = respalda todo. */
+  backup_exclude: string;
 };
 
 export type Session = {
@@ -212,6 +222,9 @@ export const serverQueries = {
   ),
   updateMemoryLimit: db.query<void, [number | null, string]>(
     "UPDATE servers SET memory_limit_gb = ? WHERE id = ?",
+  ),
+  updateBackupExclude: db.query<void, [string, string]>(
+    "UPDATE servers SET backup_exclude = ? WHERE id = ?",
   ),
 };
 
@@ -263,7 +276,31 @@ export const backupQueries = {
   oldest: db.query<Backup, [string]>(
     "SELECT * FROM backups WHERE server_id = ? ORDER BY created_at ASC LIMIT 1",
   ),
+  deleteByServerId: db.query<void, [string]>("DELETE FROM backups WHERE server_id = ?"),
 };
+
+/** Tablas con filas por servidor; ninguna tiene clave foránea, así que el
+ * borrado de un servidor tiene que limpiarlas a mano. */
+const SERVER_SCOPED_TABLES = ["backups", "server_sessions", "user_server_access"] as const;
+
+/** Filas que apuntan a un servidor que ya no existe. */
+export function countOrphanRows(): { table: string; server_id: string; rows: number }[] {
+  return SERVER_SCOPED_TABLES.flatMap((table) =>
+    db
+      .query<{ server_id: string; cnt: number }, []>(
+        `SELECT server_id, COUNT(*) AS cnt FROM ${table}
+         WHERE server_id NOT IN (SELECT id FROM servers) GROUP BY server_id`,
+      )
+      .all()
+      .map((r) => ({ table, server_id: r.server_id, rows: r.cnt })),
+  );
+}
+
+export function deleteOrphanRows(): void {
+  for (const table of SERVER_SCOPED_TABLES) {
+    db.exec(`DELETE FROM ${table} WHERE server_id NOT IN (SELECT id FROM servers)`);
+  }
+}
 
 export const botSettingsQueries = {
   get: db.query<{ key: string; value: string }, [string]>(
@@ -389,6 +426,7 @@ export const userServerAccessQueries = {
   deleteByUserAndServer: db.query<void, [string, string]>(
     "DELETE FROM user_server_access WHERE discord_id = ? AND server_id = ?",
   ),
+  deleteByServer: db.query<void, [string]>("DELETE FROM user_server_access WHERE server_id = ?"),
 };
 
 export const inviteLinkQueries = {
@@ -402,6 +440,9 @@ export const inviteLinkQueries = {
     "UPDATE invite_links SET use_count = use_count + 1 WHERE code = ?",
   ),
   deleteById: db.query<void, [number]>("DELETE FROM invite_links WHERE id = ?"),
+  updateServerIds: db.query<void, [string, number]>(
+    "UPDATE invite_links SET server_ids = ? WHERE id = ?",
+  ),
 };
 
 export const mcpTokenQueries = {

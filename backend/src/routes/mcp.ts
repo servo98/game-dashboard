@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { GameAdapter } from "../adapters/adapter";
 import { createMinecraftAdapter } from "../adapters/minecraft/index";
 import { sanitize } from "../adapters/minecraft/sanitize";
+import { parseBackupExclude } from "../backup";
 import { type McpToken, mcpTokenQueries, serverQueries, sessionQueries } from "../db";
 import { getContainerStatus, getRunningGameServers } from "../docker";
 import { MCP_TOOL_LABELS } from "../mcp-catalog";
@@ -823,6 +824,37 @@ function createMcpServer(mcpToken: McpToken | null, adminMode: boolean) {
           started: true,
           warnings,
           message: `Servidor "${id}" creado y en marcha como "${started.data.image}".`,
+        });
+      },
+    );
+
+    // Admin-only: rutas que el respaldo de un servidor se salta
+    server.tool(
+      "set_backup_exclude",
+      "Set which host paths a server's backups skip (admin only). Use it for large data that never changes, e.g. a game disc image, so each backup only holds what actually changes. Replaces the whole list; pass [] to back up everything again.",
+      {
+        server_id: z.string().describe("Server ID."),
+        paths: z
+          .array(z.string())
+          .describe(
+            "Host paths inside one of the server's volumes, e.g. ['/data/svr2007/disc']. '*' works as a wildcard.",
+          ),
+      },
+      async ({ server_id, paths }) => {
+        const row = serverQueries.getById.get(server_id);
+        if (!row) return errorResult(`Server "${server_id}" not found.`);
+
+        const parsed = parseBackupExclude(paths, JSON.parse(row.volumes) as Record<string, string>);
+        if (!parsed.ok) return errorResult(parsed.error);
+
+        serverQueries.updateBackupExclude.run(JSON.stringify(parsed.paths), server_id);
+        return successResult({
+          server_id,
+          backup_exclude: parsed.paths,
+          message:
+            parsed.paths.length > 0
+              ? "Backups of this server will skip those paths from now on."
+              : "Backups of this server include everything again.",
         });
       },
     );

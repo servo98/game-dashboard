@@ -39,6 +39,53 @@ export function effectiveMemoryLimitGb(server: Pick<Server, "memory_limit_gb">):
   return Number(getPanelSetting("game_memory_limit_gb"));
 }
 
+const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
+
+// ─── Helper: imagen con la que arranca un servidor ───────────────────────────
+/**
+ * La imagen que de verdad se usa al arrancar. Coincide con `docker_image` salvo
+ * en itzg/minecraft-server, donde el tag de Java sale de la versión de Minecraft.
+ * Pura: también la usa la limpieza para saber qué imágenes siguen haciendo falta.
+ */
+export function resolveImageRef(server: Pick<Server, "docker_image" | "env_vars">): string {
+  const dockerImage = server.docker_image;
+  if (!dockerImage.startsWith("itzg/minecraft-server")) return dockerImage;
+
+  // Si la DB ya tiene un tag explícito (p. ej. java21), respétalo
+  const existingTag = dockerImage.includes(":") ? dockerImage.split(":")[1] : null;
+  if (existingTag && /^java\d+$/.test(existingTag)) {
+    // El usuario eligió una versión específica de Java en la config — no la sobreescribas
+    return `itzg/minecraft-server:${existingTag}`;
+  }
+
+  let envVars: Record<string, string> = {};
+  try {
+    envVars = JSON.parse(server.env_vars) as Record<string, string>;
+  } catch {
+    // env ilegible: se trata como sin versión
+  }
+  // Los modpacks sacan la versión de su manifest, así que VERSION no cuenta
+  const version = MODPACK_TYPES.has(envVars.TYPE) ? "LATEST" : (envVars.VERSION ?? "LATEST");
+  const parts = version.split(".").map(Number);
+  const minor = parts[1] ?? 0;
+  const patch = parts[2] ?? 0;
+  let javaTag = "java21"; // por defecto para latest/moderno
+  if (version !== "LATEST" && version !== "SNAPSHOT") {
+    if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
+    else if (minor >= 18) javaTag = "java17";
+    else javaTag = "java8";
+  }
+  return `itzg/minecraft-server:${javaTag}`;
+}
+
+/** Imágenes que necesitan los demás servidores del panel (tengan contenedor o no). */
+export function imageRefsOfOtherServers(exceptId: string): string[] {
+  return serverQueries.getAll
+    .all()
+    .filter((s) => s.id !== exceptId)
+    .map(resolveImageRef);
+}
+
 // ─── Helper: resolución de parámetros de arranque ────────────────────────────
 // Puro (salvo el side-effect de persistir volúmenes auto-arreglados): produce la
 // imagen/env/volúmenes ya procesados para una fila de servidor. NO toca contenedores.
@@ -75,7 +122,6 @@ function resolveStartParams(
   }
 
   // Modpacks: auto-detecta versión desde el manifest del modpack, no la sobreescribas
-  const MODPACK_TYPES = new Set(["AUTO_CURSEFORGE", "MODRINTH", "FTBA"]);
   if (MODPACK_TYPES.has(envVars.TYPE)) {
     delete envVars.VERSION;
   }
@@ -91,30 +137,7 @@ function resolveStartParams(
     envVars.SERVER_PORT = String(server.port);
   }
 
-  // Auto-selecciona el tag de imagen Java para itzg/minecraft-server según la versión de MC
-  let dockerImage = server.docker_image;
-  if (dockerImage.startsWith("itzg/minecraft-server")) {
-    // Si la DB ya tiene un tag explícito (p. ej. java21), respétalo
-    const existingTag = dockerImage.includes(":") ? dockerImage.split(":")[1] : null;
-    const hasExplicitJavaTag = existingTag && /^java\d+$/.test(existingTag);
-
-    if (hasExplicitJavaTag) {
-      // El usuario eligió una versión específica de Java en la config — no la sobreescribas
-      dockerImage = `itzg/minecraft-server:${existingTag}`;
-    } else {
-      const version = envVars.VERSION ?? "LATEST";
-      const parts = version.split(".").map(Number);
-      const minor = parts[1] ?? 0;
-      const patch = parts[2] ?? 0;
-      let javaTag = "java21"; // por defecto para latest/moderno
-      if (version !== "LATEST" && version !== "SNAPSHOT") {
-        if (minor >= 21 || (minor === 20 && patch >= 5)) javaTag = "java21";
-        else if (minor >= 18) javaTag = "java17";
-        else javaTag = "java8";
-      }
-      dockerImage = `itzg/minecraft-server:${javaTag}`;
-    }
-  }
+  const dockerImage = resolveImageRef(server);
 
   return { image: dockerImage, env: envVars, volumes };
 }
@@ -161,7 +184,10 @@ export async function startServer(
       };
     }
 
-    await startGameContainer(server.id, image, server.port, env, volumes, perServerGb);
+    await startGameContainer(server.id, image, server.port, env, volumes, perServerGb, {
+      // Al actualizar se borra la imagen anterior, salvo que otro servidor la use
+      keepImageRefs: imageRefsOfOtherServers(server.id),
+    });
 
     // Registra la nueva sesión
     serverSessionQueries.start.run(server.id, Math.floor(Date.now() / 1000));

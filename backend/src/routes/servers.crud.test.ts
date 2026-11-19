@@ -123,6 +123,15 @@ vi.mock("../backup", () => ({
   restoreBackup: vi.fn(),
 }));
 
+// El borrado completo tiene sus propias pruebas (server-cleanup.test.ts); aquí
+// solo importa cómo traduce la ruta cada resultado a un código HTTP.
+const mockDeleteServer = vi.fn();
+vi.mock("../server-cleanup", () => ({
+  deleteServer: (...args: unknown[]) => mockDeleteServer(...args),
+  findOrphans: vi.fn(),
+  removeOrphans: vi.fn(),
+}));
+
 const { default: servers } = await import("./servers");
 
 const session = makeSession();
@@ -241,7 +250,7 @@ describe("DELETE /:id", () => {
   });
 
   it("returns 404 for missing server", async () => {
-    mockServerGetById.mockReturnValue(undefined);
+    mockDeleteServer.mockResolvedValue({ ok: false, code: "not_found", error: "nope" });
     const res = await servers.request("/nonexistent", {
       method: "DELETE",
       headers: { cookie: "panel_session=valid-token" },
@@ -250,8 +259,11 @@ describe("DELETE /:id", () => {
   });
 
   it("returns 400 when server is running", async () => {
-    mockServerGetById.mockReturnValue(server);
-    mockGetContainerStatus.mockResolvedValue("running");
+    mockDeleteServer.mockResolvedValue({
+      ok: false,
+      code: "invalid",
+      error: "Cannot delete a running server. Stop it first.",
+    });
     const res = await servers.request("/minecraft", {
       method: "DELETE",
       headers: { cookie: "panel_session=valid-token" },
@@ -260,17 +272,32 @@ describe("DELETE /:id", () => {
     expect((await res.json()).error).toMatch(/Stop it first/);
   });
 
-  it("deletes stopped server", async () => {
-    mockServerGetById.mockReturnValue(server);
-    mockGetContainerStatus.mockResolvedValue("stopped");
+  it("returns 500 when Docker no deja quitar el contenedor", async () => {
+    mockDeleteServer.mockResolvedValue({ ok: false, code: "docker", error: "boom" });
+    const res = await servers.request("/minecraft", {
+      method: "DELETE",
+      headers: { cookie: "panel_session=valid-token" },
+    });
+    expect(res.status).toBe(500);
+  });
+
+  it("deletes stopped server and reports what was removed", async () => {
+    const removed = {
+      container: true,
+      image: "removed",
+      data_removed: ["/data/minecraft"],
+      data_kept: [],
+      backups: { files: 2, bytes: 2048 },
+      warnings: [],
+    };
+    mockDeleteServer.mockResolvedValue({ ok: true, data: removed });
     const res = await servers.request("/minecraft", {
       method: "DELETE",
       headers: { cookie: "panel_session=valid-token" },
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).ok).toBe(true);
-    expect(mockDeleteByServerId).toHaveBeenCalledWith("minecraft");
-    expect(mockServerDeleteById).toHaveBeenCalledWith("minecraft");
+    expect(await res.json()).toEqual({ ok: true, removed });
+    expect(mockDeleteServer).toHaveBeenCalledWith("minecraft");
   });
 });
 

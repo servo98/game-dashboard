@@ -391,7 +391,9 @@ export default memo(function ServerCard({
               icon={!confirmDelete}
               onClick={handleDeleteClick}
               title={
-                confirmDelete ? "Confirmar borrado del servidor y sus ficheros" : "Borrar servidor"
+                confirmDelete
+                  ? "Confirmar: se borran el servidor, sus ficheros y sus copias"
+                  : "Borrar servidor"
               }
               className={confirmDelete ? "" : "hover:text-danger"}
             >

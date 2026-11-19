@@ -414,6 +414,11 @@ jobs:
             cd /root/game-panel
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) backend
             docker compose up -d --force-recreate --no-deps backend
+            # Cada build deja la imagen anterior sin etiqueta y su caché; sin esto
+            # se acumulan (llegaron a ser 27 GB de caché). Solo borra lo que ya
+            # no usa ningún contenedor; falla en silencio para no tumbar el deploy.
+            docker image prune -f >/dev/null || true
+            docker builder prune -f --filter until=72h >/dev/null || true
 
   deploy-dashboard:
     runs-on: ubuntu-latest
@@ -434,6 +439,11 @@ jobs:
             cd /root/game-panel
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) dashboard
             docker compose up -d --no-deps dashboard
+            # Cada build deja la imagen anterior sin etiqueta y su caché; sin esto
+            # se acumulan (llegaron a ser 27 GB de caché). Solo borra lo que ya
+            # no usa ningún contenedor; falla en silencio para no tumbar el deploy.
+            docker image prune -f >/dev/null || true
+            docker builder prune -f --filter until=72h >/dev/null || true
 
   deploy-bot:
     runs-on: ubuntu-latest
@@ -454,6 +464,11 @@ jobs:
             cd /root/game-panel
             docker compose build --build-arg CACHE_BUST=$(git rev-parse HEAD) bot
             docker compose up -d --no-deps bot
+            # Cada build deja la imagen anterior sin etiqueta y su caché; sin esto
+            # se acumulan (llegaron a ser 27 GB de caché). Solo borra lo que ya
+            # no usa ningún contenedor; falla en silencio para no tumbar el deploy.
+            docker image prune -f >/dev/null || true
+            docker builder prune -f --filter until=72h >/dev/null || true
 
   deploy-nginx:
     runs-on: ubuntu-latest

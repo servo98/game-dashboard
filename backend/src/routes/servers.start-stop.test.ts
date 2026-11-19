@@ -206,6 +206,7 @@ describe("POST /:id/start", () => {
       { EULA: "TRUE" },
       { "/data/minecraft": "/data" },
       expect.any(Number),
+      { keepImageRefs: [] },
     );
     expect(mockSessionStart.mock.calls.length).toBe(1);
     expect(mockWatchContainer).toHaveBeenCalled();
@@ -347,6 +348,7 @@ describe("A — Java Image Tag Selection", () => {
       expect.any(Object),
       expect.any(Object),
       expect.any(Number),
+      expect.any(Object),
     );
 
   it("A1: respects explicit :java21 tag", async () => {

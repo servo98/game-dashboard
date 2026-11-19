@@ -96,6 +96,7 @@ const ADMIN_TOOLS = [
   "update_server_env",
   "update_server_image",
   "create_server",
+  "set_backup_exclude",
 ];
 
 describe("MCP admin tools — gating", () => {

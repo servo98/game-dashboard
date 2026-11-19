@@ -143,10 +143,14 @@ describe("ServerCard", () => {
     const deleteBtn = screen.getByTitle("Borrar servidor");
     fireEvent.click(deleteBtn);
     // First click shows confirm button
-    expect(screen.getByTitle("Confirmar borrado del servidor y sus ficheros")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("Confirmar: se borran el servidor, sus ficheros y sus copias"),
+    ).toBeInTheDocument();
     expect(defaultProps.onDelete).not.toHaveBeenCalled();
     // Second click confirms deletion
-    fireEvent.click(screen.getByTitle("Confirmar borrado del servidor y sus ficheros"));
+    fireEvent.click(
+      screen.getByTitle("Confirmar: se borran el servidor, sus ficheros y sus copias"),
+    );
     expect(defaultProps.onDelete).toHaveBeenCalledWith("minecraft", true);
   });
 
